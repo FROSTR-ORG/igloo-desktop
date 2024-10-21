@@ -4,7 +4,8 @@
     "module": "CommonJS",
     "strict": true,
     "esModuleInterop": true,
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "jsx": "react"
   },
   "include": ["src/**/*"]
 }
