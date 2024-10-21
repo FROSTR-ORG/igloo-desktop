@@ -1,0 +1,15 @@
+{
+  "name": "igloo",
+  "version": "1.0.0",
+  "description": "Minimal Electron TypeScript boilerplate",
+  "main": "dist/main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "tsc",
+    "watch": "tsc -w"
+  },
+  "devDependencies": {
+    "electron": "^13.0.0",
+    "typescript": "^4.3.2"
+  }
+}
