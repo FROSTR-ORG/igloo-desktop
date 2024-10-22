@@ -3,7 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2, Play, RotateCcw, Square, Trash2, Upload } from "lucide-react"
+import { CheckCircle2, Play, RotateCcw, Square, Trash2, Upload, Snowflake } from "lucide-react"
 
 const App: React.FC = () => {
   const [isSignerRunning, setIsSignerRunning] = useState(false)
@@ -22,14 +22,11 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-center mb-12">
-          <svg className="w-10 h-10 mr-3" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M12 3L4 9V21H20V9L12 3Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            <path d="M9 21V12H15V21" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <Snowflake className="w-10 h-10 mr-3" />
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
         </div>
         <p className="mb-12 text-blue-400 text-center max-w-xl mx-auto text-sm">
-          Simple Electron client for generating, verifying, updating, and acting as a remote signer for your Frostr keyset.
+          Frostr keyset generator, rotator, and remote signer.
         </p>
 
         <Tabs defaultValue="generate" className="w-full">
@@ -52,7 +49,11 @@ const App: React.FC = () => {
                     Rotate Keyset
                   </Button>
                   <div className="relative">
-                    <Input id="rotate-file" type="file" className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm" />
+                    <Input
+                      id="rotate-file"
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
                     <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
                   </div>
                 </div>
@@ -71,7 +72,11 @@ const App: React.FC = () => {
                     {isSignerRunning ? "Stop Remote Signer" : "Start Remote Signer"}
                   </Button>
                   <div className="relative mt-4">
-                    <Input id="signer-file" type="file" className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm" />
+                  <Input
+                      id="rotate-file"
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
                     <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
                   </div>
                 </div>
@@ -88,22 +93,22 @@ const App: React.FC = () => {
               {isSignerRunning && (
                 <CardFooter className="flex justify-between pt-6">
                   <Button variant="outline" size="icon" onClick={toggleSigner} className="bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50">
-                    <Square className="h-4 w-4" />
+                    <Square className="h-4 w-4 text-blue-300" />
                   </Button>
                   <Button variant="outline" size="icon" onClick={() => setIsSignerRunning(true)} className="bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50">
-                    <Play className="h-4 w-4" />
+                    <Play className="h-4 w-4 text-blue-300" />
                   </Button>
                   <Button variant="outline" size="icon" onClick={() => {
                     setIsSignerRunning(false)
                     setTimeout(() => setIsSignerRunning(true), 1000)
                   }} className="bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50">
-                    <RotateCcw className="h-4 w-4" />
+                    <RotateCcw className="h-4 w-4 text-blue-300" />
                   </Button>
                   <Button variant="outline" size="icon" onClick={() => {
                     setIsSignerRunning(false)
                     setSignerEndpoint("")
                   }} className="bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50">
-                    <Trash2 className="h-4 w-4" />
+                    <Trash2 className="h-4 w-4 text-blue-300" />
                   </Button>
                 </CardFooter>
               )}

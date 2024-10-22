@@ -55,6 +55,8 @@ module.exports = {
       },
       fontFamily: {
         sans: ["var(--font-sans)", ...fontFamily.sans],
+        dotgothic: ["DotGothic16", "sans-serif"],
+        sharetech: ["Share Tech Mono", "monospace"],
       },
       keyframes: {
         "accordion-down": {
