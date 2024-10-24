@@ -1,5 +1,6 @@
-import { app, BrowserWindow } from 'electron';
+import { app, BrowserWindow, ipcMain } from 'electron';
 import * as path from 'path';
+import { startServer } from './server';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -14,7 +15,14 @@ function createWindow() {
   win.loadFile('index.html');
 }
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+
+  ipcMain.handle('start-server', async () => {
+    const serverAddress = await startServer();
+    return serverAddress;
+  });
+});
 
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {

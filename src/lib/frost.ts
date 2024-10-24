@@ -1,14 +1,21 @@
 import {writeKeysetFiles, readKeysetFile} from "./fileio"
 
-export const generateKeyset = async () => {
-    // Generate psuedorandom num
+export const generateKeyset = async (): Promise<{ success: boolean; location: string | null }> => {
+    // Generate pseudorandom num
     // call frost library with secret to generate
-    let newKeyset = {};
+    let newKeyset = {
+        "share1": "",
+        "share2": "",
+        "share3": "",
+        "full": ""
+    };
     // call fileio to write files
-    const written = await writeKeysetFiles(newKeyset, "/")
+    const written = await writeKeysetFiles(newKeyset, "/Users/plebdev/Desktop")
     if (written.success === true) {
-        return written.location
-    } else return false
+        return { success: true, location: written.location };
+    } else {
+        return { success: false, location: null };
+    }
 }
 
 export const rotateKeyset = async (filepath: string) => {
