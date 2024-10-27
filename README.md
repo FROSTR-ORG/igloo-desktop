@@ -1,4 +1,5 @@
-# Igloo
+# Igloo 
+## still under contstructon 🚧
 Simple Electron client for generating, rotating, and acting as a remote signer for your Frostr keyset.
 
 <img width="1012" alt="Screenshot 2024-10-23 at 1 56 42 PM" src="https://github.com/user-attachments/assets/55a98d7b-7cc2-421b-933a-ecfb26485068">
