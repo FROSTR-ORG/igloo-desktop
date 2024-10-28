@@ -9,7 +9,14 @@ module.exports = {
     rules: [
       {
         test: /\.tsx?$/,
-        use: 'ts-loader',
+        use: [
+          {
+            loader: 'ts-loader',
+            options: {
+              transpileOnly: true
+            }
+          }
+        ],
         exclude: /node_modules/,
       },
       {
@@ -20,7 +27,7 @@ module.exports = {
   },
   resolve: {
     plugins: [new TsconfigPathsPlugin()],
-    extensions: ['.ts', '.tsx', '.js', '.jsx']
+    extensions: ['.tsx', '.ts', '.js', '.jsx']
   },
   output: {
     filename: 'renderer.js',
