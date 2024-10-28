@@ -14,6 +14,7 @@ const App: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [serverAddress, setServerAddress] = useState<string | null>(null);
   const [isServerStarting, setIsServerStarting] = useState(false);
+  const [nsecKey, setNsecKey] = useState("");
 
   useEffect(() => {
     if (keysetGenerated.success) {
@@ -39,6 +40,11 @@ const App: React.FC = () => {
     setIsGenerating(true);
     const result = await generateKeyset();
     setKeysetGenerated(result);
+  };
+
+  const handleNsecImport = (e: React.FormEvent) => {
+    e.preventDefault();
+    console.log("Importing nsec:", nsecKey);
   };
 
   const handleStartRemoteSigner = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -69,24 +75,58 @@ const App: React.FC = () => {
         </p>
 
         <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-gray-900/50">
-            <TabsTrigger value="generate" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Generate/Rotate Keyset</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 mb-8 bg-gray-900/50">
+            <TabsTrigger value="generate" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Generate Keyset</TabsTrigger>
+            <TabsTrigger value="rotate" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Rotate Keyset</TabsTrigger>
             <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Remote Signer</TabsTrigger>
           </TabsList>
           <TabsContent value="generate">
             <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl text-blue-200">Keyset Management</CardTitle>
-                <CardDescription className="text-blue-400 text-sm">Generate or rotate your Frostr keyset</CardDescription>
+                <CardDescription className="text-blue-400 text-sm">Generate your Frostr keyset</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <Button 
-                  onClick={handleGenerateKeyset} 
-                  className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                  disabled={isGenerating}
-                >
-                  {isGenerating ? "Generating..." : "Generate Keyset"}
-                </Button>
+                <div>
+                  <h3 className="text-blue-200 text-sm font-medium mb-2">Generate new nostr keyset</h3>
+                  <Button 
+                    onClick={handleGenerateKeyset} 
+                    className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                    disabled={isGenerating}
+                  >
+                    {isGenerating ? "Generating..." : "Generate Keyset"}
+                  </Button>
+                </div>
+
+                <div>
+                  <h3 className="text-blue-200 text-sm font-medium mb-2">Import existing nsec</h3>
+                  <form onSubmit={handleNsecImport} className="space-y-2">
+                    <Input
+                      type="text"
+                      placeholder="Enter your nsec..."
+                      value={nsecKey}
+                      onChange={(e) => setNsecKey(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                    />
+                    <Button 
+                      type="submit"
+                      className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium"
+                    >
+                      Import Key
+                    </Button>
+                  </form>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="rotate">
+            <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-xl text-blue-200">Rotate Keyset</CardTitle>
+                <CardDescription className="text-blue-400 text-sm">Rotate your existing Frostr keyset</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
                 <div>
                   <Button className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium mb-4">
                     Rotate Keyset
@@ -102,22 +142,8 @@ const App: React.FC = () => {
                 </div>
               </CardContent>
             </Card>
-            {keysetGenerated.success && (
-              <Card className="mt-6 bg-green-900/30 border-green-700/30 backdrop-blur-sm shadow-lg">
-                <CardHeader>
-                  <CardTitle className="text-xl text-green-200">Keyset Generated Successfully</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-green-300 text-sm">
-                    Your keyset has been generated and saved to:
-                  </p>
-                  <p className="text-green-200 font-mono text-sm mt-2 break-all">
-                    {keysetGenerated.location}
-                  </p>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
+
           <TabsContent value="signer">
             <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
               <CardHeader>
