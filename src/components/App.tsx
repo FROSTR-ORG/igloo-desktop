@@ -6,16 +6,22 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { CheckCircle2, Play, RotateCcw, Square, Trash2, Upload, Snowflake } from "lucide-react"
 import { generateKeyset } from "@/lib/frost"
 import { ipcRenderer } from 'electron';
+import { SimplePool } from 'nostr-tools'
 
 const App: React.FC = () => {
-  const [isSignerRunning, setIsSignerRunning] = useState(false)
-  const [signerEndpoint, setSignerEndpoint] = useState("")
+  const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | null }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [isServerStarting, setIsServerStarting] = useState(false);
   const [nsecKey, setNsecKey] = useState("");
   const [relays, setRelays] = useState<string[]>([]);
   const [newRelay, setNewRelay] = useState("");
+
+  // todo: make this dynamic based off share pubkeys
+  const WATCHED_PUBKEYS = [
+    'f33c8a9617cb15f705fc70cd461cfd6eaf22f9e24c33eabad981648e5ec6f741',
+    '676c02247668d5b18479be3d1a80933044256f3fbd03640a8c234684e641b6d6'
+  ];
 
   useEffect(() => {
     if (keysetGenerated.success) {
@@ -27,15 +33,6 @@ const App: React.FC = () => {
       return () => clearTimeout(timer);
     }
   }, [keysetGenerated.success]);
-
-  const toggleSigner = () => {
-    setIsSignerRunning(!isSignerRunning)
-    if (!isSignerRunning) {
-      setSignerEndpoint("192.168.1.100:8080/sign")
-    } else {
-      setSignerEndpoint("")
-    }
-  }
 
   const handleGenerateKeyset = async () => {
     setIsGenerating(true);
@@ -60,12 +57,33 @@ const App: React.FC = () => {
     setRelays(relays.filter(relay => relay !== relayToRemove));
   };
 
+  const startRelayPoolSubscription = (relayUrls: string[]) => {
+    const pool = new SimplePool();
+    
+    pool.subscribeMany(
+      relayUrls,
+      [{
+        kinds: [69420],
+        authors: WATCHED_PUBKEYS
+      }],
+      {
+        onevent(event) {
+          console.log('Received kind 69420 event:', event);
+        },
+        oneose() {
+          console.log('Relay pool subscription completed');
+        }
+      }
+    );
+  };
+
   const handleStartRemoteSigner = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files.length > 0 && relays.length >= 2) {
       setIsServerStarting(true);
       try {
         await ipcRenderer.invoke('start-server', { relays });
         setIsSignerRunning(true);
+        startRelayPoolSubscription(relays);
       } catch (error) {
         console.error('Failed to start server:', error);
       } finally {
