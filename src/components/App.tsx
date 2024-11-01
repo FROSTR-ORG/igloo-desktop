@@ -16,6 +16,8 @@ const App: React.FC = () => {
   const [nsecKey, setNsecKey] = useState("");
   const [relays, setRelays] = useState<string[]>([]);
   const [newRelay, setNewRelay] = useState("");
+  const [totalKeys, setTotalKeys] = useState<number>(3);
+  const [threshold, setThreshold] = useState<number>(2);
 
   // todo: make this dynamic based off share pubkeys
   const WATCHED_PUBKEYS = [
@@ -104,9 +106,10 @@ const App: React.FC = () => {
         </p>
 
         <Tabs defaultValue="generate" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 mb-8 bg-gray-900/50">
+          <TabsList className="grid w-full grid-cols-4 mb-8 bg-gray-900/50">
             <TabsTrigger value="generate" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Generate Keyset</TabsTrigger>
-            <TabsTrigger value="rotate" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Rotate Keyset</TabsTrigger>
+            <TabsTrigger value="edit" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Edit Keyset</TabsTrigger>
+            <TabsTrigger value="share" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Edit Share</TabsTrigger>
             <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Remote Signer</TabsTrigger>
           </TabsList>
           <TabsContent value="generate">
@@ -118,6 +121,35 @@ const App: React.FC = () => {
               <CardContent className="space-y-6">
                 <div>
                   <h3 className="text-blue-200 text-sm font-medium mb-2">Generate new nostr keyset</h3>
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div className="space-y-2">
+                      <label htmlFor="gen-total-keys" className="text-blue-200 text-sm font-medium">
+                        Total Keys
+                      </label>
+                      <Input
+                        id="gen-total-keys"
+                        type="number"
+                        min={2}
+                        value={totalKeys}
+                        onChange={(e) => setTotalKeys(Number(e.target.value))}
+                        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="gen-threshold" className="text-blue-200 text-sm font-medium">
+                        Threshold
+                      </label>
+                      <Input
+                        id="gen-threshold"
+                        type="number"
+                        min={2}
+                        max={totalKeys}
+                        value={threshold}
+                        onChange={(e) => setThreshold(Number(e.target.value))}
+                        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
                   <Button 
                     onClick={handleGenerateKeyset} 
                     className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -129,7 +161,36 @@ const App: React.FC = () => {
 
                 <div>
                   <h3 className="text-blue-200 text-sm font-medium mb-2">Import existing nsec</h3>
-                  <form onSubmit={handleNsecImport} className="space-y-2">
+                  <form onSubmit={handleNsecImport} className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label htmlFor="import-total-keys" className="text-blue-200 text-sm font-medium">
+                          Total Keys
+                        </label>
+                        <Input
+                          id="import-total-keys"
+                          type="number"
+                          min={2}
+                          value={totalKeys}
+                          onChange={(e) => setTotalKeys(Number(e.target.value))}
+                          className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label htmlFor="import-threshold" className="text-blue-200 text-sm font-medium">
+                          Threshold
+                        </label>
+                        <Input
+                          id="import-threshold"
+                          type="number"
+                          min={2}
+                          max={totalKeys}
+                          value={threshold}
+                          onChange={(e) => setThreshold(Number(e.target.value))}
+                          className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                        />
+                      </div>
+                    </div>
                     <Input
                       type="text"
                       placeholder="Enter your nsec..."
@@ -149,17 +210,61 @@ const App: React.FC = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="rotate">
+          <TabsContent value="edit">
             <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
               <CardHeader>
-                <CardTitle className="text-xl text-blue-200">Rotate Keyset</CardTitle>
-                <CardDescription className="text-blue-400 text-sm">Rotate your existing Frostr keyset</CardDescription>
+                <CardTitle className="text-xl text-blue-200">Edit Keyset</CardTitle>
+                <CardDescription className="text-blue-400 text-sm">Modify your existing Frostr keyset configuration</CardDescription>
               </CardHeader>
-              <CardContent className="space-y-6">
-                <div>
-                  <Button className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium mb-4">
-                    Rotate Keyset
+              <CardContent className="space-y-8">
+                <div className="space-y-4">
+                  <h3 className="text-blue-200 text-sm font-medium">Edit Keyset Configuration</h3>
+                  <div className="relative">
+                    <Input
+                      id="edit-file"
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
+                    <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
+                        Total Keys
+                      </label>
+                      <Input
+                        id="total-keys"
+                        type="number"
+                        min={2}
+                        value={totalKeys}
+                        onChange={(e) => setTotalKeys(Number(e.target.value))}
+                        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
+                        Threshold
+                      </label>
+                      <Input
+                        id="threshold"
+                        type="number"
+                        min={2}
+                        max={totalKeys}
+                        value={threshold}
+                        onChange={(e) => setThreshold(Number(e.target.value))}
+                        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <Button className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium">
+                    Update Keyset
                   </Button>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-blue-200 text-sm font-medium">Rotate Keyset</h3>
                   <div className="relative">
                     <Input
                       id="rotate-file"
@@ -168,6 +273,61 @@ const App: React.FC = () => {
                     />
                     <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
                   </div>
+                  <Button className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium">
+                    Rotate Keyset
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="share">
+            <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
+              <CardHeader>
+                <CardTitle className="text-xl text-blue-200">Share Management</CardTitle>
+                <CardDescription className="text-blue-400 text-sm">Add, remove, or recover shares from your keyset</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-8">
+                <div className="space-y-2">
+                  <h3 className="text-blue-200 text-sm font-medium">Add Share</h3>
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
+                    <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
+                  </div>
+                  <Button className="w-full bg-green-600 hover:bg-green-700">
+                    Add Share
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-blue-200 text-sm font-medium">Remove Share</h3>
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
+                    <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
+                  </div>
+                  <Button className="w-full bg-red-600 hover:bg-red-700">
+                    Remove Share
+                  </Button>
+                </div>
+
+                <div className="space-y-2">
+                  <h3 className="text-blue-200 text-sm font-medium">Recover Share</h3>
+                  <div className="relative">
+                    <Input
+                      type="file"
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
+                    />
+                    <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
+                  </div>
+                  <Button className="w-full bg-yellow-600 hover:bg-yellow-700">
+                    Recover Share
+                  </Button>
                 </div>
               </CardContent>
             </Card>
