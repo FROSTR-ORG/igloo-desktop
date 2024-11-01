@@ -12,9 +12,10 @@ const App: React.FC = () => {
   const [signerEndpoint, setSignerEndpoint] = useState("")
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | null }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
-  const [serverAddress, setServerAddress] = useState<string | null>(null);
   const [isServerStarting, setIsServerStarting] = useState(false);
   const [nsecKey, setNsecKey] = useState("");
+  const [relays, setRelays] = useState<string[]>([]);
+  const [newRelay, setNewRelay] = useState("");
 
   useEffect(() => {
     if (keysetGenerated.success) {
@@ -47,14 +48,24 @@ const App: React.FC = () => {
     console.log("Importing nsec:", nsecKey);
   };
 
+  const handleAddRelay = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (newRelay && !relays.includes(newRelay)) {
+      setRelays([...relays, newRelay]);
+      setNewRelay("");
+    }
+  };
+
+  const handleRemoveRelay = (relayToRemove: string) => {
+    setRelays(relays.filter(relay => relay !== relayToRemove));
+  };
+
   const handleStartRemoteSigner = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files.length > 0) {
+    if (event.target.files && event.target.files.length > 0 && relays.length >= 2) {
       setIsServerStarting(true);
       try {
-        const address = await ipcRenderer.invoke('start-server');
-        setServerAddress(address);
+        await ipcRenderer.invoke('start-server', { relays });
         setIsSignerRunning(true);
-        setSignerEndpoint(address);
       } catch (error) {
         console.error('Failed to start server:', error);
       } finally {
@@ -148,33 +159,84 @@ const App: React.FC = () => {
             <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl text-blue-200">Remote Signer</CardTitle>
-                <CardDescription className="text-blue-400 text-sm">Manage your remote signer endpoint</CardDescription>
+                <CardDescription className="text-blue-400 text-sm">Setup / Manage your remote signer</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
-                <div>
-                  <div className="relative mt-4">
+                <div className="space-y-4">
+                  <div>
+                    <h3 className="text-blue-200 text-sm font-medium mb-2">Add Nostr Relays (minimum 2)</h3>
+                    <form onSubmit={handleAddRelay} className="flex gap-2">
+                      <Input
+                        type="text"
+                        placeholder="wss://relay.example.com"
+                        value={newRelay}
+                        onChange={(e) => setNewRelay(e.target.value)}
+                        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm flex-1"
+                      />
+                      <Button 
+                        type="submit"
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        Add
+                      </Button>
+                    </form>
+                  </div>
+
+                  {relays.length > 0 && (
+                    <div className="space-y-2">
+                      {relays.map((relay) => (
+                        <div key={relay} className="flex items-center justify-between bg-gray-800/30 p-2 rounded-md">
+                          <span className="text-blue-300 text-sm font-mono">{relay}</span>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleRemoveRelay(relay)}
+                            className="text-red-400 hover:text-red-300 hover:bg-red-900/20"
+                          >
+                            <Trash2 size={16} />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <div className="relative">
                     <Input
                       id="signer-file"
                       type="file"
                       className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 pl-10 text-sm file:text-blue-300"
                       onChange={handleStartRemoteSigner}
-                      disabled={isServerStarting || isSignerRunning}
+                      disabled={isServerStarting || isSignerRunning || relays.length < 2}
                     />
                     <Upload className="absolute left-3 top-1/2 transform -translate-y-1/2 text-blue-400" size={16} />
                   </div>
                 </div>
+
+                {relays.length < 2 && (
+                  <div className="bg-yellow-900/20 p-3 rounded-md flex items-center justify-center border border-yellow-700/30">
+                    <span className="text-yellow-300 text-sm">Please add at least 2 relays to continue</span>
+                  </div>
+                )}
+
                 {isServerStarting && (
                   <div className="bg-blue-900/20 p-3 rounded-md flex items-center justify-center border border-blue-700/30">
                     <span className="text-blue-300 text-sm">Starting server...</span>
                   </div>
                 )}
-                {isSignerRunning && serverAddress && (
-                  <div className="bg-green-900/20 p-3 rounded-md flex items-center justify-between border border-green-700/30">
+                {isSignerRunning && (
+                  <div className="bg-green-900/20 p-3 rounded-md flex flex-col space-y-2 border border-green-700/30">
                     <div className="flex items-center space-x-2">
                       <CheckCircle2 className="text-green-400" size={16} />
                       <span className="text-green-300 text-sm">Remote Signer Running</span>
                     </div>
-                    <span className="text-green-400 font-mono text-sm">{serverAddress}</span>
+                    <div className="space-y-1">
+                      <span className="text-green-300 text-sm">Listening on relays:</span>
+                      {relays.map((relay) => (
+                        <div key={relay} className="text-green-400 font-mono text-sm pl-4">
+                          {relay}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
               </CardContent>
@@ -182,7 +244,6 @@ const App: React.FC = () => {
                 <CardFooter className="flex justify-between pt-6">
                   <Button variant="outline" size="icon" onClick={() => {
                     setIsSignerRunning(false);
-                    setServerAddress(null);
                   }} className="bg-gray-800/30 border-gray-700/50 hover:bg-gray-700/50">
                     <Square className="h-4 w-4 text-blue-300" />
                   </Button>
