@@ -1,23 +1,59 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, Square, Snowflake } from "lucide-react"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
+import { BifrostSigner } from '@/signer'
+import { NostrRelay } from "@/relay"
 
 const App: React.FC = () => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | null }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [signerSecret, setSignerSecret] = useState("");
+  const [relayUrl, setRelayUrl] = useState("ws://localhost:8002");
   const [totalKeys, setTotalKeys] = useState<number>(3);
   const [threshold, setThreshold] = useState<number>(2);
+  const [groupCredential, setGroupCredential] = useState("");
 
   const [importSecret, setImportSecret] = useState("");
   const [importTotalKeys, setImportTotalKeys] = useState<number>(3);
   const [importThreshold, setImportThreshold] = useState<number>(2);
   const [isImporting, setIsImporting] = useState(false);
+
+  const [signer, setSigner] = useState<BifrostSigner | null>(null);
+  const [relay, setRelay] = useState<NostrRelay | null>(null);
+  const [relayReady, setRelayReady] = useState(false);
+
+  useEffect(() => {
+    const newRelay = new NostrRelay(8002);
+    
+    const handleConnect = () => {
+      setRelayReady(true);
+      console.log("Relay connected successfully");
+    };
+
+    const handleDisconnect = () => {
+      setRelayReady(false);
+      console.log("Relay disconnected");
+    };
+
+    newRelay.onConnected(handleConnect);
+    newRelay.onDisconnected(handleDisconnect);
+
+    newRelay.start().then(() => {
+      setRelay(newRelay);
+    }).catch(err => {
+      console.error("Failed to start relay:", err);
+      setRelayReady(false);
+    });
+
+    return () => {
+      newRelay.close();
+    };
+  }, []);
 
   const handleGenerateKeyset = async () => {
     setIsGenerating(true);
@@ -28,6 +64,7 @@ const App: React.FC = () => {
         success: true, 
         location: `Generated ${totalKeys} keys with threshold ${threshold}. Group: ${keyset.groupCredential}`
       });
+      console.log("Generated keyset:", keyset);
     } catch (error: any) {
       setKeysetGenerated({ 
         success: false, 
@@ -59,10 +96,65 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartSigner = () => {
-    if (signerSecret.trim()) {
+  const handleStartSigner = async () => {
+    if (!signerSecret.trim() || !groupCredential.trim()) {
+      return;
+    }
+    
+    if (!relayReady) {
+      console.error('Relay server is not connected');
+      return;
+    }
+
+    try {
+      const newSigner = new BifrostSigner({
+        groupCredential: groupCredential,
+        shareCredential: signerSecret,
+        relayUrl: relayUrl
+      });
+
+      // Set up event handlers
+      newSigner.onReady(() => {
+        console.log('Signer ready');
+      });
+
+      newSigner.onMessage((msg) => {
+        console.log('Received message:', msg);
+      });
+
+      newSigner.onError((error) => {
+        console.error('Signer error:', error);
+        setIsSignerRunning(false);
+      });
+
+      // Start the signer
+      await newSigner.start();
+      setSigner(newSigner);
       setIsSignerRunning(true);
-      // TODO: Implement actual signer start logic
+      
+    } catch (error) {
+      console.error('Failed to start signer:', error);
+      setIsSignerRunning(false);
+    }
+  };
+
+  const handleStopSigner = async () => {
+    if (signer) {
+      try {
+        await signer.stop();
+        setSigner(null);
+        setIsSignerRunning(false);
+      } catch (error) {
+        console.error('Failed to stop signer:', error);
+      }
+    }
+  };
+
+  const handleSignerButtonClick = () => {
+    if (isSignerRunning) {
+      handleStopSigner();
+    } else {
+      handleStartSigner();
     }
   };
 
@@ -202,10 +294,28 @@ const App: React.FC = () => {
               <CardContent className="space-y-6">
                 <div className="space-y-4">
                   <Input
+                    type="text"
+                    placeholder="Enter group credential"
+                    value={groupCredential}
+                    onChange={(e) => setGroupCredential(e.target.value)}
+                    className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                    disabled={isSignerRunning}
+                  />
+                  
+                  <Input
                     type="password"
                     placeholder="Enter frostr share"
                     value={signerSecret}
                     onChange={(e) => setSignerSecret(e.target.value)}
+                    className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                    disabled={isSignerRunning}
+                  />
+                  
+                  <Input
+                    type="text"
+                    placeholder="Relay URL"
+                    value={relayUrl}
+                    onChange={(e) => setRelayUrl(e.target.value)}
                     className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
                     disabled={isSignerRunning}
                   />
@@ -219,7 +329,7 @@ const App: React.FC = () => {
                     </div>
                     
                     <Button
-                      onClick={() => isSignerRunning ? setIsSignerRunning(false) : handleStartSigner()}
+                      onClick={handleSignerButtonClick}
                       className={`${isSignerRunning ? 'bg-red-600 hover:bg-red-700' : 'bg-green-600 hover:bg-green-700'}`}
                     >
                       {isSignerRunning ? 'Stop Signer' : 'Start Signer'}
