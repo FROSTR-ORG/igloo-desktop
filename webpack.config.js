@@ -27,7 +27,10 @@ module.exports = {
   },
   resolve: {
     plugins: [new TsconfigPathsPlugin()],
-    extensions: ['.tsx', '.ts', '.js', '.jsx']
+    extensions: ['.tsx', '.ts', '.js', '.jsx'],
+    alias: {
+      'react/jsx-runtime': require.resolve('react/jsx-runtime.js')
+    }
   },
   output: {
     filename: 'renderer.js',
