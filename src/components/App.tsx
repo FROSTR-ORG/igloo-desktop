@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { CheckCircle2, Square, Snowflake } from "lucide-react"
-import { generateKeyset } from "@/lib/frost"
+import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
 
 const App: React.FC = () => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
@@ -21,9 +21,21 @@ const App: React.FC = () => {
 
   const handleGenerateKeyset = async () => {
     setIsGenerating(true);
-    const result = await generateKeyset();
-    setKeysetGenerated(result);
-    setIsGenerating(false);
+    try {
+      const keyset = generateRandomKeyset(threshold, totalKeys);
+      // Store or display the keyset information
+      setKeysetGenerated({ 
+        success: true, 
+        location: `Generated ${totalKeys} keys with threshold ${threshold}. Group: ${keyset.groupCredential}`
+      });
+    } catch (error: any) {
+      setKeysetGenerated({ 
+        success: false, 
+        location: `Error generating keyset: ${error.message}` 
+      });
+    } finally {
+      setIsGenerating(false);
+    }
   };
 
   const handleImportKeyset = async () => {
@@ -31,11 +43,17 @@ const App: React.FC = () => {
     
     setIsImporting(true);
     try {
-      // TODO: Implement actual import logic
-      // const result = await importKeyset(importSecret, importTotalKeys, importThreshold);
-      // Handle success
-    } catch (error) {
-      // Handle error
+      const keyset = generateKeysetWithSecret(importThreshold, importTotalKeys, importSecret);
+      // Store or display the keyset information
+      setKeysetGenerated({ 
+        success: true, 
+        location: `Imported keyset with ${importTotalKeys} keys and threshold ${importThreshold}. Group: ${keyset.groupCredential}`
+      });
+    } catch (error: any) {
+      setKeysetGenerated({ 
+        success: false, 
+        location: `Error importing keyset: ${error.message}` 
+      });
     } finally {
       setIsImporting(false);
     }
@@ -163,6 +181,14 @@ const App: React.FC = () => {
                     </Button>
                   </div>
                 </div>
+
+                {keysetGenerated.location && (
+                  <div className={`mt-4 p-3 rounded-lg text-sm ${
+                    keysetGenerated.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
+                  }`}>
+                    {keysetGenerated.location}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
