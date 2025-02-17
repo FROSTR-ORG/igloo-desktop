@@ -1,15 +1,14 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
-import { get_node } from "@/lib/bifrost-node"
+import { generateRandomKeyset, generateKeysetWithSecret, get_node } from "@/lib/bifrost"
 import FrostrLogo from "@/assets/frostr-logo-transparent.png"
 
 const App: React.FC = () => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
-  const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | null }>({ success: false, location: null });
+  const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | React.ReactNode }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [signerSecret, setSignerSecret] = useState("");
   const [relayUrls, setRelayUrls] = useState<string[]>([]);
@@ -23,14 +22,38 @@ const App: React.FC = () => {
   const [importThreshold, setImportThreshold] = useState<number>(2);
   const [isImporting, setIsImporting] = useState(false);
 
+  const nodeRef = useRef<any>(null);
+
+  const formatKeysetDisplay = (keyset: any) => {
+    return (
+      <div className="space-y-3">
+        <div>
+          <div className="text-sm font-medium mb-1">Group Credential:</div>
+          <div className="bg-gray-800/50 p-2 rounded text-xs break-all">
+            {keyset.groupCredential}
+          </div>
+        </div>
+        <div>
+          <div className="text-sm font-medium mb-1">Share Credentials:</div>
+          <div className="space-y-2">
+            {keyset.shareCredentials.map((share: string, index: number) => (
+              <div key={index} className="bg-gray-800/50 p-2 rounded text-xs break-all">
+                {share}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   const handleGenerateKeyset = async () => {
     setIsGenerating(true);
     try {
       const keyset = generateRandomKeyset(threshold, totalKeys);
-      // Store or display the keyset information
       setKeysetGenerated({ 
         success: true, 
-        location: `Generated ${totalKeys} keys with threshold ${threshold}. Group: ${keyset.groupCredential}`
+        location: formatKeysetDisplay(keyset)
       });
       console.log("Generated keyset:", keyset);
     } catch (error: any) {
@@ -49,10 +72,9 @@ const App: React.FC = () => {
     setIsImporting(true);
     try {
       const keyset = generateKeysetWithSecret(importThreshold, importTotalKeys, importSecret);
-      // Store or display the keyset information
       setKeysetGenerated({ 
         success: true, 
-        location: `Imported keyset with ${importTotalKeys} keys and threshold ${importThreshold}. Group: ${keyset.groupCredential}`
+        location: formatKeysetDisplay(keyset)
       });
       console.log("Imported keyset:", keyset);
     } catch (error: any) {
@@ -88,15 +110,28 @@ const App: React.FC = () => {
         relays: relayUrls 
       });
 
+      nodeRef.current = node;
+
       node.client.on('ready', () => {
-        console.log('node connected')
-      })
+        console.log('node connected');
+        setIsSignerRunning(true);
+      });
       
       node.client.on('message', (msg) => {
-        console.log('received message event:', msg)
-      })
+        console.log('received message event:', msg);
+      });
 
-      await node.connect()
+      node.client.on('error', (error) => {
+        console.error('node error:', error);
+        setIsSignerRunning(false);
+      });
+
+      node.client.on('disconnect', () => {
+        console.log('node disconnected');
+        setIsSignerRunning(false);
+      });
+
+      await node.connect();
     } catch (error) {
       console.error('Failed to start signer:', error);
       setIsSignerRunning(false);
@@ -104,7 +139,15 @@ const App: React.FC = () => {
   };
 
   const handleStopSigner = async () => {
-    return;
+    try {
+      if (nodeRef.current) {
+        await nodeRef.current.disconnect();
+        nodeRef.current = null;
+      }
+      setIsSignerRunning(false);
+    } catch (error) {
+      console.error('Failed to stop signer:', error);
+    }
   };
 
   const handleSignerButtonClick = () => {
@@ -115,6 +158,14 @@ const App: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    return () => {
+      if (nodeRef.current) {
+        nodeRef.current.disconnect();
+      }
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl">
@@ -123,7 +174,7 @@ const App: React.FC = () => {
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
         </div>
         <p className="mb-12 text-blue-400 text-center max-w-xl mx-auto text-sm">
-          Frostr keyset generator and remote signer.
+          Frostr keyset manager and remote signer.
         </p>
 
         <Tabs defaultValue="keys" className="w-full">
@@ -136,14 +187,13 @@ const App: React.FC = () => {
             <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
               <CardHeader>
                 <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
-                <CardDescription className="text-blue-400 text-sm">Generate or import Frostr keysets</CardDescription>
               </CardHeader>
               <CardContent className="space-y-8">
                 <div className="p-4 rounded-lg border border-blue-900/30">
-                  <h3 className="text-blue-200 text-sm font-medium mb-4">Generate New Keyset</h3>
+                  <h3 className="text-blue-200 text-sm font-medium mb-4">Generate new nsec and create keyset</h3>
                   <div className="grid grid-cols-2 gap-4 mb-4">
                     <div className="space-y-2">
-                      <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
+                      <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium" role="label">
                         Total Keys
                       </label>
                       <Input
@@ -175,12 +225,12 @@ const App: React.FC = () => {
                     className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={isGenerating}
                   >
-                    {isGenerating ? "Generating..." : "Generate Keyset"}
+                    {isGenerating ? "Generating..." : "Generate keyset"}
                   </Button>
                 </div>
 
                 <div className="p-4 rounded-lg border border-purple-900/30">
-                  <h3 className="text-purple-200 text-sm font-medium mb-4">Import Existing Keyset</h3>
+                  <h3 className="text-purple-200 text-sm font-medium mb-4">Import existing nsec and create keyset</h3>
                   <div className="space-y-4">
                     <Input
                       type="password"
@@ -226,13 +276,13 @@ const App: React.FC = () => {
                       className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
                       disabled={isImporting || !importSecret.trim()}
                     >
-                      {isImporting ? "Importing..." : "Import Keyset"}
+                      {isImporting ? "Importing..." : "Import nsec"}
                     </Button>
                   </div>
                 </div>
 
                 {keysetGenerated.location && (
-                  <div className={`mt-4 p-3 rounded-lg text-sm ${
+                  <div className={`mt-4 p-3 rounded-lg ${
                     keysetGenerated.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
                   }`}>
                     {keysetGenerated.location}
@@ -252,7 +302,7 @@ const App: React.FC = () => {
                 <div className="space-y-4">
                   <Input
                     type="text"
-                    placeholder="Enter group credential"
+                    placeholder="Enter group data (ex: bfgroup1q...)"
                     value={groupCredential}
                     onChange={(e) => setGroupCredential(e.target.value)}
                     className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
@@ -261,7 +311,7 @@ const App: React.FC = () => {
                   
                   <Input
                     type="password"
-                    placeholder="Enter frostr share"
+                    placeholder="Enter share (ex: bfshare1q...)"
                     value={signerSecret}
                     onChange={(e) => setSignerSecret(e.target.value)}
                     className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
