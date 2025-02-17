@@ -15,7 +15,7 @@ function createWindow() {
 }
 
 app.whenReady().then(createWindow);
-
+// 65df5d134e3a9fd0307295268ee952431e579a9fc6da9a45499de1bbcc323802
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();

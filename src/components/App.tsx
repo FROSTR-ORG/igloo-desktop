@@ -3,17 +3,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { CheckCircle2, Square, Snowflake } from "lucide-react"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
-import { BifrostSigner } from '@/signer'
-import { NostrRelay } from "@/relay"
+import { get_node } from "@/lib/bifrost-node"
+import FrostrLogo from "@/assets/frostr-logo-transparent.png"
 
 const App: React.FC = () => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | null }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [signerSecret, setSignerSecret] = useState("");
-  const [relayUrl, setRelayUrl] = useState("ws://localhost:8002");
+  const [relayUrls, setRelayUrls] = useState<string[]>([]);
+  const [newRelayUrl, setNewRelayUrl] = useState("");
   const [totalKeys, setTotalKeys] = useState<number>(3);
   const [threshold, setThreshold] = useState<number>(2);
   const [groupCredential, setGroupCredential] = useState("");
@@ -22,38 +22,6 @@ const App: React.FC = () => {
   const [importTotalKeys, setImportTotalKeys] = useState<number>(3);
   const [importThreshold, setImportThreshold] = useState<number>(2);
   const [isImporting, setIsImporting] = useState(false);
-
-  const [signer, setSigner] = useState<BifrostSigner | null>(null);
-  const [relay, setRelay] = useState<NostrRelay | null>(null);
-  const [relayReady, setRelayReady] = useState(false);
-
-  useEffect(() => {
-    const newRelay = new NostrRelay(8002);
-    
-    const handleConnect = () => {
-      setRelayReady(true);
-      console.log("Relay connected successfully");
-    };
-
-    const handleDisconnect = () => {
-      setRelayReady(false);
-      console.log("Relay disconnected");
-    };
-
-    newRelay.onConnected(handleConnect);
-    newRelay.onDisconnected(handleDisconnect);
-
-    newRelay.start().then(() => {
-      setRelay(newRelay);
-    }).catch(err => {
-      console.error("Failed to start relay:", err);
-      setRelayReady(false);
-    });
-
-    return () => {
-      newRelay.close();
-    };
-  }, []);
 
   const handleGenerateKeyset = async () => {
     setIsGenerating(true);
@@ -86,6 +54,7 @@ const App: React.FC = () => {
         success: true, 
         location: `Imported keyset with ${importTotalKeys} keys and threshold ${importThreshold}. Group: ${keyset.groupCredential}`
       });
+      console.log("Imported keyset:", keyset);
     } catch (error: any) {
       setKeysetGenerated({ 
         success: false, 
@@ -96,42 +65,38 @@ const App: React.FC = () => {
     }
   };
 
-  const handleStartSigner = async () => {
-    if (!signerSecret.trim() || !groupCredential.trim()) {
-      return;
+  const handleAddRelay = () => {
+    if (newRelayUrl.trim() && !relayUrls.includes(newRelayUrl)) {
+      setRelayUrls([...relayUrls, newRelayUrl]);
+      setNewRelayUrl("");
     }
-    
-    if (!relayReady) {
-      console.error('Relay server is not connected');
+  };
+
+  const handleRemoveRelay = (urlToRemove: string) => {
+    setRelayUrls(relayUrls.filter(url => url !== urlToRemove));
+  };
+
+  const handleStartSigner = async () => {
+    if (!signerSecret.trim() || !groupCredential.trim() || relayUrls.length === 0) {
       return;
     }
 
     try {
-      const newSigner = new BifrostSigner({
-        groupCredential: groupCredential,
-        shareCredential: signerSecret,
-        relayUrl: relayUrl
+      const node = get_node({ 
+        group: groupCredential, 
+        share: signerSecret, 
+        relays: relayUrls 
       });
 
-      // Set up event handlers
-      newSigner.onReady(() => {
-        console.log('Signer ready');
-      });
-
-      newSigner.onMessage((msg) => {
-        console.log('Received message:', msg);
-      });
-
-      newSigner.onError((error) => {
-        console.error('Signer error:', error);
-        setIsSignerRunning(false);
-      });
-
-      // Start the signer
-      await newSigner.start();
-      setSigner(newSigner);
-      setIsSignerRunning(true);
+      node.client.on('ready', () => {
+        console.log('node connected')
+      })
       
+      node.client.on('message', (msg) => {
+        console.log('received message event:', msg)
+      })
+
+      await node.connect()
     } catch (error) {
       console.error('Failed to start signer:', error);
       setIsSignerRunning(false);
@@ -139,15 +104,7 @@ const App: React.FC = () => {
   };
 
   const handleStopSigner = async () => {
-    if (signer) {
-      try {
-        await signer.stop();
-        setSigner(null);
-        setIsSignerRunning(false);
-      } catch (error) {
-        console.error('Failed to stop signer:', error);
-      }
-    }
+    return;
   };
 
   const handleSignerButtonClick = () => {
@@ -162,7 +119,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-center mb-12">
-          <Snowflake className="w-10 h-10 mr-3" />
+          <img src={FrostrLogo} alt="Frostr Logo" className="w-12 h-12 mr-2" />
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
         </div>
         <p className="mb-12 text-blue-400 text-center max-w-xl mx-auto text-sm">
@@ -311,15 +268,6 @@ const App: React.FC = () => {
                     disabled={isSignerRunning}
                   />
                   
-                  <Input
-                    type="text"
-                    placeholder="Relay URL"
-                    value={relayUrl}
-                    onChange={(e) => setRelayUrl(e.target.value)}
-                    className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
-                    disabled={isSignerRunning}
-                  />
-                  
                   <div className="flex items-center justify-between">
                     <div className="flex items-center space-x-2">
                       <div className={`w-3 h-3 rounded-full ${isSignerRunning ? 'bg-green-500' : 'bg-red-500'}`} />
@@ -334,6 +282,41 @@ const App: React.FC = () => {
                     >
                       {isSignerRunning ? 'Stop Signer' : 'Start Signer'}
                     </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-blue-200 text-sm font-medium">Relay URLs</label>
+                  <div className="flex gap-2 mb-2">
+                    <Input
+                      type="text"
+                      placeholder="Add relay URL"
+                      value={newRelayUrl}
+                      onChange={(e) => setNewRelayUrl(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm flex-1"
+                      disabled={isSignerRunning}
+                    />
+                    <Button
+                      onClick={handleAddRelay}
+                      disabled={isSignerRunning || !newRelayUrl.trim()}
+                      className="bg-blue-600 hover:bg-blue-700"
+                    >
+                      Add
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {relayUrls.map((url, index) => (
+                      <div key={index} className="flex items-center gap-2 bg-gray-800/30 p-2 rounded">
+                        <span className="text-sm text-blue-300 flex-1 break-all">{url}</span>
+                        <Button
+                          onClick={() => handleRemoveRelay(url)}
+                          disabled={isSignerRunning}
+                          className="bg-red-600 hover:bg-red-700 h-6 w-6 p-0"
+                        >
+                          ×
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 </div>
               </CardContent>
