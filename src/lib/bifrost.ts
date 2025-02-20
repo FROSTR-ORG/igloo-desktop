@@ -6,7 +6,7 @@ import {
   generate_dealer_pkg 
 } from '@frostr/bifrost/lib'
 import { BifrostNode } from '@frostr/bifrost'
-
+import { nip19 } from 'nostr-tools'
 /**
  * Generates a keyset with a random secret
  * @param threshold Number of shares required to sign
@@ -49,6 +49,11 @@ export function generateKeysetWithSecret(threshold: number, totalMembers: number
   if (!secretKey || typeof secretKey !== 'string') {
     throw new Error('Secret key must be a non-empty string');
   }
+  // check if nsec
+  if (secretKey.startsWith('nsec')) {
+    secretKey = nip19.decode(secretKey).data as string
+  }
+
   // Generate the threshold signing group using provided secret
   const { group, shares } = generate_dealer_pkg(
     threshold,
