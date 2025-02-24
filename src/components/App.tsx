@@ -55,7 +55,6 @@ const App: React.FC = () => {
         success: true, 
         location: formatKeysetDisplay(keyset)
       });
-      console.log("Generated keyset:", keyset);
     } catch (error: any) {
       setKeysetGenerated({ 
         success: false, 
@@ -76,7 +75,6 @@ const App: React.FC = () => {
         success: true, 
         location: formatKeysetDisplay(keyset)
       });
-      console.log("Imported keyset:", keyset);
     } catch (error: any) {
       setKeysetGenerated({ 
         success: false, 
