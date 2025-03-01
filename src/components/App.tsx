@@ -3,6 +3,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import FrostrLogo from "@/assets/frostr-logo-transparent.png"
 import Create from "@/components/Create"
 import Signer from "@/components/Signer"
+import ShareList from "@/components/ShareList"
+import LoadShare from "@/components/LoadShare"
+import SaveShare from "@/components/SaveShare"
 
 const App: React.FC = () => {
   return (
@@ -20,6 +23,9 @@ const App: React.FC = () => {
           <TabsList className="grid w-full grid-cols-2 mb-8 bg-gray-900/50">
             <TabsTrigger value="keys" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Keys</TabsTrigger>
             <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Signer</TabsTrigger>
+            <TabsTrigger value="shares" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Shares</TabsTrigger>
+            <TabsTrigger value="loadshare" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Load Share</TabsTrigger>
+            <TabsTrigger value="saveshare" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Save Share</TabsTrigger>
           </TabsList>
 
           <TabsContent value="keys">
@@ -28,6 +34,18 @@ const App: React.FC = () => {
 
           <TabsContent value="signer">
             <Signer />
+          </TabsContent>
+
+          <TabsContent value="shares">
+            <ShareList />
+          </TabsContent>
+
+          <TabsContent value="loadshare">
+            <LoadShare />
+          </TabsContent>
+
+          <TabsContent value="saveshare">
+            <SaveShare />
           </TabsContent>
         </Tabs>
       </div>
