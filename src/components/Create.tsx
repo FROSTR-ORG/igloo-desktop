@@ -9,10 +9,12 @@ const Create: React.FC = () => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [totalKeys, setTotalKeys] = useState<number>(3);
   const [threshold, setThreshold] = useState<number>(2);
+  const [keysetName, setKeysetName] = useState("");
   
   const [importSecret, setImportSecret] = useState("");
   const [importTotalKeys, setImportTotalKeys] = useState<number>(3);
   const [importThreshold, setImportThreshold] = useState<number>(2);
+  const [importKeysetName, setImportKeysetName] = useState("");
   const [isImporting, setIsImporting] = useState(false);
 
   const formatKeysetDisplay = (keyset: any) => {
@@ -39,6 +41,8 @@ const Create: React.FC = () => {
   };
 
   const handleGenerateKeyset = async () => {
+    if (!keysetName.trim()) return;
+    
     setIsGenerating(true);
     try {
       const keyset = generateRandomKeyset(threshold, totalKeys);
@@ -57,7 +61,7 @@ const Create: React.FC = () => {
   };
 
   const handleImportKeyset = async () => {
-    if (!importSecret.trim()) return;
+    if (!importSecret.trim() || !importKeysetName.trim()) return;
     
     setIsImporting(true);
     try {
@@ -84,39 +88,55 @@ const Create: React.FC = () => {
       <CardContent className="space-y-8">
         <div className="p-4 rounded-lg border border-blue-900/30">
           <h3 className="text-blue-200 text-sm font-medium mb-4">Generate new nsec and create keyset</h3>
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className="space-y-4 mb-4">
             <div className="space-y-2">
-              <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium" role="label">
-                Total Keys
+              <label htmlFor="keyset-name" className="text-blue-200 text-sm font-medium">
+                Keyset Name
               </label>
               <Input
-                id="total-keys"
-                type="number"
-                min={2}
-                value={totalKeys}
-                onChange={(e) => setTotalKeys(Number(e.target.value))}
+                id="keyset-name"
+                type="text"
+                placeholder="Enter a name for this keyset"
+                value={keysetName}
+                onChange={(e) => setKeysetName(e.target.value)}
                 className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                disabled={isGenerating}
               />
             </div>
-            <div className="space-y-2">
-              <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
-                Threshold
-              </label>
-              <Input
-                id="threshold"
-                type="number"
-                min={2}
-                max={totalKeys}
-                value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
-              />
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium" role="label">
+                  Total Keys
+                </label>
+                <Input
+                  id="total-keys"
+                  type="number"
+                  min={2}
+                  value={totalKeys}
+                  onChange={(e) => setTotalKeys(Number(e.target.value))}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                />
+              </div>
+              <div className="space-y-2">
+                <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
+                  Threshold
+                </label>
+                <Input
+                  id="threshold"
+                  type="number"
+                  min={2}
+                  max={totalKeys}
+                  value={threshold}
+                  onChange={(e) => setThreshold(Number(e.target.value))}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                />
+              </div>
             </div>
           </div>
           <Button 
             onClick={handleGenerateKeyset} 
             className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-            disabled={isGenerating}
+            disabled={isGenerating || !keysetName.trim()}
           >
             {isGenerating ? "Generating..." : "Generate keyset"}
           </Button>
@@ -125,6 +145,20 @@ const Create: React.FC = () => {
         <div className="p-4 rounded-lg border border-purple-900/30">
           <h3 className="text-purple-200 text-sm font-medium mb-4">Import existing nsec and create keyset</h3>
           <div className="space-y-4">
+            <div className="space-y-2">
+              <label htmlFor="import-keyset-name" className="text-purple-200 text-sm font-medium">
+                Keyset Name
+              </label>
+              <Input
+                id="import-keyset-name"
+                type="text"
+                placeholder="Enter a name for this keyset"
+                value={importKeysetName}
+                onChange={(e) => setImportKeysetName(e.target.value)}
+                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                disabled={isImporting}
+              />
+            </div>
             <Input
               type="password"
               placeholder="Enter your nsec or hex private key"
@@ -167,7 +201,7 @@ const Create: React.FC = () => {
             <Button 
               onClick={handleImportKeyset}
               className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isImporting || !importSecret.trim()}
+              disabled={isImporting || !importSecret.trim() || !importKeysetName.trim()}
             >
               {isImporting ? "Importing..." : "Import nsec"}
             </Button>
