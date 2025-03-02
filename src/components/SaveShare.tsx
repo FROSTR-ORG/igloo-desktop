@@ -1,22 +1,15 @@
 import React, { useState } from 'react';
 
 interface SaveShareProps {
-  onSave?: (name: string, password: string) => void;
+  onSave?: (password: string) => void;
 }
 
 const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
-  const [name, setName] = useState<string>('');
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Basic validation
-    if (!name.trim()) {
-      setError('Please enter a name for this share');
-      return;
-    }
     
     if (!password) {
       setError('Please enter a password');
@@ -28,14 +21,13 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
     
     // Call the onSave prop if provided
     if (onSave) {
-      onSave(name, password);
+      onSave(password);
     } else {
       // For now, just log the data
-      console.log('Saving share:', { name, password: '****' });
+      console.log('Saving share:', { password: '****' });
     }
     
     // Reset form
-    setName('');
     setPassword('');
   };
 
@@ -49,20 +41,6 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
             {error}
           </div>
         )}
-        
-        <div className="space-y-2">
-          <label htmlFor="share-name" className="block text-blue-200 text-sm">
-            Share Name
-          </label>
-          <input
-            id="share-name"
-            type="text"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Enter a name for this share"
-            className="w-full bg-gray-800/60 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500"
-          />
-        </div>
         
         <div className="space-y-2">
           <label htmlFor="share-password" className="block text-blue-200 text-sm">

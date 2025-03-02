@@ -6,6 +6,7 @@ import Signer from "@/components/Signer"
 import ShareList from "@/components/ShareList"
 import LoadShare from "@/components/LoadShare"
 import SaveShare from "@/components/SaveShare"
+import Manage from "@/components/Manage"
 
 const App: React.FC = () => {
   return (
@@ -20,8 +21,9 @@ const App: React.FC = () => {
         </p>
 
         <Tabs defaultValue="keys" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 mb-8 bg-gray-900/50">
+          <TabsList className="grid w-full grid-cols-3 mb-8 bg-gray-900/50">
             <TabsTrigger value="keys" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Keys</TabsTrigger>
+            <TabsTrigger value="manage" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Manage</TabsTrigger>
             <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Signer</TabsTrigger>
             <TabsTrigger value="shares" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Shares</TabsTrigger>
             <TabsTrigger value="loadshare" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">Load Share</TabsTrigger>
@@ -30,6 +32,10 @@ const App: React.FC = () => {
 
           <TabsContent value="keys">
             <Create />
+          </TabsContent>
+
+          <TabsContent value="manage">
+            <Manage />
           </TabsContent>
 
           <TabsContent value="signer">
