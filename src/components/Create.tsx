@@ -4,56 +4,37 @@ import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
 
-const Create: React.FC = () => {
+interface CreateProps {
+  onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
+}
+
+const Create: React.FC<CreateProps> = ({ onKeysetCreated }) => {
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | React.ReactNode }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [totalKeys, setTotalKeys] = useState<number>(3);
   const [threshold, setThreshold] = useState<number>(2);
   const [keysetName, setKeysetName] = useState("");
-  
+
   const [importSecret, setImportSecret] = useState("");
   const [importTotalKeys, setImportTotalKeys] = useState<number>(3);
   const [importThreshold, setImportThreshold] = useState<number>(2);
   const [importKeysetName, setImportKeysetName] = useState("");
   const [isImporting, setIsImporting] = useState(false);
 
-  const formatKeysetDisplay = (keyset: any) => {
-    return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-sm font-medium mb-1">Group Credential:</div>
-          <div className="bg-gray-800/50 p-2 rounded text-xs break-all">
-            {keyset.groupCredential}
-          </div>
-        </div>
-        <div>
-          <div className="text-sm font-medium mb-1">Share Credentials:</div>
-          <div className="space-y-2">
-            {keyset.shareCredentials.map((share: string, index: number) => (
-              <div key={index} className="bg-gray-800/50 p-2 rounded text-xs break-all">
-                {share}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   const handleGenerateKeyset = async () => {
     if (!keysetName.trim()) return;
-    
+
     setIsGenerating(true);
     try {
       const keyset = generateRandomKeyset(threshold, totalKeys);
-      setKeysetGenerated({ 
-        success: true, 
-        location: formatKeysetDisplay(keyset)
+      onKeysetCreated({
+        ...keyset,
+        name: keysetName
       });
     } catch (error: any) {
-      setKeysetGenerated({ 
-        success: false, 
-        location: `Error generating keyset: ${error.message}` 
+      setKeysetGenerated({
+        success: false,
+        location: `Error generating keyset: ${error.message}`
       });
     } finally {
       setIsGenerating(false);
@@ -62,18 +43,18 @@ const Create: React.FC = () => {
 
   const handleImportKeyset = async () => {
     if (!importSecret.trim() || !importKeysetName.trim()) return;
-    
+
     setIsImporting(true);
     try {
       const keyset = generateKeysetWithSecret(importThreshold, importTotalKeys, importSecret);
-      setKeysetGenerated({ 
-        success: true, 
-        location: formatKeysetDisplay(keyset)
+      onKeysetCreated({
+        ...keyset,
+        name: importKeysetName
       });
     } catch (error: any) {
-      setKeysetGenerated({ 
-        success: false, 
-        location: `Error importing keyset: ${error.message}` 
+      setKeysetGenerated({
+        success: false,
+        location: `Error importing keyset: ${error.message}`
       });
     } finally {
       setIsImporting(false);
@@ -133,8 +114,8 @@ const Create: React.FC = () => {
               </div>
             </div>
           </div>
-          <Button 
-            onClick={handleGenerateKeyset} 
+          <Button
+            onClick={handleGenerateKeyset}
             className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             disabled={isGenerating || !keysetName.trim()}
           >
@@ -159,14 +140,19 @@ const Create: React.FC = () => {
                 disabled={isImporting}
               />
             </div>
-            <Input
-              type="password"
-              placeholder="Enter your nsec or hex private key"
-              value={importSecret}
-              onChange={(e) => setImportSecret(e.target.value)}
-              className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
-              disabled={isImporting}
-            />
+            <div className="space-y-2">
+              <label htmlFor="import-secret" className="text-purple-200 text-sm font-medium">
+                nsec or hex private key
+              </label>
+              <Input
+                type="password"
+                placeholder="Enter your nsec or hex private key"
+                value={importSecret}
+                onChange={(e) => setImportSecret(e.target.value)}
+                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                disabled={isImporting}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-4 mb-4">
               <div className="space-y-2">
                 <label htmlFor="import-total-keys" className="text-purple-200 text-sm font-medium">
@@ -198,7 +184,7 @@ const Create: React.FC = () => {
                 />
               </div>
             </div>
-            <Button 
+            <Button
               onClick={handleImportKeyset}
               className="w-full py-5 bg-purple-600 hover:bg-purple-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={isImporting || !importSecret.trim() || !importKeysetName.trim()}
@@ -209,9 +195,8 @@ const Create: React.FC = () => {
         </div>
 
         {keysetGenerated.location && (
-          <div className={`mt-4 p-3 rounded-lg ${
-            keysetGenerated.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
-          }`}>
+          <div className={`mt-4 p-3 rounded-lg ${keysetGenerated.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
+            }`}>
             {keysetGenerated.location}
           </div>
         )}

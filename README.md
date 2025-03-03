@@ -18,6 +18,10 @@ Frostr keyset manager and remote signer.
     In file save Buff.join([salt, encryptedData])
     In file read, split the data into salt and encryptedData and use the salt with user entered password to derive the key 
     -->
+- [ ] Manage shares (rotate)
+  <!-- 
+  - If nsec is entered for rotation then get the pubkey of that nsec and verify that it matches the pubkey of the current share loaded in the UI.
+  -->
 - [ ] Better Logging
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect
