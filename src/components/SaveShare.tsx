@@ -32,7 +32,7 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
   };
 
   return (
-    <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
+    <div className="bg-gray-900 border border-blue-900/50 rounded-lg p-6 shadow-xl backdrop-blur-sm">
       <h2 className="text-xl font-semibold text-blue-300 mb-4">Save Share</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -52,7 +52,7 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Enter password to encrypt this share"
-            className="w-full bg-gray-800/60 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500"
+            className="w-full bg-gray-800 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500"
           />
         </div>
         

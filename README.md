@@ -22,6 +22,9 @@ Frostr keyset manager and remote signer.
   <!-- 
   - If nsec is entered for rotation then get the pubkey of that nsec and verify that it matches the pubkey of the current share loaded in the UI.
   -->
+  <!-- 
+  Ensure that keyset with name already saved in file system can not be created again.
+  -->
 - [ ] Better Logging
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect

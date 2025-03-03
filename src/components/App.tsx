@@ -63,7 +63,7 @@ const App: React.FC = () => {
                 value="shares" 
                 className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200"
               >
-                Available Profiles
+                Available Shares
               </TabsTrigger>
               <TabsTrigger 
                 value="create" 
