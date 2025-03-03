@@ -1,6 +1,6 @@
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
 const path = require('path');
-const profileManagerModule = require('./lib/profileManager');
+const shareManagerModule = require('./lib/shareManager');
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -18,20 +18,25 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   
-  // Initialize profile manager
-  const profileManager = new profileManagerModule.ProfileManager();
+  // Initialize share manager
+  const shareManager = new shareManagerModule.ShareManager();
   
-  // Set up IPC handlers for profile operations
-  ipcMain.handle('get-profiles', async () => {
-    return profileManagerModule.getAllProfiles();
+  // Set up IPC handlers for share operations
+  ipcMain.handle('get-shares', async () => {
+    return shareManagerModule.getAllShares();
   });
   
-  ipcMain.handle('save-profile', async (_: any, profile: any) => {
-    return profileManager.saveProfile(profile);
+  ipcMain.handle('save-share', async (_: any, share: any) => {
+    return shareManager.saveShare(share);
   });
   
-  ipcMain.handle('delete-profile', async (_: any, profileId: string) => {
-    return profileManager.deleteProfile(profileId);
+  ipcMain.handle('delete-share', async (_: any, shareId: string) => {
+    return shareManager.deleteShare(shareId);
+  });
+
+  ipcMain.handle('open-share-location', async (_: any, shareId: string) => {
+    const filePath = shareManager.getSharePath(shareId);
+    await shell.showItemInFolder(filePath);
   });
 });
 
