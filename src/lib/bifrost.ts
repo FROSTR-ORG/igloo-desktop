@@ -79,6 +79,14 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   return new BifrostNode(decodedGroup, decodedShare, relays)
 }
 
+export function decode_share(share: string) {
+  return decode_share_pkg(share)
+}
+
+export function decode_group(group: string) {
+  return decode_group_pkg(group)
+}
+
 function validateKeysetParams(threshold: number, totalMembers: number) {
   if (threshold <= 0 || totalMembers <= 0) {
     throw new Error('Threshold and total members must be positive numbers');
