@@ -4,7 +4,9 @@ import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
 import Signer from "@/components/Signer"
+import Manage from "@/components/Manage"
 import { Button } from "@/components/ui/button"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 interface KeysetData {
   groupCredential: string;
@@ -91,7 +93,25 @@ const App: React.FC = () => {
                 Back to Shares
               </Button>
             </div>
-            <Signer initialData={signerData} />
+            
+            <Tabs defaultValue="signer" className="w-full">
+              <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/50 w-full">
+                <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
+                  Signer
+                </TabsTrigger>
+                <TabsTrigger value="manage" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
+                  Manage
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="signer" className="border border-blue-900/30 rounded-lg p-4">
+                <Signer initialData={signerData} />
+              </TabsContent>
+              
+              <TabsContent value="manage" className="border border-purple-900/30 rounded-lg p-4">
+                <Manage initialShare={signerData?.share} />
+              </TabsContent>
+            </Tabs>
           </div>
         </div>
       </div>
