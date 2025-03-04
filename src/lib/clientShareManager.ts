@@ -4,7 +4,9 @@ export interface IglooShare {
   id: string;
   name: string;
   share: string;
+  salt: string;
   groupCredential: string;
+  savedAt?: string;
   [key: string]: any;
 }
 
