@@ -137,7 +137,6 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   return (
     <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl text-blue-200">Remote Signer</CardTitle>
         <CardDescription className="text-blue-400 text-sm">Start/Stop your remote signer</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

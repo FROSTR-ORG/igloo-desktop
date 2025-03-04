@@ -4,7 +4,6 @@ import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
 import Signer from "@/components/Signer"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 
 interface KeysetData {
@@ -19,7 +18,7 @@ interface SignerData {
 }
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState("shares");
+  const [showingCreate, setShowingCreate] = useState(false);
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
@@ -27,6 +26,7 @@ const App: React.FC = () => {
   const handleKeysetCreated = (data: KeysetData) => {
     setKeysetData(data);
     setShowingNewKeyset(true);
+    setShowingCreate(false);
   };
 
   const handleShareLoaded = (share: string, groupCredential: string) => {
@@ -35,13 +35,13 @@ const App: React.FC = () => {
 
   const handleBackToShares = () => {
     setSignerData(null);
-    setActiveTab("shares");
+    setShowingCreate(false);
   };
 
   const handleFinish = () => {
     setKeysetData(null);
     setShowingNewKeyset(false);
-    setActiveTab("shares");
+    setShowingCreate(false);
   };
 
   // Show new keyset view
@@ -82,7 +82,7 @@ const App: React.FC = () => {
           
           <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
             <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-blue-300">Remote Signer</h2>
+              <h2 className="text-xl font-semibold text-blue-300">Signer</h2>
               <Button
                 variant="ghost"
                 onClick={handleBackToShares}
@@ -98,7 +98,7 @@ const App: React.FC = () => {
     );
   }
 
-  // Show main view with tabs
+  // Show main view
   return (
     <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl">
@@ -111,30 +111,11 @@ const App: React.FC = () => {
         </p>
 
         <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-2 mb-6 bg-gray-900/50">
-              <TabsTrigger 
-                value="shares" 
-                className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200"
-              >
-                Available Shares
-              </TabsTrigger>
-              <TabsTrigger 
-                value="create" 
-                className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200"
-              >
-                Create New
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="shares">
-              <ShareList onShareLoaded={handleShareLoaded} />
-            </TabsContent>
-
-            <TabsContent value="create">
-              <Create onKeysetCreated={handleKeysetCreated} />
-            </TabsContent>
-          </Tabs>
+          {showingCreate ? (
+            <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
+          ) : (
+            <ShareList onShareLoaded={handleShareLoaded} onNewKeyset={() => setShowingCreate(true)} />
+          )}
         </div>
       </div>
     </div>

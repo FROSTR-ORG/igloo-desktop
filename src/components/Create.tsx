@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
+import { ArrowLeft } from 'lucide-react';
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
+  onBack: () => void;
 }
 
-const Create: React.FC<CreateProps> = ({ onKeysetCreated }) => {
+const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const [keysetGenerated, setKeysetGenerated] = useState<{ success: boolean; location: string | React.ReactNode }>({ success: false, location: null });
   const [isGenerating, setIsGenerating] = useState(false);
   const [totalKeys, setTotalKeys] = useState<number>(3);
@@ -64,7 +66,19 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated }) => {
   return (
     <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              onClick={onBack}
+              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+            >
+              <ArrowLeft className="w-4 h-4 mr-2" />
+              Back
+            </Button>
+            <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-8">
         <div className="p-4 rounded-lg border border-blue-900/30">
