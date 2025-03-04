@@ -157,7 +157,6 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 {groupCredential}
               </div>
               {decodedGroup && (
-                console.log(decodedGroup),
                 <div className="text-xs text-gray-400">
                   Threshold: {decodedGroup.threshold} of {decodedGroup.commits.length} shares required
                 </div>

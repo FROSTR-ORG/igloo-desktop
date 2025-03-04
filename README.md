@@ -9,27 +9,15 @@ Frostr keyset manager and remote signer.
 - [x] Remote signing
 
 ### TODO
-- [ ] Encrypted App State
-    <!-- 
-    Generate a random salt number
-    User puts in custom password for a given share
-    use @noble/hashes to derive key from password and salt (pbkdf2)
-    use key to encrypt key share in json file (leave other fields unencrypted)
-    In file save Buff.join([salt, encryptedData])
-    In file read, split the data into salt and encryptedData and use the salt with user entered password to derive the key 
-    -->
-- [ ] Manage shares (rotate)
+- [ ] Save Encrypted Shares to file system
+- [ ] Recover NSEC from threshold of shares
   <!-- 
   - If nsec is entered for rotation then get the pubkey of that nsec and verify that it matches the pubkey of the current share loaded in the UI.
   -->
   <!-- 
   Ensure that keyset with name already saved in file system can not be created again.
   -->
-  <!-- Generate nsec button inside of form, unify forms. -->
-  <!-- options for manage shares: 
-  - recover nsec from threshold of shares 
-  - create new keyset with nsec.
-  -->
+  <!-- Add confirm password for saving each share-->
 - [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
 - [ ] FAQ:
   - What is a share?
