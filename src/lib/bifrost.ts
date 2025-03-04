@@ -3,10 +3,17 @@ import {
   decode_group_pkg,
   encode_share_pkg, 
   decode_share_pkg,
-  generate_dealer_pkg 
+  generate_dealer_pkg,
+  recover_secret_key
 } from '@frostr/bifrost/lib'
 import { BifrostNode } from '@frostr/bifrost'
+import type {
+  BifrostNodeConfig,
+  GroupPackage,
+  SharePackage
+} from '@frostr/bifrost'
 import { nip19 } from 'nostr-tools'
+
 /**
  * Generates a keyset with a random secret
  * @param threshold Number of shares required to sign
@@ -113,6 +120,34 @@ export function decode_share(share: string) {
 
 export function decode_group(group: string) {
   return decode_group_pkg(group)
+}
+
+/**
+ * Recovers the secret key from a group package and array of share packages
+ * @param group The group package containing threshold signing parameters
+ * @param shares Array of share packages containing the key shares
+ * @returns The recovered secret key as a hex string
+ */
+export function recover_nsec(group: GroupPackage, shares: SharePackage[]): string {
+  if (!group || !shares || shares.length === 0) {
+    throw new Error('Group package and at least one share package are required');
+  }
+
+  if (shares.length < group.threshold) {
+    throw new Error(`Not enough shares provided. Need at least ${group.threshold} shares`);
+  }
+
+  try {
+    // todo: ??
+    const hex_secret = recover_secret_key(group, shares);
+    console.log('hex_secret', hex_secret)
+    const secretBytes = Buffer.from(hex_secret, 'hex');
+    console.log('secretBytes', secretBytes)
+    console.log('nip19.nsecEncode(secretBytes)', nip19.nsecEncode(secretBytes))
+    return nip19.nsecEncode(secretBytes)
+  } catch (error: any) {
+    throw new Error(`Failed to recover secret key: ${error.message}`);
+  }
 }
 
 function validateKeysetParams(threshold: number, totalMembers: number) {

@@ -2,21 +2,24 @@ import React, { useState, useEffect, FormEvent } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { generateKeysetWithSecret } from "@/lib/bifrost"
+import { recover_nsec, decode_share, decode_group } from "@/lib/bifrost"
 
 interface RecoverProps {
   initialShare?: string;
+  initialGroupCredential?: string;
   threshold?: number;
   totalShares?: number;
 }
 
 const Recover: React.FC<RecoverProps> = ({ 
   initialShare,
+  initialGroupCredential,
   threshold = 2,
   totalShares = 3
 }) => {
   // State for t of n shares
   const [sharesInputs, setSharesInputs] = useState<string[]>([initialShare || ""]);
+  const [groupCredential, setGroupCredential] = useState<string>(initialGroupCredential || "");
   const [sharesFormValid, setSharesFormValid] = useState(false);
   
   // State for the result
@@ -29,15 +32,18 @@ const Recover: React.FC<RecoverProps> = ({
   // Validate the shares form
   useEffect(() => {
     const validShares = sharesInputs.filter(share => share.trim()).length;
-    setSharesFormValid(validShares >= threshold);
-  }, [sharesInputs, threshold]);
+    setSharesFormValid(validShares >= threshold && groupCredential.trim().length > 0);
+  }, [sharesInputs, threshold, groupCredential]);
 
   // Update shares inputs when initialShare changes
   useEffect(() => {
     if (initialShare) {
       setSharesInputs([initialShare]);
     }
-  }, [initialShare]);
+    if (initialGroupCredential) {
+      setGroupCredential(initialGroupCredential);
+    }
+  }, [initialShare, initialGroupCredential]);
 
   // Handle adding more share inputs
   const addShareInput = () => {
@@ -61,20 +67,6 @@ const Recover: React.FC<RecoverProps> = ({
     setSharesInputs(newSharesInputs);
   };
 
-  // Format keyset display for the result
-  const formatKeysetDisplay = (keyset: any) => {
-    return (
-      <div className="space-y-3">
-        <div>
-          <div className="text-sm font-medium mb-1">Recovered NSEC:</div>
-          <div className="bg-gray-800/50 p-2 rounded text-xs break-all">
-            {keyset.nsec}
-          </div>
-        </div>
-      </div>
-    );
-  };
-
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -83,12 +75,17 @@ const Recover: React.FC<RecoverProps> = ({
     
     setIsProcessing(true);
     try {
-      // In a real implementation, you would:
-      // 1. Reconstruct the secret from the shares
-      // 2. Return the reconstructed nsec
-      
-      // This is a placeholder - actual implementation would use the reconstructed secret
-      const keyset = { nsec: "reconstructed_nsec_here" };
+      // Decode all shares
+      const decodedShares = sharesInputs
+        .filter(share => share.trim())
+        .map(share => decode_share(share));
+
+      // Decode the group credential
+      const group = decode_group(groupCredential);
+
+      // Recover the secret key
+      const nsec = recover_nsec(group, decodedShares);
+
       setResult({
         success: true,
         message: (
@@ -96,7 +93,14 @@ const Recover: React.FC<RecoverProps> = ({
             <div className="mb-3 text-green-200 font-medium">
               Successfully recovered NSEC using {sharesInputs.length} shares
             </div>
-            {formatKeysetDisplay(keyset)}
+            <div className="space-y-3">
+              <div>
+                <div className="text-sm font-medium mb-1">Recovered NSEC:</div>
+                <div className="bg-gray-800/50 p-2 rounded text-xs break-all">
+                  {nsec}
+                </div>
+              </div>
+            </div>
           </div>
         )
       });
@@ -123,6 +127,18 @@ const Recover: React.FC<RecoverProps> = ({
               <div className="text-sm text-blue-200">
                 You need {threshold} out of {totalShares} shares to recover your NSEC
               </div>
+            </div>
+
+            <div className="space-y-3">
+              <div className="text-blue-200 text-sm font-medium">Group Credential:</div>
+              <Input
+                type="text"
+                placeholder="Enter group credential"
+                value={groupCredential}
+                onChange={(e) => setGroupCredential(e.target.value)}
+                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                disabled={isProcessing}
+              />
             </div>
 
             <div className="space-y-3">
