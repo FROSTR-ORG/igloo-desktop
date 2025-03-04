@@ -38,6 +38,12 @@ const App: React.FC = () => {
     setActiveTab("shares");
   };
 
+  const handleFinish = () => {
+    setKeysetData(null);
+    setShowingNewKeyset(false);
+    setActiveTab("shares");
+  };
+
   // Show new keyset view
   if (showingNewKeyset && keysetData) {
     return (
@@ -56,6 +62,7 @@ const App: React.FC = () => {
               name={keysetData.name}
               groupCredential={keysetData.groupCredential}
               shareCredentials={keysetData.shareCredentials}
+              onFinish={handleFinish}
             />
           </div>
         </div>

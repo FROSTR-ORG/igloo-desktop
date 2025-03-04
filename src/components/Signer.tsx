@@ -99,12 +99,22 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const handleStopSigner = async () => {
     try {
       if (nodeRef.current) {
+        // First remove all event listeners to prevent memory leaks
+        nodeRef.current.client.removeAllListeners('ready');
+        nodeRef.current.client.removeAllListeners('message');
+        nodeRef.current.client.removeAllListeners('error');
+        nodeRef.current.client.removeAllListeners('disconnect');
+        
+        // Disconnect the node
         await nodeRef.current.disconnect();
         nodeRef.current = null;
       }
       setIsSignerRunning(false);
     } catch (error) {
       console.error('Failed to stop signer:', error);
+      // Force the signer to stop even if there's an error
+      nodeRef.current = null;
+      setIsSignerRunning(false);
     }
   };
 
