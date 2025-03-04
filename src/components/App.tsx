@@ -4,7 +4,7 @@ import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
 import Signer from "@/components/Signer"
-import Manage from "@/components/Manage"
+import Recover from "@/components/Recover"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
@@ -17,6 +17,8 @@ interface KeysetData {
 interface SignerData {
   share: string;
   groupCredential: string;
+  threshold?: number;
+  totalShares?: number;
 }
 
 const App: React.FC = () => {
@@ -99,8 +101,8 @@ const App: React.FC = () => {
                 <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
                   Signer
                 </TabsTrigger>
-                <TabsTrigger value="manage" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
-                  Manage
+                <TabsTrigger value="recover" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
+                  Recover
                 </TabsTrigger>
               </TabsList>
               
@@ -108,8 +110,12 @@ const App: React.FC = () => {
                 <Signer initialData={signerData} />
               </TabsContent>
               
-              <TabsContent value="manage" className="border border-purple-900/30 rounded-lg p-4">
-                <Manage initialShare={signerData?.share} />
+              <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
+                <Recover 
+                  initialShare={signerData?.share} 
+                  threshold={signerData?.threshold}
+                  totalShares={signerData?.totalShares}
+                />
               </TabsContent>
             </Tabs>
           </div>

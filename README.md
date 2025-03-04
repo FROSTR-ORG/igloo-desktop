@@ -25,6 +25,20 @@ Frostr keyset manager and remote signer.
   <!-- 
   Ensure that keyset with name already saved in file system can not be created again.
   -->
+  <!-- Generate nsec button inside of form, unify forms. -->
+  <!-- options for manage shares: 
+  - recover nsec from threshold of shares 
+  - create new keyset with nsec.
+  -->
+- [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
+- [ ] FAQ:
+  - What is a share?
+  - What is a group?
+  - What is a relay?
+  - What is an nsec?
+  - What does it mean to create a new keyset?
+  - What does it mean to recover a keyset?
+  - How do you rotate a keyset?
 - [ ] Better Logging
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect
