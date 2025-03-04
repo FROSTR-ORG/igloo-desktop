@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
-import { FolderOpen } from 'lucide-react';
+import { FolderOpen, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LoadShare from './LoadShare';
 
 interface ShareListProps {
   onShareLoaded?: (share: string, groupCredential: string) => void;
+  onNewKeyset?: () => void;
 }
 
-const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
+const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => {
   const [shares, setShares] = useState<IglooShare[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingShare, setLoadingShare] = useState<IglooShare | null>(null);
@@ -41,6 +42,17 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
 
   return (
     <>
+      <div className="flex justify-between items-center mb-6">
+        <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
+        <Button
+          onClick={onNewKeyset}
+          className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+        >
+          <Plus className="w-4 h-4 mr-2" />
+          Create New
+        </Button>
+      </div>
+
       {isLoading ? (
         <div className="text-center py-4">
           <div className="animate-pulse text-gray-400">Loading shares...</div>
@@ -86,7 +98,7 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No shares available</p>
-          <p className="text-sm text-gray-500">Switch to the Create tab to create your first share</p>
+          <p className="text-sm text-gray-500">Click the Create New button to create your first share</p>
         </div>
       )}
 

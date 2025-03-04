@@ -5,6 +5,7 @@ import { decode_group, decode_share } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2 } from 'lucide-react';
+import ConfirmModal from './ui/ConfirmModal';
 
 interface KeysetProps {
   groupCredential: string;
@@ -251,29 +252,18 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         </div>
       )}
 
-      {showConfirmModal && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-gray-900 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-            <h3 className="text-xl font-semibold text-blue-200 mb-4">Are you sure?</h3>
-            <p className="text-gray-300 mb-6">This will take you back to the initial screen.</p>
-            <div className="flex justify-end space-x-3">
-              <Button
-                variant="ghost"
-                onClick={() => setShowConfirmModal(false)}
-                className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={handleConfirmFinish}
-                className="bg-green-600 hover:bg-green-700 text-green-100"
-              >
-                Yes, continue
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmModal
+        isOpen={showConfirmModal}
+        title="Are you sure?"
+        body={
+          <>
+            <p>This will take you back to the initial screen and your shares will be unavailable unless you saved them through Igloo or backed them up manually.</p>
+            <p>You can always recover a keyset using your NSEC or the required threshold of shares.</p>
+          </>
+        }
+        onConfirm={handleConfirmFinish}
+        onCancel={() => setShowConfirmModal(false)}
+      />
     </>
   );
 };
