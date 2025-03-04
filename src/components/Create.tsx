@@ -3,7 +3,8 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
-import { ArrowLeft, RefreshCw } from 'lucide-react';
+import { generateNsec, nsecToHex } from "@/lib/nostr"
+import { ArrowLeft } from 'lucide-react';
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
@@ -17,12 +18,18 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const [threshold, setThreshold] = useState<number>(2);
   const [keysetName, setKeysetName] = useState("");
   const [nsec, setNsec] = useState("");
+  const [isValidNsec, setIsValidNsec] = useState(false);
 
   const handleGenerateNsec = async () => {
     setIsGenerating(true);
     try {
-      const keyset = generateRandomKeyset(threshold, totalKeys);
-      setNsec(keyset.groupCredential);
+      const { nsec: newNsec } = generateNsec();
+      setNsec(newNsec);
+      setIsValidNsec(true);
+      setKeysetGenerated({
+        success: true,
+        location: "New nsec key generated successfully"
+      });
     } catch (error: any) {
       setKeysetGenerated({
         success: false,
@@ -33,14 +40,29 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
     }
   };
 
+  const handleNsecChange = (value: string) => {
+    setNsec(value);
+    if (value.trim()) {
+      try {
+        // Try to convert to hex to validate the nsec
+        nsecToHex(value);
+        setIsValidNsec(true);
+      } catch (error) {
+        setIsValidNsec(false);
+      }
+    } else {
+      setIsValidNsec(false);
+    }
+  };
+
   const handleCreateKeyset = async () => {
-    if (!keysetName.trim() || !nsec.trim()) return;
+    if (!keysetName.trim() || !nsec.trim() || !isValidNsec) return;
 
     setIsGenerating(true);
     try {
-      const keyset = nsec === keysetGenerated.location ? 
-        { groupCredential: nsec, shareCredentials: [] } : // Use the generated keyset
-        generateKeysetWithSecret(threshold, totalKeys, nsec); // Generate from provided nsec
+      // Convert nsec to hex before passing to bifrost
+      const hexKey = nsecToHex(nsec);
+      const keyset = generateKeysetWithSecret(threshold, totalKeys, hexKey);
 
       onKeysetCreated({
         ...keyset,
@@ -90,6 +112,35 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
             />
           </div>
 
+          <div className="space-y-2">
+            <label htmlFor="nsec" className="text-blue-200 text-sm font-medium">
+              nsec or hex private key
+            </label>
+            <div className="flex gap-2">
+              <Input
+                id="nsec"
+                type="password"
+                placeholder="Enter your nsec or generate a new one"
+                value={nsec}
+                onChange={(e) => handleNsecChange(e.target.value)}
+                className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm flex-1 ${
+                  nsec && !isValidNsec ? 'border-red-500' : ''
+                }`}
+                disabled={isGenerating}
+              />
+              <Button
+                onClick={handleGenerateNsec}
+                className="bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isGenerating}
+              >
+                Generate
+              </Button>
+            </div>
+            {nsec && !isValidNsec && (
+              <p className="text-red-400 text-sm">Invalid nsec format</p>
+            )}
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
@@ -121,36 +172,12 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               />
             </div>
           </div>
-
-          <div className="space-y-2">
-            <label htmlFor="nsec" className="text-blue-200 text-sm font-medium">
-              nsec or hex private key
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="nsec"
-                type="password"
-                placeholder="Enter your nsec or generate a new one"
-                value={nsec}
-                onChange={(e) => setNsec(e.target.value)}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm flex-1"
-                disabled={isGenerating}
-              />
-              <Button
-                onClick={handleGenerateNsec}
-                className="bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isGenerating}
-              >
-                Generate
-              </Button>
-            </div>
-          </div>
         </div>
 
         <Button
           onClick={handleCreateKeyset}
           className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isGenerating || !keysetName.trim() || !nsec.trim()}
+          disabled={isGenerating || !keysetName.trim() || !nsec.trim() || !isValidNsec}
         >
           {isGenerating ? "Creating..." : "Create keyset"}
         </Button>
