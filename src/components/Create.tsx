@@ -67,7 +67,8 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
     <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
       <CardHeader>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
+          <div className="flex items-center w-full justify-between">
+            <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
             <Button
               variant="ghost"
               onClick={onBack}
@@ -76,7 +77,6 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               <ArrowLeft className="w-4 h-4 mr-2" />
               Back
             </Button>
-            <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
           </div>
         </div>
       </CardHeader>

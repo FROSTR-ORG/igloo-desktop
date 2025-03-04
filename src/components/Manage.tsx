@@ -5,12 +5,16 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
 
-const Manage: React.FC = () => {
+interface ManageProps {
+  initialShare?: string;
+}
+
+const Manage: React.FC<ManageProps> = ({ initialShare }) => {
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("shares");
 
   // State for t of n shares
-  const [sharesInputs, setSharesInputs] = useState<string[]>([""]);
+  const [sharesInputs, setSharesInputs] = useState<string[]>([initialShare || ""]);
   const [totalShares, setTotalShares] = useState<number>(3);
   const [threshold, setThreshold] = useState<number>(2);
   const [keysetName, setKeysetName] = useState("");
@@ -69,6 +73,13 @@ const Manage: React.FC = () => {
       setSharesInputs([""]);
     }
   }, [threshold]);
+
+  // Update shares inputs when initialShare changes
+  useEffect(() => {
+    if (initialShare) {
+      setSharesInputs([initialShare]);
+    }
+  }, [initialShare]);
 
   // Handle tab change
   const handleTabChange = (value: string) => {
