@@ -1,12 +1,21 @@
 import React, { useState } from 'react';
+import { bytesToHex } from '@noble/hashes/utils';
+import { derive_secret, encrypt_payload } from '@/lib/encryption';
 
 interface SaveShareProps {
-  onSave?: (password: string) => void;
+  onSave?: (password: string, salt: string, encryptedShare: string) => void;
+  shareToEncrypt?: string;
 }
 
-const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
+const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
   const [password, setPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+
+  const generateSalt = () => {
+    const array = new Uint8Array(16);
+    crypto.getRandomValues(array);
+    return bytesToHex(array);
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -15,20 +24,35 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave }) => {
       setError('Please enter a password');
       return;
     }
-    
-    // Clear any errors
-    setError(null);
-    
-    // Call the onSave prop if provided
-    if (onSave) {
-      onSave(password);
-    } else {
-      // For now, just log the data
-      console.log('Saving share:', { password: '****' });
+
+    if (!shareToEncrypt) {
+      setError('No share data to encrypt');
+      return;
     }
     
-    // Reset form
-    setPassword('');
+    try {
+      // Generate a random salt
+      const salt = generateSalt();
+      
+      // Derive encryption key from password and salt
+      const secret = derive_secret(password, salt);
+      
+      // Encrypt the share
+      const encryptedShare = encrypt_payload(secret, shareToEncrypt);
+      
+      // Clear any errors
+      setError(null);
+      
+      // Call the onSave prop if provided
+      if (onSave) {
+        onSave(password, salt, encryptedShare);
+      }
+      
+      // Reset form
+      setPassword('');
+    } catch (err) {
+      setError('Failed to encrypt share: ' + (err instanceof Error ? err.message : String(err)));
+    }
   };
 
   return (

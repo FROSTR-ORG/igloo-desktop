@@ -12,9 +12,9 @@ Frostr keyset manager and remote signer.
 - [ ] Encrypted App State
     <!-- 
     Generate a random salt number
-    User puts in custom password for a given keyset
+    User puts in custom password for a given share
     use @noble/hashes to derive key from password and salt (pbkdf2)
-    use key to encrypt/decrypt key share state in folders in the file system
+    use key to encrypt key share in json file (leave other fields unencrypted)
     In file save Buff.join([salt, encryptedData])
     In file read, split the data into salt and encryptedData and use the salt with user entered password to derive the key 
     -->

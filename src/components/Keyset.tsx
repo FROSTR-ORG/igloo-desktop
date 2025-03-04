@@ -41,7 +41,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setShowSaveDialog({ show: true, shareIndex });
   };
 
-  const handleSaveComplete = async (password: string) => {
+  const handleSaveComplete = async (password: string, salt: string, encryptedShare: string) => {
     if (showSaveDialog.shareIndex === null) return;
 
     const shareCredential = shareCredentials[showSaveDialog.shareIndex];
@@ -50,8 +50,9 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     // Create a share object to save
     const share = {
       id: `${name}_share_${decodedShare?.idx || showSaveDialog.shareIndex + 1}`,
-      name: `${name} Share ${decodedShare?.idx || showSaveDialog.shareIndex + 1}`,
-      share: shareCredential,
+      name: `${name} share ${decodedShare?.idx || showSaveDialog.shareIndex + 1}`,
+      share: encryptedShare,
+      salt,
       groupCredential,
       savedAt: new Date().toISOString()
     };
@@ -147,6 +148,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 {groupCredential}
               </div>
               {decodedGroup && (
+                console.log(decodedGroup),
                 <div className="text-xs text-gray-400">
                   Threshold: {decodedGroup.threshold} of {decodedGroup.commits.length} shares required
                 </div>
@@ -230,10 +232,13 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         </CardContent>
       </Card>
 
-      {showSaveDialog.show && (
+      {showSaveDialog.show && showSaveDialog.shareIndex !== null && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
           <div className="w-full max-w-md mx-4">
-            <SaveShare onSave={handleSaveComplete} />
+            <SaveShare 
+              onSave={handleSaveComplete}
+              shareToEncrypt={shareCredentials[showSaveDialog.shareIndex]}
+            />
           </div>
         </div>
       )}

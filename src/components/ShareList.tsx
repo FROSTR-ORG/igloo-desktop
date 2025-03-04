@@ -2,10 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import { FolderOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import LoadShare from './LoadShare';
 
-const ShareList: React.FC = () => {
+interface ShareListProps {
+  onShareLoaded?: (share: string, groupCredential: string) => void;
+}
+
+const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
   const [shares, setShares] = useState<IglooShare[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadingShare, setLoadingShare] = useState<IglooShare | null>(null);
 
   useEffect(() => {
     const loadShares = async () => {
@@ -19,8 +25,14 @@ const ShareList: React.FC = () => {
   }, []);
 
   const handleLoad = (share: IglooShare) => {
-    console.log(`Loading share: ${share.name}`);
-    // This would integrate with the actual load functionality later
+    setLoadingShare(share);
+  };
+
+  const handleLoadComplete = (decryptedShare: string, groupCredential: string) => {
+    if (onShareLoaded) {
+      onShareLoaded(decryptedShare, groupCredential);
+    }
+    setLoadingShare(null);
   };
 
   const handleOpenLocation = async (share: IglooShare) => {
@@ -75,6 +87,18 @@ const ShareList: React.FC = () => {
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No shares available</p>
           <p className="text-sm text-gray-500">Switch to the Create tab to create your first share</p>
+        </div>
+      )}
+
+      {loadingShare && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+          <div className="w-full max-w-md mx-4">
+            <LoadShare 
+              share={loadingShare}
+              onLoad={handleLoadComplete}
+              onCancel={() => setLoadingShare(null)}
+            />
+          </div>
         </div>
       )}
     </>
