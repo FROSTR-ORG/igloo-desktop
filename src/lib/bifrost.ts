@@ -76,7 +76,35 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   const decodedGroup  = decode_group_pkg(group)
   const decodedShare  = decode_share_pkg(share)
 
-  return new BifrostNode(decodedGroup, decodedShare, relays)
+  const node = new BifrostNode(decodedGroup, decodedShare, relays)
+
+  // Base events
+  node.on('ready', () => console.log('Bifrost node is ready'))
+  node.on('closed', () => console.log('Bifrost node is closed'))
+  node.on('message', (msg: any) => console.log('Received message:', msg))
+  node.on('bounced', ([reason, msg]: [string, any]) => console.log('Message bounced:', reason, msg))
+
+  // ECDH events
+  node.on('/ecdh/sender/req', (msg: any) => console.log('ECDH request sent:', msg))
+  node.on('/ecdh/sender/res', (msgs: any[]) => console.log('ECDH responses received:', msgs))
+  node.on('/ecdh/sender/rej', ([reason, pkg]: [string, any]) => console.log('ECDH request rejected:', reason, pkg))
+  node.on('/ecdh/sender/sec', ([reason, pkgs]: [string, any[]]) => console.log('ECDH shares aggregated:', reason, pkgs))
+  node.on('/ecdh/sender/err', ([reason, msgs]: [string, any[]]) => console.log('ECDH share aggregation failed:', reason, msgs))
+  node.on('/ecdh/handler/req', (msg: any) => console.log('ECDH request received:', msg))
+  node.on('/ecdh/handler/res', (msg: any) => console.log('ECDH response sent:', msg))
+  node.on('/ecdh/handler/rej', ([reason, msg]: [string, any]) => console.log('ECDH rejection sent:', reason, msg))
+
+  // Signature events
+  node.on('/sign/sender/req', (msg: any) => console.log('Signature request sent:', msg))
+  node.on('/sign/sender/res', (msgs: any[]) => console.log('Signature responses received:', msgs))
+  node.on('/sign/sender/rej', ([reason, pkg]: [string, any]) => console.log('Signature request rejected:', reason, pkg))
+  node.on('/sign/sender/sig', ([reason, msgs]: [string, any[]]) => console.log('Signature shares aggregated:', reason, msgs))
+  node.on('/sign/sender/err', ([reason, msgs]: [string, any[]]) => console.log('Signature share aggregation failed:', reason, msgs))
+  node.on('/sign/handler/req', (msg: any) => console.log('Signature request received:', msg))
+  node.on('/sign/handler/res', (msg: any) => console.log('Signature response sent:', msg))
+  node.on('/sign/handler/rej', ([reason, msg]: [string, any]) => console.log('Signature rejection sent:', reason, msg))
+
+  return node
 }
 
 export function decode_share(share: string) {
