@@ -47,7 +47,6 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   const handleSaveComplete = async (password: string, salt: string, encryptedShare: string) => {
     if (showSaveDialog.shareIndex === null) return;
 
-    const shareCredential = shareCredentials[showSaveDialog.shareIndex];
     const decodedShare = decodedShares[showSaveDialog.shareIndex];
     
     // Create a share object to save

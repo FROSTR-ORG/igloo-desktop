@@ -8,7 +8,6 @@ import {
 } from '@frostr/bifrost/lib'
 import { BifrostNode } from '@frostr/bifrost'
 import type {
-  BifrostNodeConfig,
   GroupPackage,
   SharePackage
 } from '@frostr/bifrost'

@@ -5,17 +5,13 @@ interface LoadShareProps {
   share: {
     id: string;
     name: string;
-    share: string; // encrypted share
+    encryptedShare: string;
     salt: string;
     groupCredential: string;
   };
   onLoad?: (decryptedShare: string, groupCredential: string) => void;
   onCancel?: () => void;
 }
-
-// validate share is part of group
-// validate correct index
-// validate share is not already loaded
 
 const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
   const [password, setPassword] = useState<string>('');
@@ -34,10 +30,10 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       const secret = derive_secret(password, share.salt);
       
       // Decrypt the share
-      const decryptedShare = decrypt_payload(secret, share.share);
+      const decryptedShare = decrypt_payload(secret, share.encryptedShare);
       
-      // Validate the decrypted share format (should start with 'bfshare1')
-      if (!decryptedShare.startsWith('bfshare1')) {
+      // Validate the decrypted share format (should start with 'bfshare')
+      if (!decryptedShare.startsWith('bfshare')) {
         setError('Invalid password or corrupted share data');
         return;
       }
