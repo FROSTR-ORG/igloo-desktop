@@ -3,26 +3,27 @@
 Frostr keyset manager and remote signer.
 
 ### Implemented Features
-- [x] Key generation
-- [x] Key rotation
+- [x] Keyset generation
 - [x] Nsec import
 - [x] Remote signing
+- [x] Save Encrypted Shares to file system
+- [X] Recover NSEC from threshold of shares
 
 ### TODO
-- [ ] Encrypted App State
-    <!-- 
-    Generate a random salt number
-    User puts in custom password for a given keyset
-    use @noble/hashes to derive key from password and salt (pbkdf2)
-    use key to encrypt/decrypt key share state in folders in the file system
-    In file save Buff.join([salt, encryptedData])
-    In file read, split the data into salt and encryptedData and use the salt with user entered password to derive the key 
-    -->
+- [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
+- [ ] FAQ:
+  - What is a share?
+  - What is a group?
+  - What is a relay?
+  - What is an nsec?
+  - What does it mean to create a new keyset?
+  - What does it mean to recover a keyset?
+  - How do you rotate a keyset?
 - [ ] Better Logging
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect
 - [ ] Build pipeline
-- [ ] Signed binary 
+- [ ] Signed binary for Windows, Linux, MacOS
 
 ### Run Locally
 ```bash
