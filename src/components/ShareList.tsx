@@ -126,7 +126,7 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No shares available</p>
-          <p className="text-sm text-gray-500">Click the Create New button to create your first share</p>
+          <p className="text-sm text-gray-500">Click the Create New button to create a keyset</p>
         </div>
       )}
 
