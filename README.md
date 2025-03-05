@@ -33,7 +33,7 @@ npm run start
 
 ### App Screens:
 ShareList: detect existing share files in filesystem
-<img width="1167" alt="Screenshot 2025-03-05 at 3 12 24 PM" src="https://github.com/user-attachments/assets/cd0756df-84f3-491f-9260-5618ea9401a8" />
+<img width="1124" alt="Screenshot 2025-03-05 at 3 38 49 PM" src="https://github.com/user-attachments/assets/4c5f30f8-9e2c-49b0-9eb1-b00c5a7faad4" />
 
 Create: create a new keyset by generating a new nsec or pasting in your own
 <img width="1165" alt="Screenshot 2025-03-05 at 3 12 47 PM" src="https://github.com/user-attachments/assets/a80e0cba-5a2c-4c50-8623-1c4750517bb1" />
