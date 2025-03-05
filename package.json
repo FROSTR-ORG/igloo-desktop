@@ -1,7 +1,7 @@
 {
   "name": "igloo",
   "version": "1.0.0",
-  "description": "Minimal Electron TypeScript boilerplate",
+  "description": "Frostr desktop signer and key management app",
   "main": "dist/main.js",
   "scripts": {
     "start": "npm run build && electron .",
