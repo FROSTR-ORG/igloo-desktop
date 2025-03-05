@@ -134,7 +134,10 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
           <div className="w-full max-w-md mx-4">
             <LoadShare 
-              share={loadingShare}
+              share={{
+                ...loadingShare,
+                encryptedShare: loadingShare.share
+              }}
               onLoad={handleLoadComplete}
               onCancel={() => setLoadingShare(null)}
             />
