@@ -1,10 +1,11 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { generateRandomKeyset, generateKeysetWithSecret } from "@/lib/bifrost"
+import { generateKeysetWithSecret } from "@/lib/bifrost"
 import { generateNsec, nsecToHex } from "@/lib/nostr"
 import { ArrowLeft } from 'lucide-react';
+import { clientShareManager } from '@/lib/clientShareManager';
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
@@ -19,6 +20,29 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const [keysetName, setKeysetName] = useState("");
   const [nsec, setNsec] = useState("");
   const [isValidNsec, setIsValidNsec] = useState(false);
+  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [isNameValid, setIsNameValid] = useState(true);
+
+  useEffect(() => {
+    const loadExistingNames = async () => {
+      const shares = await clientShareManager.getShares();
+      if (shares) {
+        const names = shares.map(share => share.name.split(' share ')[0]);
+        setExistingNames(names);
+      }
+    };
+    loadExistingNames();
+  }, []);
+
+  const handleNameChange = (value: string) => {
+    setKeysetName(value);
+    if (value.trim()) {
+      const nameWithoutShare = value.split(' share ')[0];
+      setIsNameValid(!existingNames.includes(nameWithoutShare));
+    } else {
+      setIsNameValid(false);
+    }
+  };
 
   const handleGenerateNsec = async () => {
     setIsGenerating(true);
@@ -56,7 +80,7 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   };
 
   const handleCreateKeyset = async () => {
-    if (!keysetName.trim() || !nsec.trim() || !isValidNsec) return;
+    if (!keysetName.trim() || !nsec.trim() || !isValidNsec || !isNameValid) return;
 
     setIsGenerating(true);
     try {
@@ -106,10 +130,15 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               type="text"
               placeholder="Enter a name for this keyset"
               value={keysetName}
-              onChange={(e) => setKeysetName(e.target.value)}
-              className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+              onChange={(e) => handleNameChange(e.target.value)}
+              className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm ${
+                keysetName && !isNameValid ? 'border-red-500' : ''
+              }`}
               disabled={isGenerating}
             />
+            {keysetName && !isNameValid && (
+              <p className="text-red-400 text-sm">This keyset name already exists</p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -177,7 +206,7 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         <Button
           onClick={handleCreateKeyset}
           className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isGenerating || !keysetName.trim() || !nsec.trim() || !isValidNsec}
+          disabled={isGenerating || !keysetName.trim() || !nsec.trim() || !isValidNsec || !isNameValid}
         >
           {isGenerating ? "Creating..." : "Create keyset"}
         </Button>

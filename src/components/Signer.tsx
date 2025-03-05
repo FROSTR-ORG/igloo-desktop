@@ -12,6 +12,8 @@ interface SignerProps {
   } | null;
 }
 
+const DEFAULT_RELAY = "wss://relay.damus.io";
+
 const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
@@ -25,11 +27,21 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   
   const nodeRef = useRef<any>(null);
 
-  // Update fields when initialData changes
+  // Update fields and auto-connect when initialData changes
   useEffect(() => {
     if (initialData) {
       setSignerSecret(initialData.share);
       setGroupCredential(initialData.groupCredential);
+      
+      // Add default relay if not already present
+      if (!relayUrls.includes(DEFAULT_RELAY)) {
+        setRelayUrls([DEFAULT_RELAY]);
+      }
+      
+      // Auto-start the signer if we have all required data
+      if (initialData.share && initialData.groupCredential) {
+        handleStartSigner();
+      }
     }
   }, [initialData]);
 

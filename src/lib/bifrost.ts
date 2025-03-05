@@ -15,36 +15,6 @@ import type {
 import { nip19 } from 'nostr-tools'
 
 /**
- * Generates a keyset with a random secret
- * @param threshold Number of shares required to sign
- * @param totalMembers Total number of shares to create
- * @returns Object containing encoded group and share credentials
- */
-export function generateRandomKeyset(threshold: number, totalMembers: number) {
-  validateKeysetParams(threshold, totalMembers);
-  try {
-    const secretKey = Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex');
-    
-    if (!secretKey) {
-      throw new Error('Failed to generate secure random key');
-    }
-
-    const { group, shares } = generate_dealer_pkg(
-      threshold,
-      totalMembers,
-      [secretKey]
-    );
-
-    return {
-      groupCredential: encode_group_pkg(group),
-      shareCredentials: shares.map(encode_share_pkg)
-    };
-  } catch (error: any) {
-    throw new Error(`Failed to generate keyset: ${error.message}`);
-  }
-}
-
-/**
  * Generates a keyset with a provided secret
  * @param threshold Number of shares required to sign
  * @param totalMembers Total number of shares to create
