@@ -3,21 +3,13 @@
 Frostr keyset manager and remote signer.
 
 ### Implemented Features
-- [x] Key generation
-- [x] Key rotation
+- [x] Keyset generation
 - [x] Nsec import
 - [x] Remote signing
+- [x] Save Encrypted Shares to file system
+- [X] Recover NSEC from threshold of shares
 
 ### TODO
-- [ ] Save Encrypted Shares to file system
-- [ ] Recover NSEC from threshold of shares
-  <!-- 
-  - If nsec is entered for rotation then get the pubkey of that nsec and verify that it matches the pubkey of the current share loaded in the UI.
-  -->
-  <!-- 
-  Ensure that keyset with name already saved in file system can not be created again.
-  -->
-  <!-- Add confirm password for saving each share-->
 - [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
 - [ ] FAQ:
   - What is a share?
@@ -31,7 +23,7 @@ Frostr keyset manager and remote signer.
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect
 - [ ] Build pipeline
-- [ ] Signed binary 
+- [ ] Signed binary for Windows, Linux, MacOS
 
 ### Run Locally
 ```bash

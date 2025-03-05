@@ -35,6 +35,14 @@ const App: React.FC = () => {
 
   const handleShareLoaded = (share: string, groupCredential: string) => {
     setSignerData({ share, groupCredential });
+    // Ensure we're on the signer tab when a share is loaded
+    const signerTab = document.querySelector('[data-state="active"][value="signer"]');
+    if (!signerTab) {
+      const signerTabTrigger = document.querySelector('[value="signer"]');
+      if (signerTabTrigger instanceof HTMLElement) {
+        signerTabTrigger.click();
+      }
+    }
   };
 
   const handleBackToShares = () => {

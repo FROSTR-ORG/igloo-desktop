@@ -9,7 +9,9 @@ interface SaveShareProps {
 
 const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
   const [password, setPassword] = useState<string>('');
+  const [confirmPassword, setConfirmPassword] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
+  const [passwordsMatch, setPasswordsMatch] = useState<boolean>(true);
 
   const generateSalt = () => {
     const array = new Uint8Array(16);
@@ -17,11 +19,36 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
     return bytesToHex(array);
   };
 
+  const validatePasswords = (pass: string, confirm: string) => {
+    if (pass && confirm && pass === confirm) {
+      setPasswordsMatch(true);
+      setError(null);
+    } else if (confirm) {
+      setPasswordsMatch(false);
+      setError('Passwords do not match');
+    }
+  };
+
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    validatePasswords(value, confirmPassword);
+  };
+
+  const handleConfirmPasswordChange = (value: string) => {
+    setConfirmPassword(value);
+    validatePasswords(password, value);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!password) {
-      setError('Please enter a password');
+    if (!password || !confirmPassword) {
+      setError('Please enter both password fields');
+      return;
+    }
+
+    if (!passwordsMatch) {
+      setError('Passwords do not match');
       return;
     }
 
@@ -50,6 +77,7 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
       
       // Reset form
       setPassword('');
+      setConfirmPassword('');
     } catch (err) {
       setError('Failed to encrypt share: ' + (err instanceof Error ? err.message : String(err)));
     }
@@ -74,15 +102,34 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
             id="share-password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => handlePasswordChange(e.target.value)}
             placeholder="Enter password to encrypt this share"
-            className="w-full bg-gray-800 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500"
+            className={`w-full bg-gray-800 border ${
+              confirmPassword && !passwordsMatch ? 'border-red-500' : 'border-gray-700'
+            } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500`}
+          />
+        </div>
+
+        <div className="space-y-2">
+          <label htmlFor="confirm-password" className="block text-blue-200 text-sm">
+            Confirm Password
+          </label>
+          <input
+            id="confirm-password"
+            type="password"
+            value={confirmPassword}
+            onChange={(e) => handleConfirmPasswordChange(e.target.value)}
+            placeholder="Confirm password"
+            className={`w-full bg-gray-800 border ${
+              confirmPassword && !passwordsMatch ? 'border-red-500' : 'border-gray-700'
+            } focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500`}
           />
         </div>
         
         <button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-blue-100 font-medium py-2 px-4 rounded-md transition-colors"
+          className="w-full bg-blue-600 hover:bg-blue-700 text-blue-100 font-medium py-2 px-4 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={!password || !confirmPassword || !passwordsMatch}
         >
           Save Share
         </button>
