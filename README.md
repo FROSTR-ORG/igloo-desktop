@@ -4,10 +4,10 @@ Frostr keyset manager and remote signer.
 
 ### Implemented Features
 - [x] Keyset generation
-- [x] Nsec import
-- [x] Remote signing
-- [x] Save Encrypted Shares to file system
-- [X] Recover NSEC from threshold of shares
+- [x] Nsec import (for keyset generation)
+- [x] Remote signing (using single share)
+- [x] Save individual Encrypted Shares to file system
+- [X] Recover nsec from threshold of shares
 
 ### TODO
 - [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
