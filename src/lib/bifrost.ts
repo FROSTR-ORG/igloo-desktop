@@ -6,7 +6,7 @@ import {
   generate_dealer_pkg,
   recover_secret_key
 } from '@frostr/bifrost/lib'
-import { BifrostNode } from '@frostr/bifrost'
+import { BifrostNode, BifrostNodeEvent, SignatureEntry } from '@frostr/bifrost'
 import type {
   GroupPackage,
   SharePackage
@@ -64,7 +64,7 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   node.on('/ecdh/sender/req', (msg: any) => console.log('ECDH request sent:', msg))
   node.on('/ecdh/sender/res', (msgs: any[]) => console.log('ECDH responses received:', msgs))
   node.on('/ecdh/sender/rej', ([reason, pkg]: [string, any]) => console.log('ECDH request rejected:', reason, pkg))
-  node.on('/ecdh/sender/sec', ([reason, pkgs]: [string, any[]]) => console.log('ECDH shares aggregated:', reason, pkgs))
+  node.on('/ecdh/sender/ret', ([reason, pkgs]: [string, string]) => console.log('ECDH shares aggregated:', reason, pkgs))
   node.on('/ecdh/sender/err', ([reason, msgs]: [string, any[]]) => console.log('ECDH share aggregation failed:', reason, msgs))
   node.on('/ecdh/handler/req', (msg: any) => console.log('ECDH request received:', msg))
   node.on('/ecdh/handler/res', (msg: any) => console.log('ECDH response sent:', msg))
@@ -74,7 +74,7 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   node.on('/sign/sender/req', (msg: any) => console.log('Signature request sent:', msg))
   node.on('/sign/sender/res', (msgs: any[]) => console.log('Signature responses received:', msgs))
   node.on('/sign/sender/rej', ([reason, pkg]: [string, any]) => console.log('Signature request rejected:', reason, pkg))
-  node.on('/sign/sender/sig', ([reason, msgs]: [string, any[]]) => console.log('Signature shares aggregated:', reason, msgs))
+  node.on('/sign/sender/ret', ([reason, msgs]: [string, SignatureEntry[]]) => console.log('Signature shares aggregated:', reason, msgs))
   node.on('/sign/sender/err', ([reason, msgs]: [string, any[]]) => console.log('Signature share aggregation failed:', reason, msgs))
   node.on('/sign/handler/req', (msg: any) => console.log('Signature request received:', msg))
   node.on('/sign/handler/res', (msg: any) => console.log('Signature response sent:', msg))
