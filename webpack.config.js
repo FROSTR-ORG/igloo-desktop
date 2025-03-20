@@ -25,10 +25,7 @@ module.exports = {
       },
       {
         test: /\.(png|jpe?g|gif)$/i,
-        type: 'asset/resource',
-        generator: {
-          filename: 'assets/[name][ext]'
-        }
+        type: 'asset/resource'
       },
     ],
   },
@@ -36,13 +33,12 @@ module.exports = {
     plugins: [new TsconfigPathsPlugin()],
     extensions: ['.tsx', '.ts', '.js', '.jsx'],
     alias: {
-      'react/jsx-runtime': require.resolve('react/jsx-runtime.js'),
-      '@': path.resolve(__dirname, 'src')
+      'react/jsx-runtime': require.resolve('react/jsx-runtime.js')
     }
   },
   output: {
     filename: 'renderer.js',
     path: path.resolve(__dirname, 'dist'),
-    publicPath: './'
+    publicPath: ''
   },
 };
