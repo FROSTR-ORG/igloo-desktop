@@ -9,7 +9,8 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: true,
       contextIsolation: false
-    }
+    },
+    icon: path.join(__dirname, '..', 'src', 'assets', 'frostr-logo-transparent.png')
   });
 
   // In development, use the local file

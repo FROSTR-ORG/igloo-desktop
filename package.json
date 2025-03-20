@@ -26,17 +26,16 @@
     "appId": "com.igloo.app",
     "productName": "Igloo",
     "directories": {
-      "output": "release",
-      "buildResources": "build"
+      "output": "release"
     },
     "files": [
       "dist/**/*",
       "package.json",
       "index.html",
-      "globals.css"
+      "globals.css",
+      "src/assets/**/*"
     ],
     "mac": {
-      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -53,11 +52,11 @@
           ]
         }
       ],
+      "icon": "src/assets/frostr-logo-transparent.png",
       "identity": null,
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
-      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -72,10 +71,10 @@
           ]
         }
       ],
+      "icon": "src/assets/frostr-logo-transparent.png",
       "artifactName": "${productName}-${version}.${ext}"
     },
     "linux": {
-      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "AppImage",
@@ -90,6 +89,7 @@
           ]
         }
       ],
+      "icon": "src/assets/frostr-logo-transparent.png",
       "artifactName": "${name}-${version}.${ext}",
       "category": "Utility"
     },
@@ -100,8 +100,7 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
-    },
-    "publish": null
+    }
   },
   "devDependencies": {
     "@types/prop-types": "^15.7.13",
