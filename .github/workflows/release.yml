@@ -133,7 +133,11 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          cp -r all-artifacts/*/* release/
+          # Copy files from each artifact directory separately and handle duplicates
+          for dir in all-artifacts/*; do
+            # Only copy the actual release files, not debug files
+            find "$dir" -type f -name "Igloo*" -o -name "igloo*" -exec cp -f {} release/ \;
+          done
           ls -la release/
       
       - name: Import GPG key
