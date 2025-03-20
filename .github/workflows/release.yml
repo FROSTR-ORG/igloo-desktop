@@ -1,0 +1,196 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+      version: ${{ steps.get_version.outputs.version }}
+    steps:
+      - name: Extract version
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: Release ${{ github.ref }}
+          draft: true
+          prerelease: false
+
+  build-linux:
+    name: Build Linux
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build Linux
+        run: npm run dist:linux
+        
+      - name: Upload Linux artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: linux-artifacts
+          path: release/
+
+  build-macos:
+    name: Build macOS
+    needs: release
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build macOS
+        run: npm run dist:mac
+        
+      - name: Upload macOS artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: macos-artifacts
+          path: release/
+
+  build-windows:
+    name: Build Windows
+    needs: release
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '18'
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: npm ci
+        
+      - name: Build Windows
+        run: npm run dist:win
+        
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@v2
+        with:
+          name: windows-artifacts
+          path: release/
+
+  sign-and-publish:
+    name: Sign and Publish
+    needs: [release, build-linux, build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      
+      - name: Download all artifacts
+        uses: actions/download-artifact@v2
+        with:
+          path: all-artifacts
+      
+      - name: Prepare release files
+        run: |
+          mkdir -p release
+          cp -r all-artifacts/*/* release/
+          ls -la release/
+      
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v5
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+      
+      - name: Generate and sign checksums
+        run: |
+          cd release
+          shasum -a 256 Igloo* > SHA256SUMS
+          gpg --detach-sign --armor SHA256SUMS
+          cd ..
+      
+      - name: Upload assets to release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: release/*
+          tag_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Update release notes
+        uses: softprops/action-gh-release@v1
+        with:
+          body: |
+            # Igloo v${{ needs.release.outputs.version }}
+            
+            ## Downloads
+            
+            Choose the appropriate file for your platform:
+            
+            - **Windows**:
+              - `Igloo-Setup-${{ needs.release.outputs.version }}.exe` - Installer
+              - `Igloo-${{ needs.release.outputs.version }}.exe` - Portable
+            
+            - **macOS**:
+              - `Igloo-${{ needs.release.outputs.version }}.dmg` - Disk Image
+              - `Igloo-${{ needs.release.outputs.version }}-mac.zip` - ZIP Archive
+            
+            - **Linux**:
+              - `igloo-${{ needs.release.outputs.version }}.AppImage` - AppImage
+              - `igloo_${{ needs.release.outputs.version }}.deb` - Debian Package
+            
+            ## Verification
+            
+            All releases are GPG signed. Follow these steps to verify your download:
+            
+            1. Download the release files and SHA256SUMS and SHA256SUMS.asc files
+            2. Import the developer's public key:
+               ```bash
+               curl -sL https://raw.githubusercontent.com/${{ github.repository }}/main/keys/igloo-signing-key.asc | gpg --import
+               ```
+            3. Verify the signature of the checksums file:
+               ```bash
+               gpg --verify SHA256SUMS.asc SHA256SUMS
+               ```
+            4. Verify the downloaded files against the checksums:
+               ```bash
+               # macOS/Linux
+               shasum -a 256 --check SHA256SUMS
+               
+               # Windows (PowerShell)
+               Get-FileHash -Algorithm SHA256 Igloo-Setup-*.exe | Format-List
+               ```
+            
+            For detailed instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
+          tag_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
