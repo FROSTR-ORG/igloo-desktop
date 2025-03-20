@@ -34,24 +34,45 @@
     ],
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
       ],
-      "identity": null
+      "identity": null,
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
       "target": [
-        "nsis",
-        "portable"
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
       ],
-      "signingHashAlgorithms": null
+      "signingHashAlgorithms": null,
+      "artifactName": "${productName}-Setup-${version}.${ext}"
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "artifactName": "${name}-${version}.${ext}"
     },
     "publish": {
       "provider": "github",
