@@ -116,8 +116,8 @@ jobs:
           name: windows-artifacts
           path: release/
 
-  sign-and-publish:
-    name: Sign and Publish
+  publish:
+    name: Publish Release
     needs: [release, build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     env:
@@ -139,19 +139,6 @@ jobs:
             find "$dir" -type f -name "Igloo*" -o -name "igloo*" -exec cp -f {} release/ \;
           done
           ls -la release/
-      
-      - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v6
-        with:
-          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-          passphrase: ${{ secrets.GPG_PASSPHRASE }}
-      
-      - name: Generate and sign checksums
-        run: |
-          cd release
-          shasum -a 256 Igloo* > SHA256SUMS
-          gpg --detach-sign --armor SHA256SUMS
-          cd ..
       
       - name: Upload assets to release
         uses: softprops/action-gh-release@v1
@@ -181,26 +168,8 @@ jobs:
             
             ## Verification
             
-            All releases are GPG signed. Follow these steps to verify your download:
+            All releases are signed with GPG. The developer's public key can be found in the repository under `keys/igloo-signing-key.asc`.
             
-            1. Download the release files and SHA256SUMS and SHA256SUMS.asc files
-            2. Import the developer's public key:
-               ```bash
-               curl -sL https://raw.githubusercontent.com/${{ github.repository }}/main/keys/igloo-signing-key.asc | gpg --import
-               ```
-            3. Verify the signature of the checksums file:
-               ```bash
-               gpg --verify SHA256SUMS.asc SHA256SUMS
-               ```
-            4. Verify the downloaded files against the checksums:
-               ```bash
-               # macOS/Linux
-               shasum -a 256 --check SHA256SUMS
-               
-               # Windows (PowerShell)
-               Get-FileHash -Algorithm SHA256 Igloo-Setup-*.exe | Format-List
-               ```
-            
-            For detailed instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
+            For detailed verification instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
