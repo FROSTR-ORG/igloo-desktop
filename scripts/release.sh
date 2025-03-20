@@ -3,42 +3,44 @@
 
 set -e
 
-# Check if version is provided
+# Check if version argument is provided
 if [ -z "$1" ]; then
-  echo "Usage: ./release.sh <version>"
-  echo "Example: ./release.sh 1.0.0"
-  exit 1
+    echo "Please provide a version number (e.g. ./scripts/release.sh 1.0.0)"
+    exit 1
 fi
 
 VERSION=$1
 
-# 1. Update version in package.json
-echo "Updating version to $VERSION..."
-# Use sed to directly update package.json
-sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
+# Ensure we're in a clean state
+if [ -n "$(git status --porcelain)" ]; then
+    echo "Working directory is not clean. Please commit or stash changes first."
+    exit 1
+fi
 
-# 2. Build for all platforms
-echo "Building release..."
-npm run dist
+# Update version in package.json
+npm version $VERSION --no-git-tag-version
 
-# 3. Generate and sign checksums
-echo "Generating and signing checksums..."
-cd release
-rm -f SHA256SUMS SHA256SUMS.asc
-shasum -a 256 Igloo* > SHA256SUMS
-gpg --detach-sign --armor SHA256SUMS
-cd ..
-
-# 4. Create git tag
-echo "Creating git tag..."
+# Commit version change
 git add package.json
 git commit -m "Release $VERSION"
+
+# Create signed tag
 git tag -s "v$VERSION" -m "Release $VERSION"
 
-echo "Release v$VERSION prepared!"
+# Build the app
+echo "Building application..."
+npm run build
+npm run dist
+
+echo "Release v$VERSION prepared successfully!"
 echo ""
 echo "Next steps:"
-echo "1. Verify the build: ./scripts/verify.sh"
-echo "2. Push the release: git push origin main && git push origin v$VERSION"
+echo "1. Run './scripts/verify.sh' to verify the build"
+echo "2. If verification passes, push the release:"
+echo "   git push origin main"
+echo "   git push origin v$VERSION"
 echo ""
-echo "The GitHub Action will automatically create the release and upload assets." 
+echo "The GitHub Action will automatically:"
+echo "- Build for all platforms"
+echo "- Create a GitHub release"
+echo "- Upload all binaries" 
