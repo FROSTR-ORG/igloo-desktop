@@ -94,7 +94,9 @@ npm run dist
 
 Each release includes:
 - Windows: `Igloo-Setup-x.y.z.exe` (installer), `Igloo-x.y.z.exe` (portable)
-- macOS: `Igloo-x.y.z.dmg`, `Igloo-x.y.z-mac.zip`
+- macOS: 
+  - Intel Mac: `Igloo-x.y.z-x64.dmg`, `Igloo-x.y.z-x64.zip`
+  - Apple Silicon: `Igloo-x.y.z-arm64.dmg`, `Igloo-x.y.z-arm64.zip`
 - Linux: `igloo-x.y.z.AppImage`, `igloo_x.y.z.deb`
 
 ## Security Notes

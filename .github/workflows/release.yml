@@ -186,8 +186,10 @@ jobs:
               - `Igloo-${{ needs.release.outputs.version }}-portable.exe` - Portable
             
             - **macOS**:
-              - `Igloo-${{ needs.release.outputs.version }}-x64.dmg` - Disk Image
-              - `Igloo-${{ needs.release.outputs.version }}-x64.zip` - ZIP Archive
+              - `Igloo-${{ needs.release.outputs.version }}-x64.dmg` - Intel Mac Disk Image
+              - `Igloo-${{ needs.release.outputs.version }}-arm64.dmg` - Apple Silicon Mac Disk Image
+              - `Igloo-${{ needs.release.outputs.version }}-x64.zip` - Intel Mac ZIP Archive
+              - `Igloo-${{ needs.release.outputs.version }}-arm64.zip` - Apple Silicon Mac ZIP Archive
             
             - **Linux**:
               - `igloo-${{ needs.release.outputs.version }}.AppImage` - AppImage
