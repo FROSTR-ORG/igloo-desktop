@@ -19,16 +19,16 @@ jobs:
     steps:
       - name: Extract version
         id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Create Release
         id: create_release
-        uses: actions/create-release@v1
+        uses: softprops/action-gh-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
+          name: Release ${{ github.ref }}
           draft: true
           prerelease: false
 
@@ -37,10 +37,10 @@ jobs:
     needs: release
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -52,7 +52,7 @@ jobs:
         run: npm run dist:linux
         
       - name: Upload Linux artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: linux-artifacts
           path: release/
@@ -62,10 +62,10 @@ jobs:
     needs: release
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -77,7 +77,7 @@ jobs:
         run: npm run dist:mac
         
       - name: Upload macOS artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: macos-artifacts
           path: release/
@@ -87,10 +87,10 @@ jobs:
     needs: release
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v4
         with:
           node-version: '18'
           cache: 'npm'
@@ -102,7 +102,7 @@ jobs:
         run: npm run dist:win
         
       - name: Upload Windows artifacts
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
           name: windows-artifacts
           path: release/
@@ -112,10 +112,10 @@ jobs:
     needs: [release, build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: all-artifacts
       
@@ -126,7 +126,7 @@ jobs:
           ls -la release/
       
       - name: Import GPG key
-        uses: crazy-max/ghaction-import-gpg@v5
+        uses: crazy-max/ghaction-import-gpg@v6
         with:
           gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
           passphrase: ${{ secrets.GPG_PASSPHRASE }}
@@ -145,12 +145,6 @@ jobs:
           tag_name: ${{ github.ref }}
           draft: false
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Update release notes
-        uses: softprops/action-gh-release@v1
-        with:
           body: |
             # Igloo v${{ needs.release.outputs.version }}
             
@@ -193,8 +187,5 @@ jobs:
                ```
             
             For detailed instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
-          tag_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
