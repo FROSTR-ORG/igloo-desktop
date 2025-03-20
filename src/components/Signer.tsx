@@ -82,24 +82,39 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
 
       nodeRef.current = node;
 
-      node.client.on('ready', () => {
+      // Store event listener references for cleanup
+      const readyListener = () => {
         console.log('node connected');
         setIsSignerRunning(true);
-      });
+      };
       
-      node.client.on('message', (msg) => {
+      const messageListener = (msg: any) => {
         console.log('received message event:', msg);
-      });
+      };
 
-      node.client.on('error', (error) => {
+      const errorListener = (error: unknown) => {
         console.error('node error:', error);
         setIsSignerRunning(false);
-      });
+      };
 
-      node.client.on('disconnect', () => {
+      const disconnectListener = () => {
         console.log('node disconnected');
         setIsSignerRunning(false);
-      });
+      };
+
+      // Store listeners in nodeRef for cleanup
+      nodeRef.current.listeners = {
+        ready: readyListener,
+        message: messageListener,
+        error: errorListener,
+        disconnect: disconnectListener
+      };
+
+      // Attach listeners
+      node.client.on('ready', readyListener);
+      node.client.on('message', messageListener);
+      node.client.on('error', errorListener);
+      node.client.on('disconnect', disconnectListener);
 
       await node.connect();
     } catch (error) {
@@ -111,14 +126,17 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const handleStopSigner = async () => {
     try {
       if (nodeRef.current) {
-        // First remove all event listeners to prevent memory leaks
-        nodeRef.current.client.removeAllListeners('ready');
-        nodeRef.current.client.removeAllListeners('message');
-        nodeRef.current.client.removeAllListeners('error');
-        nodeRef.current.client.removeAllListeners('disconnect');
+        // Remove event listeners using stored references
+        if (nodeRef.current.listeners) {
+          const { ready, message, error, disconnect } = nodeRef.current.listeners;
+          nodeRef.current.client.off('ready', ready);
+          nodeRef.current.client.off('message', message);
+          nodeRef.current.client.off('error', error);
+          nodeRef.current.client.off('disconnect', disconnect);
+        }
         
         // Disconnect the node
-        await nodeRef.current.disconnect();
+        await nodeRef.current.listeners.disconnect();
         nodeRef.current = null;
       }
       setIsSignerRunning(false);
