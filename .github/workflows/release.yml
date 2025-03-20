@@ -133,11 +133,13 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          # Copy files from each artifact directory separately and handle duplicates
+          # Copy files from each artifact directory separately
           for dir in all-artifacts/*; do
-            # Only copy the actual release files, not debug files
-            find "$dir" -type f -name "Igloo*" -o -name "igloo*" -exec cp -f {} release/ \;
+            # Copy both Igloo* and igloo* files
+            find "$dir" -type f \( -name "Igloo*" -o -name "igloo*" \) -exec cp -f {} release/ \;
           done
+          # List files for verification
+          echo "Files prepared for release:"
           ls -la release/
       
       - name: Upload assets to release
