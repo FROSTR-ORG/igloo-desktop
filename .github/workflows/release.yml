@@ -138,16 +138,16 @@ jobs:
           
           echo "Copying release files..."
           # Windows
-          find all-artifacts/windows-artifacts -type f -name "Igloo-Setup-*.exe" -exec cp {} release/ \; || true
-          find all-artifacts/windows-artifacts -type f -name "Igloo-*.exe" ! -name "Igloo-Setup-*.exe" -exec cp {} release/ \; || true
+          cp all-artifacts/windows-artifacts/Igloo-Setup-*.exe release/ || echo "No Windows installer found"
+          cp all-artifacts/windows-artifacts/Igloo-*.exe release/ || echo "No Windows portable found"
           
           # macOS
-          find all-artifacts/macos-artifacts -type f -name "Igloo-*-x64.dmg" -exec cp {} release/ \; || true
-          find all-artifacts/macos-artifacts -type f -name "Igloo-*-x64-mac.zip" -exec cp {} release/ \; || true
+          cp all-artifacts/macos-artifacts/Igloo-*-x64.dmg release/ || echo "No macOS DMG found"
+          cp all-artifacts/macos-artifacts/Igloo-*-x64-mac.zip release/ || echo "No macOS ZIP found"
           
           # Linux
-          find all-artifacts/linux-artifacts -type f -name "igloo-*.AppImage" -exec cp {} release/ \; || true
-          find all-artifacts/linux-artifacts -type f -name "igloo_*_amd64.deb" -exec cp {} release/ \; || true
+          cp all-artifacts/linux-artifacts/igloo-*.AppImage release/ || echo "No Linux AppImage found"
+          cp all-artifacts/linux-artifacts/igloo_*_amd64.deb release/ || echo "No Linux DEB found"
           
           # Remove any blockmap files
           rm -f release/*.blockmap
@@ -157,17 +157,14 @@ jobs:
       
       - name: Upload assets to release
         uses: softprops/action-gh-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: |
-            release/Igloo-Setup-*.exe
-            release/Igloo-*.exe
-            release/Igloo-*-x64.dmg
-            release/Igloo-*-x64-mac.zip
-            release/igloo-*.AppImage
-            release/igloo_*_amd64.deb
+          files: release/*
           tag_name: ${{ github.ref }}
           draft: false
           prerelease: false
+          fail_on_unmatched_files: false
           body: |
             # Igloo v${{ needs.release.outputs.version }}
             
@@ -191,6 +188,4 @@ jobs:
             
             All releases are signed with GPG. The developer's public key can be found in the repository under `keys/igloo-signing-key.asc`.
             
-            For detailed verification instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 
+            For detailed verification instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md) 
