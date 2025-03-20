@@ -34,23 +34,26 @@
       "index.html",
       "globals.css"
     ],
+    "icon": "src/assets/frostr-logo-transparent.png",
     "mac": {
       "target": [
         {
           "target": "dmg",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "x64"
+            "x64",
+            "arm64"
           ]
         }
       ],
       "identity": null,
-      "artifactName": "${productName}-${version}-x64.${ext}"
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
       "target": [
