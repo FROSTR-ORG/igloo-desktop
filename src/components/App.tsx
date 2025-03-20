@@ -1,5 +1,4 @@
 import React, { useState } from "react"
-import FrostrLogo from "@/assets/frostr-logo-transparent.png"
 import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
@@ -62,7 +61,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
         <div className="w-full max-w-3xl">
           <div className="flex items-center justify-center mb-8">
-            <img src={FrostrLogo} alt="Frostr Logo" className="w-12 h-12 mr-2" />
+            <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
           </div>
           
@@ -88,7 +87,7 @@ const App: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
         <div className="w-full max-w-3xl">
           <div className="flex items-center justify-center mb-8">
-            <img src={FrostrLogo} alt="Frostr Logo" className="w-12 h-12 mr-2" />
+            <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
             <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
           </div>
           
@@ -137,7 +136,7 @@ const App: React.FC = () => {
     <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-center mb-8">
-          <img src={FrostrLogo} alt="Frostr Logo" className="w-12 h-12 mr-2" />
+          <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
           <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
         </div>
         <p className="mb-8 text-blue-400 text-center max-w-xl mx-auto text-sm">
