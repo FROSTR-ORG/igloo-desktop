@@ -26,7 +26,8 @@
     "appId": "com.igloo.app",
     "productName": "Igloo",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "build"
     },
     "files": [
       "dist/**/*",
@@ -34,8 +35,8 @@
       "index.html",
       "globals.css"
     ],
-    "icon": "src/assets/frostr-logo-transparent.png",
     "mac": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "dmg",
@@ -56,6 +57,7 @@
       "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "nsis",
@@ -73,6 +75,7 @@
       "artifactName": "${productName}-${version}.${ext}"
     },
     "linux": {
+      "icon": "build/icons/icon.png",
       "target": [
         {
           "target": "AppImage",
