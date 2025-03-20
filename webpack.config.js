@@ -39,6 +39,6 @@ module.exports = {
   output: {
     filename: 'renderer.js',
     path: path.resolve(__dirname, 'dist'),
-    publicPath: './'
+    publicPath: ''
   },
 };
