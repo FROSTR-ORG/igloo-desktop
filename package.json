@@ -56,7 +56,8 @@
     "publish": {
       "provider": "github",
       "owner": "FROSTR-ORG",
-      "repo": "igloo"
+      "repo": "igloo",
+      "releaseType": "release"
     }
   },
   "devDependencies": {
