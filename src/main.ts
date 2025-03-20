@@ -12,8 +12,18 @@ function createWindow() {
     }
   });
 
-  // Load the index.html from the app bundle
-  win.loadFile(path.join(__dirname, '..', 'index.html'));
+  // In development, use the local file
+  if (process.env.NODE_ENV === 'development') {
+    win.loadFile('index.html');
+  } else {
+    // In production, use the path relative to the app bundle
+    win.loadFile(path.join(app.getAppPath(), 'index.html'));
+  }
+
+  // Open DevTools in development
+  if (process.env.NODE_ENV === 'development') {
+    win.webContents.openDevTools();
+  }
 }
 
 app.whenReady().then(() => {
