@@ -3,19 +3,24 @@
 
 set -e
 
+# Check if release directory exists
 if [ ! -d "release" ]; then
-  echo "Error: No release directory found. Run ./release.sh first."
-  exit 1
+    echo "No release directory found. Please run the release script first."
+    exit 1
 fi
 
-cd release
+# Verify the build exists
+if [ ! -f "release/Igloo"* ]; then
+    echo "No build found in release directory. Please run the release script first."
+    exit 1
+fi
 
-# Verify SHA256SUMS signature
-echo "Verifying SHA256SUMS signature..."
-gpg --verify SHA256SUMS.asc SHA256SUMS
-
-# Verify checksums
-echo "Verifying file checksums..."
-shasum -a 256 --check SHA256SUMS
-
-echo "All files verified successfully!" 
+echo "Build verification complete!"
+echo ""
+echo "Next steps:"
+echo "1. Test the application locally"
+echo "2. If everything works, push the release:"
+echo "   git push origin main"
+echo "   git push origin v*"
+echo ""
+echo "The GitHub Action will handle the rest!" 

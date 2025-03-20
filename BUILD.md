@@ -6,7 +6,7 @@ This document outlines the process for building and releasing Igloo.
 
 - Node.js and npm installed
 - Git installed
-- GPG installed and configured
+- GPG installed and configured (for signing releases)
 - GitHub account with repository access
 
 ## First-Time Setup
@@ -29,90 +29,73 @@ This document outlines the process for building and releasing Igloo.
    # Choose RSA and RSA, 4096 bits, no expiration
    ```
 
-3. Export your public key:
-   ```bash
-   # List your keys
-   gpg --list-secret-keys --keyid-format LONG
-   
-   # Export the key (replace KEY_ID)
-   ./scripts/export-key.sh YOUR_KEY_ID
-   
-   # Commit and push the key
-   git add keys/
-   git commit -m "Add release signing key"
-   git push
-   ```
-
-4. Add your GPG key to GitHub:
+3. Add your GPG key to GitHub:
    - Go to GitHub Settings > SSH and GPG keys
    - Click "New GPG key"
-   - Paste the contents of `keys/igloo-signing-key.asc`
+   - Run `gpg --armor --export your@email.com`
+   - Copy and paste the output into GitHub
+
+4. Configure Git to use your GPG key:
+   ```bash
+   git config --global user.signingkey YOUR_KEY_ID
+   git config --global commit.gpgsign true
+   git config --global tag.gpgsign true
+   ```
 
 ## Release Process
 
-1. Create a new release:
+1. Ensure your working directory is clean:
+   ```bash
+   git status
+   ```
+
+2. Create a new release:
    ```bash
    ./scripts/release.sh 1.0.0
    ```
    This will:
    - Update version in package.json
-   - Build the application
-   - Generate and sign checksums
+   - Create a commit with the version change
    - Create a signed git tag
+   - Build the application locally
 
-2. Verify the build:
+3. Verify the build:
    ```bash
    ./scripts/verify.sh
    ```
 
-3. Push the release:
+4. Push the release:
    ```bash
    git push origin main
    git push origin v1.0.0
    ```
 
 The GitHub Action will automatically:
-- Build for all platforms
+- Build for all platforms (Windows, macOS, Linux)
 - Create a GitHub release
-- Upload the binaries and verification files
+- Upload all binaries
 
-## Testing Releases Locally
+## Testing Locally
 
-Before pushing a release, you can test the entire process locally:
+You can test builds locally before releasing:
 
-1. Build for your platform:
-   ```bash
-   # For macOS
-   npm run dist:mac
-   # For Windows
-   npm run dist:win
-   # For Linux
-   npm run dist:linux
-   ```
+```bash
+# Install dependencies
+npm install
 
-2. Generate and sign checksums:
-   ```bash
-   cd release
-   shasum -a 256 Igloo* > SHA256SUMS
-   gpg --detach-sign --armor SHA256SUMS
-   ```
+# Start in development mode
+npm start
 
-3. Verify everything works:
-   ```bash
-   # Verify signature
-   gpg --verify SHA256SUMS.asc SHA256SUMS
-   
-   # Verify checksums
-   shasum -a 256 -c SHA256SUMS
-   ```
+# Build for your platform
+npm run dist
+```
 
 ## Output Files
 
-The following files will be available in each release:
+Each release includes:
 - Windows: `Igloo-Setup-x.y.z.exe` (installer), `Igloo-x.y.z.exe` (portable)
 - macOS: `Igloo-x.y.z.dmg`, `Igloo-x.y.z-mac.zip`
 - Linux: `igloo-x.y.z.AppImage`, `igloo_x.y.z.deb`
-- Verification: `SHA256SUMS`, `SHA256SUMS.asc`
 
 ## Security Notes
 
@@ -125,5 +108,5 @@ The following files will be available in each release:
 ## Additional Resources
 
 - [GPG Documentation](https://www.gnupg.org/documentation/)
-- [Bitcoin Core Release Process](https://github.com/bitcoin/bitcoin/blob/master/doc/release-process.md)
+- [GitHub GPG Guide](https://docs.github.com/en/authentication/managing-commit-signature-verification)
 - [Electron Builder Documentation](https://www.electron.build/)
