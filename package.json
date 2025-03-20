@@ -55,7 +55,7 @@
     },
     "publish": {
       "provider": "github",
-      "owner": "austinkelsay",
+      "owner": "FROSTR-ORG",
       "repo": "igloo"
     }
   },
