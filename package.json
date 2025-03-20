@@ -23,69 +23,26 @@
     "create-release": "./scripts/create-release.sh"
   },
   "build": {
-    "appId": "com.igloo.app",
+    "appId": "com.frostr.igloo",
     "productName": "Igloo",
+    "files": [
+      "dist/**/*",
+      "index.html",
+      "globals.css",
+      "!**/node_modules/**/*"
+    ],
     "directories": {
       "output": "release"
     },
-    "files": [
-      "dist/**/*",
-      "package.json",
-      "index.html",
-      "globals.css"
-    ],
     "mac": {
-      "target": [
-        {
-          "target": "dmg",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "identity": null,
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"]
     },
     "win": {
-      "target": [
-        {
-          "target": "nsis",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "portable",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "${productName}-${version}.${ext}"
+      "target": ["nsis", "portable"]
     },
     "linux": {
-      "target": [
-        {
-          "target": "AppImage",
-          "arch": [
-            "x64"
-          ]
-        },
-        {
-          "target": "deb",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "artifactName": "${name}-${version}.${ext}",
-      "category": "Utility"
+      "target": ["AppImage", "deb"]
     },
     "publish": null,
     "nsis": {
