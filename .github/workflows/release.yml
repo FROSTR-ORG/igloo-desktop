@@ -36,6 +36,9 @@ jobs:
     name: Build Linux
     needs: release
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ELECTRON_BUILDER_PUBLISH: 'never'
     steps:
       - uses: actions/checkout@v4
       
@@ -61,6 +64,9 @@ jobs:
     name: Build macOS
     needs: release
     runs-on: macos-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ELECTRON_BUILDER_PUBLISH: 'never'
     steps:
       - uses: actions/checkout@v4
       
@@ -86,6 +92,9 @@ jobs:
     name: Build Windows
     needs: release
     runs-on: windows-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      ELECTRON_BUILDER_PUBLISH: 'never'
     steps:
       - uses: actions/checkout@v4
       
@@ -111,6 +120,8 @@ jobs:
     name: Sign and Publish
     needs: [release, build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v4
       
