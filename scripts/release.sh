@@ -14,7 +14,8 @@ VERSION=$1
 
 # 1. Update version in package.json
 echo "Updating version to $VERSION..."
-npm version $VERSION
+# Use sed to directly update package.json
+sed -i '' "s/\"version\": \".*\"/\"version\": \"$VERSION\"/" package.json
 
 # 2. Build for all platforms
 echo "Building release..."
@@ -30,6 +31,8 @@ cd ..
 
 # 4. Create git tag
 echo "Creating git tag..."
+git add package.json
+git commit -m "Release $VERSION"
 git tag -s "v$VERSION" -m "Release $VERSION"
 
 echo "Release v$VERSION prepared!"
