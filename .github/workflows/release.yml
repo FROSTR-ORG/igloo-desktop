@@ -183,11 +183,11 @@ jobs:
             
             - **Windows**:
               - `Igloo-Setup-${{ needs.release.outputs.version }}.exe` - Installer
-              - `Igloo-${{ needs.release.outputs.version }}.exe` - Portable
+              - `Igloo-${{ needs.release.outputs.version }}-portable.exe` - Portable
             
             - **macOS**:
               - `Igloo-${{ needs.release.outputs.version }}-x64.dmg` - Disk Image
-              - `Igloo-${{ needs.release.outputs.version }}-x64-mac.zip` - ZIP Archive
+              - `Igloo-${{ needs.release.outputs.version }}-x64.zip` - ZIP Archive
             
             - **Linux**:
               - `igloo-${{ needs.release.outputs.version }}.AppImage` - AppImage

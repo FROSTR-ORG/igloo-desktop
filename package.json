@@ -45,7 +45,8 @@
           "arch": ["x64"]
         }
       ],
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "identity": null,
+      "artifactName": "${productName}-${version}-x64.${ext}"
     },
     "win": {
       "target": [
@@ -57,7 +58,8 @@
           "target": "portable",
           "arch": ["x64"]
         }
-      ]
+      ],
+      "artifactName": "${productName}-${version}.${ext}"
     },
     "linux": {
       "target": [
@@ -70,6 +72,7 @@
           "arch": ["x64"]
         }
       ],
+      "artifactName": "${name}-${version}.${ext}",
       "category": "Utility"
     },
     "nsis": {
@@ -80,12 +83,7 @@
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
     },
-    "deb": {
-      "artifactName": "${productName}-${version}.${ext}"
-    },
-    "appImage": {
-      "artifactName": "${productName}-${version}.${ext}"
-    }
+    "publish": null
   },
   "devDependencies": {
     "@types/prop-types": "^15.7.13",
