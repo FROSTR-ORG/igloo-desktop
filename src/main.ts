@@ -12,7 +12,8 @@ function createWindow() {
     }
   });
 
-  win.loadFile('index.html');
+  // Load the index.html from the app bundle
+  win.loadFile(path.join(__dirname, '..', 'index.html'));
 }
 
 app.whenReady().then(() => {
