@@ -133,19 +133,38 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          # Copy files from each artifact directory separately
-          for dir in all-artifacts/*; do
-            # Copy both Igloo* and igloo* files
-            find "$dir" -type f \( -name "Igloo*" -o -name "igloo*" \) -exec cp -f {} release/ \;
-          done
-          # List files for verification
-          echo "Files prepared for release:"
+          echo "Available artifacts:"
+          find all-artifacts -type f -ls
+          
+          echo "Copying release files..."
+          # Windows
+          find all-artifacts/windows-artifacts -type f -name "Igloo-Setup-*.exe" -exec cp {} release/ \; || true
+          find all-artifacts/windows-artifacts -type f -name "Igloo-*.exe" ! -name "Igloo-Setup-*.exe" -exec cp {} release/ \; || true
+          
+          # macOS
+          find all-artifacts/macos-artifacts -type f -name "Igloo-*-x64.dmg" -exec cp {} release/ \; || true
+          find all-artifacts/macos-artifacts -type f -name "Igloo-*-x64-mac.zip" -exec cp {} release/ \; || true
+          
+          # Linux
+          find all-artifacts/linux-artifacts -type f -name "igloo-*.AppImage" -exec cp {} release/ \; || true
+          find all-artifacts/linux-artifacts -type f -name "igloo_*_amd64.deb" -exec cp {} release/ \; || true
+          
+          # Remove any blockmap files
+          rm -f release/*.blockmap
+          
+          echo "Final release files:"
           ls -la release/
       
       - name: Upload assets to release
         uses: softprops/action-gh-release@v1
         with:
-          files: release/*
+          files: |
+            release/Igloo-Setup-*.exe
+            release/Igloo-*.exe
+            release/Igloo-*-x64.dmg
+            release/Igloo-*-x64-mac.zip
+            release/igloo-*.AppImage
+            release/igloo_*_amd64.deb
           tag_name: ${{ github.ref }}
           draft: false
           prerelease: false
@@ -161,12 +180,12 @@ jobs:
               - `Igloo-${{ needs.release.outputs.version }}.exe` - Portable
             
             - **macOS**:
-              - `Igloo-${{ needs.release.outputs.version }}.dmg` - Disk Image
-              - `Igloo-${{ needs.release.outputs.version }}-mac.zip` - ZIP Archive
+              - `Igloo-${{ needs.release.outputs.version }}-x64.dmg` - Disk Image
+              - `Igloo-${{ needs.release.outputs.version }}-x64-mac.zip` - ZIP Archive
             
             - **Linux**:
               - `igloo-${{ needs.release.outputs.version }}.AppImage` - AppImage
-              - `igloo_${{ needs.release.outputs.version }}.deb` - Debian Package
+              - `igloo_${{ needs.release.outputs.version }}_amd64.deb` - Debian Package
             
             ## Verification
             
