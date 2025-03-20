@@ -133,26 +133,30 @@ jobs:
       - name: Prepare release files
         run: |
           mkdir -p release
-          echo "Available artifacts:"
-          find all-artifacts -type f -ls
+          echo "=== Available artifacts ==="
+          find all-artifacts -type f -exec ls -l {} \;
           
-          echo "Copying release files..."
-          # Windows
-          cp all-artifacts/windows-artifacts/Igloo-Setup-*.exe release/ || echo "No Windows installer found"
+          echo "=== Copying Windows files ==="
+          find all-artifacts/windows-artifacts -type f -name "*.exe" -exec ls -l {} \;
+          cp all-artifacts/windows-artifacts/*Setup*.exe release/ || echo "No Windows installer found"
           cp all-artifacts/windows-artifacts/Igloo-*.exe release/ || echo "No Windows portable found"
           
-          # macOS
-          cp all-artifacts/macos-artifacts/Igloo-*-x64.dmg release/ || echo "No macOS DMG found"
-          cp all-artifacts/macos-artifacts/Igloo-*-x64-mac.zip release/ || echo "No macOS ZIP found"
+          echo "=== Copying macOS files ==="
+          find all-artifacts/macos-artifacts -type f \( -name "*.dmg" -o -name "*.zip" \) -exec ls -l {} \;
+          cp all-artifacts/macos-artifacts/*.dmg release/ || echo "No macOS DMG found"
+          cp all-artifacts/macos-artifacts/*.zip release/ || echo "No macOS ZIP found"
           
-          # Linux
-          cp all-artifacts/linux-artifacts/igloo-*.AppImage release/ || echo "No Linux AppImage found"
-          cp all-artifacts/linux-artifacts/igloo_*_amd64.deb release/ || echo "No Linux DEB found"
+          echo "=== Copying Linux files ==="
+          find all-artifacts/linux-artifacts -type f \( -name "*.AppImage" -o -name "*.deb" \) -exec ls -l {} \;
+          cp all-artifacts/linux-artifacts/*.AppImage release/ || echo "No Linux AppImage found"
+          cp all-artifacts/linux-artifacts/*.deb release/ || echo "No Linux DEB found"
           
-          # Remove any blockmap files
+          echo "=== Removing unnecessary files ==="
           rm -f release/*.blockmap
+          rm -f release/*-mac.zip.blockmap
+          rm -f release/*.dmg.blockmap
           
-          echo "Final release files:"
+          echo "=== Final release files ==="
           ls -la release/
       
       - name: Upload assets to release
@@ -160,7 +164,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: release/*
+          files: |
+            release/*.exe
+            release/*.dmg
+            release/*.zip
+            release/*.AppImage
+            release/*.deb
           tag_name: ${{ github.ref }}
           draft: false
           prerelease: false
