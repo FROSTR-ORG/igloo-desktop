@@ -23,28 +23,55 @@
     "create-release": "./scripts/create-release.sh"
   },
   "build": {
-    "appId": "com.frostr.igloo",
+    "appId": "com.igloo.app",
     "productName": "Igloo",
-    "files": [
-      "dist/**/*",
-      "index.html",
-      "globals.css",
-      "!**/node_modules/**/*"
-    ],
     "directories": {
       "output": "release"
     },
+    "files": [
+      "dist/**/*",
+      "package.json",
+      "index.html",
+      "globals.css"
+    ],
     "mac": {
-      "category": "public.app-category.utilities",
-      "target": ["dmg", "zip"]
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64"]
+        }
+      ],
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
-      "target": ["nsis", "portable"]
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ]
     },
     "linux": {
-      "target": ["AppImage", "deb"]
+      "target": [
+        {
+          "target": "AppImage",
+          "arch": ["x64"]
+        },
+        {
+          "target": "deb",
+          "arch": ["x64"]
+        }
+      ],
+      "category": "Utility"
     },
-    "publish": null,
     "nsis": {
       "oneClick": true,
       "perMachine": false,
@@ -52,6 +79,12 @@
     },
     "portable": {
       "artifactName": "${productName}-${version}-portable.${ext}"
+    },
+    "deb": {
+      "artifactName": "${productName}-${version}.${ext}"
+    },
+    "appImage": {
+      "artifactName": "${productName}-${version}.${ext}"
     }
   },
   "devDependencies": {
