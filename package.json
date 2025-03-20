@@ -1,6 +1,6 @@
 {
   "name": "igloo",
-  "version": "1.0.0",
+  "version": "0.0.1",
   "description": "Frostr desktop signer and key management app",
   "author": {
     "name": "austinkelsay",
@@ -33,15 +33,24 @@
       "package.json"
     ],
     "mac": {
-      "target": ["dmg", "zip"],
+      "target": [
+        "dmg",
+        "zip"
+      ],
       "identity": null
     },
     "win": {
-      "target": ["nsis", "portable"],
+      "target": [
+        "nsis",
+        "portable"
+      ],
       "signingHashAlgorithms": null
     },
     "linux": {
-      "target": ["AppImage", "deb"],
+      "target": [
+        "AppImage",
+        "deb"
+      ],
       "category": "Utility"
     },
     "publish": {
