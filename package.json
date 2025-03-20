@@ -30,7 +30,9 @@
     },
     "files": [
       "dist/**/*",
-      "package.json"
+      "package.json",
+      "index.html",
+      "globals.css"
     ],
     "mac": {
       "target": [

@@ -2,7 +2,7 @@ const path = require('path');
 const TsconfigPathsPlugin = require('tsconfig-paths-webpack-plugin');
 
 module.exports = {
-  mode: 'development',
+  mode: process.env.NODE_ENV === 'production' ? 'production' : 'development',
   entry: './src/renderer.tsx',
   target: 'electron-renderer',
   module: {
@@ -39,5 +39,6 @@ module.exports = {
   output: {
     filename: 'renderer.js',
     path: path.resolve(__dirname, 'dist'),
+    publicPath: './'
   },
 };
