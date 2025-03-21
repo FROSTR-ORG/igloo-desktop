@@ -11,8 +11,8 @@ fi
 
 VERSION=$1
 
-# Ensure we're in a clean state
-if [ -n "$(git status --porcelain)" ]; then
+# Ensure working directory is clean
+if [[ -n $(git status -s) ]]; then
     echo "Working directory is not clean. Please commit or stash changes first."
     exit 1
 fi
@@ -20,17 +20,31 @@ fi
 # Update version in package.json
 npm version $VERSION --no-git-tag-version
 
-# Commit version change
-git add package.json
+# Create release directory if it doesn't exist
+mkdir -p release
+
+# Build the application
+npm run dist
+
+# Export public key to release directory
+gpg --armor --export austinkelsay@protonmail.com > release/igloo-signing-key.asc
+
+# Create checksums
+cd release
+shasum -a 256 Igloo* igloo* > SHA256SUMS
+cd ..
+
+# Sign the checksums
+gpg --detach-sign --armor release/SHA256SUMS
+
+# Add all files to git
+git add package.json release/
+
+# Create release commit
 git commit -m "Release $VERSION"
 
 # Create signed tag
 git tag -s "v$VERSION" -m "Release $VERSION"
-
-# Build the app
-echo "Building application..."
-npm run build
-npm run dist
 
 echo "Release v$VERSION prepared successfully!"
 echo ""
