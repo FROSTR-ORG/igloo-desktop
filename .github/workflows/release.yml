@@ -125,6 +125,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v6
+        with:
+          gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
@@ -155,6 +161,16 @@ jobs:
           rm -f release/*.blockmap
           rm -f release/*-mac.zip.blockmap
           rm -f release/*.dmg.blockmap
+          
+          echo "=== Creating verification files ==="
+          # Export public key
+          gpg --armor --export austinkelsay@protonmail.com > release/igloo-signing-key.asc
+          
+          # Create and sign checksums
+          cd release
+          shasum -a 256 Igloo* igloo* > SHA256SUMS
+          gpg --detach-sign --armor SHA256SUMS
+          cd ..
           
           echo "=== Final release files ==="
           ls -la release/
