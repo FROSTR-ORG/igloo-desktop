@@ -170,6 +170,9 @@ jobs:
             release/*.zip
             release/*.AppImage
             release/*.deb
+            release/SHA256SUMS
+            release/SHA256SUMS.asc
+            release/igloo-signing-key.asc
           tag_name: ${{ github.ref }}
           draft: false
           prerelease: false
@@ -197,6 +200,26 @@ jobs:
             
             ## Verification
             
-            All releases are signed with GPG. The developer's public key can be found in the repository under `keys/igloo-signing-key.asc`.
+            All releases are signed with GPG. To verify this release:
+            
+            1. Download the verification files:
+               - `igloo-signing-key.asc` - Developer's public key
+               - `SHA256SUMS` - File checksums
+               - `SHA256SUMS.asc` - Signature for checksums
+            
+            2. Import the public key:
+               ```bash
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/igloo-signing-key.asc | gpg --import
+               ```
+            
+            3. Verify the checksums signature:
+               ```bash
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/SHA256SUMS.asc | gpg --verify
+               ```
+            
+            4. Verify file checksums:
+               ```bash
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/SHA256SUMS | shasum -a 256 -c
+               ```
             
             For detailed verification instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md) 

@@ -2,24 +2,45 @@
 
 This document outlines how to verify Igloo release binaries. This process ensures the binaries you download are the ones created by the Igloo developers.
 
-## Verifying Releases
+## Quick Verification
 
-1. Download the release files for your platform from the [official GitHub releases page](https://github.com/FROSTR-ORG/igloo/releases).
+Each release includes verification files:
+- `igloo-signing-key.asc` - Developer's public key
+- `SHA256SUMS` - File checksums
+- `SHA256SUMS.asc` - Signature for checksums
 
-2. Verify the Git tag signature:
+To verify a release:
+
+1. Import the public key:
+   ```sh
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/igloo-signing-key.asc | gpg --import
+   ```
+
+2. Verify the checksums signature:
+   ```sh
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS.asc | gpg --verify
+   ```
+
+3. Verify file checksums:
+   ```sh
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS | shasum -a 256 -c
+   ```
+
+Replace `VERSION` with the version you're verifying (e.g., `v0.0.3`).
+
+## Advanced Verification
+
+You can also verify the Git tag and commit signatures:
+
+1. Verify the Git tag signature:
    ```sh
    git fetch origin --tags
-   git verify-tag v1.0.0  # Replace with the version you're verifying
+   git verify-tag VERSION  # Replace with the version you're verifying
    ```
    
-   The output should show:
-   ```
-   gpg: Good signature from "Your Name <your@email.com>"
-   ```
-
-3. Verify the commit signature:
+2. Verify the commit signature:
    ```sh
-   git verify-commit v1.0.0^{commit}
+   git verify-commit VERSION^{commit}
    ```
 
 ## Common Issues
@@ -30,17 +51,12 @@ This warning means you've verified the signature but haven't personally certifie
 1. Verify the key fingerprint through other channels (GitHub, Twitter, etc.)
 2. Sign the key if you trust it:
    ```sh
-   gpg --sign-key your@email.com
+   gpg --sign-key austinkelsay@protonmail.com
    ```
 
 ### GPG: Can't check signature: No public key
 
-You need to import the developer's public key. You can:
-1. Get it from GitHub's API:
-   ```sh
-   curl -L https://api.github.com/users/USERNAME/gpg_keys | jq -r '.[0].raw_key' | gpg --import
-   ```
-2. Or from their GitHub profile directly (look for the GPG keys section)
+You need to import the developer's public key using the steps above. The key is included with each release for convenience.
 
 ## Security Notes
 
