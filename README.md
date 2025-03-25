@@ -1,5 +1,4 @@
 # Igloo 
-## still under contstructon 🚧
 Frostr keyset manager and remote signer.
 
 ### Implemented Features
