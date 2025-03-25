@@ -14,7 +14,7 @@ Frostr keyset manager and remote signer.
 
 ### TODO
 - [ ] Better Form Validation for Share, Group, Relay, Nsec, Hex Privkey.
-- [ ] Better Error Handling
+- [ ] Better Error Messages and Fallbacks
 - [ ] Keep Alive / Auto Reconnect
 
 ## FAQ
