@@ -1,5 +1,5 @@
 #!/bin/bash
-# Script to create a new release, build, and sign it
+# Script to create a new release tag
 
 set -e
 
@@ -20,25 +20,8 @@ fi
 # Update version in package.json
 npm version $VERSION --no-git-tag-version
 
-# Create release directory if it doesn't exist
-mkdir -p release
-
-# Build the application
-npm run dist
-
-# Export public key to release directory
-gpg --armor --export austinkelsay@protonmail.com > release/igloo-signing-key.asc
-
-# Create checksums
-cd release
-shasum -a 256 Igloo* igloo* > SHA256SUMS
-cd ..
-
-# Sign the checksums
-gpg --detach-sign --armor release/SHA256SUMS
-
-# Add all files to git
-git add package.json release/
+# Add package.json changes
+git add package.json
 
 # Create release commit
 git commit -m "Release $VERSION"
@@ -49,12 +32,12 @@ git tag -s "v$VERSION" -m "Release $VERSION"
 echo "Release v$VERSION prepared successfully!"
 echo ""
 echo "Next steps:"
-echo "1. Run './scripts/verify.sh' to verify the build"
-echo "2. If verification passes, push the release:"
+echo "1. Push the release:"
 echo "   git push origin main"
 echo "   git push origin v$VERSION"
 echo ""
 echo "The GitHub Action will automatically:"
 echo "- Build for all platforms"
 echo "- Create a GitHub release"
-echo "- Upload all binaries" 
+echo "- Upload all binaries"
+echo "- Generate and sign checksums" 
