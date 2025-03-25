@@ -3,7 +3,10 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
 import { get_node } from "@/lib/bifrost"
-import { Copy, Check } from "lucide-react"
+import { Copy, Check, Trash2, ChevronDown, ChevronUp, ChevronRight } from "lucide-react"
+import type { SignatureEntry } from '@frostr/bifrost'
+import { cn } from "@/lib/utils"
+import { EventLog, type LogEntryData } from "./EventLog"
 
 interface SignerProps {
   initialData?: {
@@ -12,7 +15,7 @@ interface SignerProps {
   } | null;
 }
 
-const DEFAULT_RELAY = "wss://relay.damus.io";
+const DEFAULT_RELAY = "wss://relay.primal.net";
 
 const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
@@ -24,26 +27,64 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     group: false,
     share: false
   });
+  const [logs, setLogs] = useState<LogEntryData[]>([]);
   
   const nodeRef = useRef<any>(null);
 
-  // Update fields and auto-connect when initialData changes
-  useEffect(() => {
-    if (initialData) {
-      setSignerSecret(initialData.share);
-      setGroupCredential(initialData.groupCredential);
-      
-      // Add default relay if not already present
-      if (!relayUrls.includes(DEFAULT_RELAY)) {
-        setRelayUrls([DEFAULT_RELAY]);
+  const addLog = (type: string, message: string, data?: any) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const id = Math.random().toString(36).substr(2, 9);
+    setLogs(prev => [...prev, { timestamp, type, message, data, id }]);
+  };
+
+  // Add cleanup function
+  const cleanupNode = () => {
+    if (nodeRef.current) {
+      try {
+        // Remove event listeners
+        if (nodeRef.current.listeners) {
+          const { ready, message, error, disconnect } = nodeRef.current.listeners;
+          nodeRef.current.client?.off('ready', ready);
+          nodeRef.current.client?.off('message', message);
+          nodeRef.current.client?.off('error', error);
+          nodeRef.current.client?.off('disconnect', disconnect);
+        }
+
+        // Remove Bifrost specific listeners
+        nodeRef.current.off('ready');
+        nodeRef.current.off('closed');
+        nodeRef.current.off('message');
+        nodeRef.current.off('bounced');
+
+        // Remove ECDH events
+        nodeRef.current.off('/ecdh/sender/req');
+        nodeRef.current.off('/ecdh/sender/res');
+        nodeRef.current.off('/ecdh/sender/rej');
+        nodeRef.current.off('/ecdh/sender/ret');
+        nodeRef.current.off('/ecdh/sender/err');
+        nodeRef.current.off('/ecdh/handler/req');
+        nodeRef.current.off('/ecdh/handler/res');
+        nodeRef.current.off('/ecdh/handler/rej');
+
+        // Remove Signature events
+        nodeRef.current.off('/sign/sender/req');
+        nodeRef.current.off('/sign/sender/res');
+        nodeRef.current.off('/sign/sender/rej');
+        nodeRef.current.off('/sign/sender/ret');
+        nodeRef.current.off('/sign/sender/err');
+        nodeRef.current.off('/sign/handler/req');
+        nodeRef.current.off('/sign/handler/res');
+        nodeRef.current.off('/sign/handler/rej');
+
+        // Disconnect the node
+        nodeRef.current.disconnect();
+      } catch (error) {
+        console.error('Error during cleanup:', error);
       }
       
-      // Auto-start the signer if we have all required data
-      if (initialData.share && initialData.groupCredential) {
-        handleStartSigner();
-      }
+      nodeRef.current = null;
     }
-  }, [initialData]);
+  };
 
   const handleCopy = async (text: string, field: 'group' | 'share') => {
     try {
@@ -70,10 +111,14 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
 
   const handleStartSigner = async () => {
     if (!signerSecret.trim() || !groupCredential.trim() || relayUrls.length === 0) {
+      addLog('error', 'Missing required fields');
       return;
     }
 
     try {
+      // Ensure cleanup before starting
+      cleanupNode();
+
       const node = get_node({ 
         group: groupCredential, 
         share: signerSecret, 
@@ -84,21 +129,21 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
 
       // Store event listener references for cleanup
       const readyListener = () => {
-        console.log('node connected');
+        addLog('ready', 'Node connected');
         setIsSignerRunning(true);
       };
       
       const messageListener = (msg: any) => {
-        console.log('received message event:', msg);
+        addLog('message', 'Received message', msg);
       };
 
       const errorListener = (error: unknown) => {
-        console.error('node error:', error);
+        addLog('error', 'Node error', error);
         setIsSignerRunning(false);
       };
 
       const disconnectListener = () => {
-        console.log('node disconnected');
+        addLog('disconnect', 'Node disconnected');
         setIsSignerRunning(false);
       };
 
@@ -116,34 +161,49 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
       node.client.on('error', errorListener);
       node.client.on('disconnect', disconnectListener);
 
+      // Add Bifrost specific event listeners
+      node.on('ready', () => addLog('bifrost', 'Bifrost node is ready'));
+      node.on('closed', () => addLog('bifrost', 'Bifrost node is closed'));
+      node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
+      node.on('bounced', ([reason, msg]: [string, any]) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+
+      // ECDH events
+      node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
+      node.on('/ecdh/sender/res', (msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
+      node.on('/ecdh/sender/rej', ([reason, pkg]: [string, any]) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
+      node.on('/ecdh/sender/ret', ([reason, pkgs]: [string, string]) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
+      node.on('/ecdh/sender/err', ([reason, msgs]: [string, any[]]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
+      node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
+      node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
+      node.on('/ecdh/handler/rej', ([reason, msg]: [string, any]) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
+
+      // Signature events
+      node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
+      node.on('/sign/sender/res', (msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
+      node.on('/sign/sender/rej', ([reason, pkg]: [string, any]) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
+      node.on('/sign/sender/ret', ([reason, msgs]: [string, SignatureEntry[]]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
+      node.on('/sign/sender/err', ([reason, msgs]: [string, any[]]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
+      node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
+      node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
+      node.on('/sign/handler/rej', ([reason, msg]: [string, any]) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+
       await node.connect();
     } catch (error) {
-      console.error('Failed to start signer:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', 'Failed to start signer', { error: errorMessage });
+      cleanupNode();
       setIsSignerRunning(false);
     }
   };
 
   const handleStopSigner = async () => {
     try {
-      if (nodeRef.current) {
-        // Remove event listeners using stored references
-        if (nodeRef.current.listeners) {
-          const { ready, message, error, disconnect } = nodeRef.current.listeners;
-          nodeRef.current.client.off('ready', ready);
-          nodeRef.current.client.off('message', message);
-          nodeRef.current.client.off('error', error);
-          nodeRef.current.client.off('disconnect', disconnect);
-        }
-        
-        // Disconnect the node
-        await nodeRef.current.listeners.disconnect();
-        nodeRef.current = null;
-      }
+      cleanupNode();
       setIsSignerRunning(false);
+      addLog('info', 'Signer stopped successfully');
     } catch (error) {
-      console.error('Failed to stop signer:', error);
-      // Force the signer to stop even if there's an error
-      nodeRef.current = null;
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      addLog('error', 'Failed to stop signer', { error: errorMessage });
       setIsSignerRunning(false);
     }
   };
@@ -156,13 +216,34 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     }
   };
 
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (nodeRef.current) {
-        nodeRef.current.disconnect();
-      }
+      cleanupNode();
     };
   }, []);
+
+  // Validate initialData
+  useEffect(() => {
+    if (initialData) {
+      const isValidData = 
+        typeof initialData.share === 'string' && 
+        typeof initialData.groupCredential === 'string' &&
+        initialData.share.trim() !== '' && 
+        initialData.groupCredential.trim() !== '';
+
+      if (!isValidData) {
+        return;
+      }
+
+      setSignerSecret(initialData.share);
+      setGroupCredential(initialData.groupCredential);
+      
+      if (!relayUrls.includes(DEFAULT_RELAY)) {
+        setRelayUrls([DEFAULT_RELAY]);
+      }
+    }
+  }, [initialData]);
 
   return (
     <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
@@ -260,6 +341,12 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
             ))}
           </div>
         </div>
+
+        <EventLog 
+          logs={logs}
+          isSignerRunning={isSignerRunning}
+          onClearLogs={() => setLogs([])}
+        />
       </CardContent>
     </Card>
   );
