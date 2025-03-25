@@ -10,6 +10,7 @@ Frostr keyset manager and remote signer.
 - [X] Recover nsec from threshold of shares
 - [x] Signed binary for Windows, Linux, MacOS
 - [x] Build pipeline
+- [x] Event Log for Signer
 
 ### TODO
 - [ ] FORM VALIDATION FOR SHARE, GROUP, RELAY, NSEC, HEX PRIVKEY.
@@ -21,7 +22,6 @@ Frostr keyset manager and remote signer.
   - What does it mean to create a new keyset?
   - What does it mean to recover a keyset?
   - How do you rotate a keyset?
-- [ ] Better Logging
 - [ ] Better Error Handling
 - [ ] Keep Alive / Auto Reconnect
 
