@@ -22,27 +22,27 @@ Frostr keyset manager and remote signer.
 ### General Concepts
 
 #### What is a share?
-A share is a piece of your private key (nsec) that has been split using threshold cryptography (specifically the FROST protocol). Each share alone cannot be used to access your funds or sign transactions. A share is intrinsically tied to its keyset - it cannot be used with shares from different keysets, and it does not reveal any sensitive information unless combined with other shares from the same keyset (up to the threshold). This threshold-based approach ensures that no single share can compromise your security.
+A share is a piece of your private key (nsec) that has been split using Shamir's Secret Sharing (SSS), which is implemented in the FROST protocol. SSS uses polynomial interpolation to split your private key into multiple shares. Each share alone cannot be used to access your funds or sign transactions. A share is intrinsically tied to its keyset - it cannot be used with shares from different keysets, and it does not reveal any sensitive information unless combined with other shares from the same keyset (up to the threshold). This threshold-based approach ensures that no single share can compromise your security.
 
 #### What is a keyset?
 A keyset is a collection of shares that work together to represent your private key (nsec). When you create a new keyset, you generate multiple shares that are mathematically related to each other. The keyset is identified by a unique group key that helps you manage and organize your shares. Each share in a keyset is designed to work together and cannot be mixed with shares from other keysets. This relationship ensures that shares from different keysets cannot be combined to reconstruct a private key.
 
 #### What is a relay?
-A relay is a server that facilitates communication between different parts of the system. In the context of remote signing, relays help transmit signing requests and responses between the client and the signer. Relays are essential for the distributed nature of the FROSTR protocol, allowing different shares to communicate securely without being in direct contact.
+A relay is a server that facilitates communication between different parts of the system. In the context of remote signing, relays help transmit signing requests and responses between the client and the signer. Relays are essential for the distributed nature of the FROST protocol, allowing different shares to communicate securely without being in direct contact.
 
 #### What is an nsec?
-An nsec is your private key in the Nostr protocol. It's a secret key that should never be shared with anyone and is used to sign messages and prove ownership of your public key (npub). When using Igloo, your nsec is split into shares using the FROSTR protocol, allowing for secure distributed signing without ever exposing the complete private key.
+An nsec is your private key in the Nostr protocol. It's a secret key that should never be shared with anyone and is used to sign messages and prove ownership of your public key (npub). When using Igloo, your nsec is split into shares using the FROST protocol, allowing for secure distributed signing without ever exposing the complete private key.
 
 ### Keyset Operations
 
 #### What does it mean to create a new keyset?
-Creating a new keyset involves either generating a new private key (nsec) or importing your own existing nsec, and then splitting it into multiple shares using the FROST threshold cryptography protocol. This process helps distribute the risk of key loss across multiple shares while ensuring that no single share can compromise your security. Whether you're generating a new nsec or using your own, the result is the same - a set of shares that together represent your private key.
+Creating a new keyset involves either generating a new private key (nsec) or importing your own existing nsec, and then splitting it into multiple shares using Shamir's Secret Sharing (SSS) as implemented in the FROST protocol. This process helps distribute the risk of key loss across multiple shares while ensuring that no single share can compromise your security. Whether you're generating a new nsec or using your own, the result is the same - a set of shares that together represent your private key.
 
 #### What does it mean to recover a keyset?
-Recovering a keyset is the process of reconstructing your original private key (nsec) by combining a sufficient number of shares (meeting the threshold requirement). This is useful when you need to access your full private key, such as when migrating to a new system. The recovery process uses the FROST protocol's share combination algorithm to reconstruct the original private key.
+Recovering a keyset is the process of reconstructing your original private key (nsec) by combining a sufficient number of shares (meeting the threshold requirement) using polynomial interpolation. This is useful when you need to access your full private key, such as when migrating to a new system. The recovery process uses the FROST protocol's share combination algorithm to reconstruct the original private key.
 
 #### How do you rotate a keyset?
-Rotating a keyset involves creating a new keyset and transferring your assets/identity to the new one. This is a security best practice that helps protect against potential compromises of your existing keyset. The process typically involves:
+Rotating a keyset involves creating a new keyset and transferring your assets/identity to the new one. This is a security best practice that helps protect against potential compromises of your existing keyset. The process is as follows:
 1. Create a new keyset (from the same nsec)
 2. Destroy all existing shares from the old keyset (remove them from signers and delete)
 3. Transfer your newly created shares and group public key into your signers.
