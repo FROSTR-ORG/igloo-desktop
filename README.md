@@ -81,7 +81,10 @@ LoadShare: enter password to decrypt and load single share into memory
 <img width="1165" alt="Screenshot 2025-03-05 at 3 15 33 PM" src="https://github.com/user-attachments/assets/82074d5d-daf6-477f-8327-a26fc380119b" />
 
 Signer: Share is in memory, auto populates share and group key in signer. Start the signer and leave running in the background.
-<img width="1166" alt="Screenshot 2025-03-05 at 3 15 52 PM" src="https://github.com/user-attachments/assets/a2bc462b-bb70-4d0d-b025-42fbe7a25488" />
+<img width="1282" alt="Screenshot 2025-03-25 at 1 51 16 PM" src="https://github.com/user-attachments/assets/fc44061d-492f-4063-8db8-38fccddb2fbd" />
+
+EventLog: See a full log of all events (requests / responses / node stte) within a session of running the signer on a given share.
+<img width="1323" alt="Screenshot 2025-03-25 at 1 53 45 PM" src="https://github.com/user-attachments/assets/f9211673-3d0e-41d3-8378-a7dede4331f9" />
 
 Recover: Use threshold of shares in keyset to recover nsec.
 <img width="1166" alt="Screenshot 2025-03-05 at 3 16 14 PM" src="https://github.com/user-attachments/assets/2c3a9c73-e43e-4c3d-b4e6-fceb14b59c1b" />
