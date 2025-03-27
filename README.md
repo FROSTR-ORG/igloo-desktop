@@ -1,5 +1,7 @@
 # Igloo 
-Frostr keyset manager and remote signer.
+Frostr keyset manager and remote signer for secure distributed key management.
+
+Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key management protocol for nostr, using the powers of FROST (Flexible Round-Optimized Schnorr Threshold signatures).
 
 ## Table of Contents
 - [Implemented Features](#implemented-features)
@@ -9,9 +11,11 @@ Frostr keyset manager and remote signer.
   - [Build from Source](#build-from-source)
   - [Run Locally for Development](#run-locally-for-development)
 - [App Screens](#app-screens)
+- [How It Works](#how-it-works)
 - [FAQ](#faq)
   - [General Concepts](#general-concepts)
   - [Keyset Operations](#keyset-operations)
+  - [Key Rotation](#key-rotation)
 
 ### Implemented Features
 - [x] Keyset generation
@@ -59,10 +63,10 @@ npm run start
 ShareList: detect existing share files in filesystem
 <img width="1124" alt="Screenshot 2025-03-05 at 3 38 49 PM" src="https://github.com/user-attachments/assets/4c5f30f8-9e2c-49b0-9eb1-b00c5a7faad4" />
 
-Create: create a new keyset by generating a new nsec or pasting in your own (nsec is in memory)
+Create: create a new keyset by generating a new nsec or pasting in your own
 <img width="1165" alt="Screenshot 2025-03-05 at 3 12 47 PM" src="https://github.com/user-attachments/assets/a80e0cba-5a2c-4c50-8623-1c4750517bb1" />
 
-Keyset: copy & save individual shares (keyset is in memory)
+Keyset: copy & save individual shares (only screen where entire keyset is in memory)
 <img width="1164" alt="Screenshot 2025-03-05 at 3 14 07 PM" src="https://github.com/user-attachments/assets/1b951ac1-9367-4be6-afe9-468d81875760" />
 
 SaveShare: add and confirm a password for each share (share will be encrypted using pbkdf2)
@@ -89,6 +93,19 @@ EventLog: See a full log of all events (requests / responses / node stte) within
 Recover: Use threshold of shares in keyset to recover nsec.
 <img width="1166" alt="Screenshot 2025-03-05 at 3 16 14 PM" src="https://github.com/user-attachments/assets/2c3a9c73-e43e-4c3d-b4e6-fceb14b59c1b" />
 
+## How It Works
+
+Igloo implements the FROSTR protocol, which uses Shamir Secret Sharing to break up your nsec into "shares" and a hyper-optimized version of FROST to coordinate signing of messages.
+
+The workflow is simple:
+1. Use Igloo to generate a new nsec or import your existing one
+2. Create your multi-signature setup (like 2/3, 3/5, etc.) generating multiple shares
+3. Store each share securely on different devices (Igloo, Frost2x extension, etc.)
+4. When signing is needed, your FROSTR nodes communicate over nostr relays using end-to-end encrypted notes
+5. Your signatures remain unchanged - nobody knows you're using multi-sig
+
+The beauty of this system is that it's a drop-in replacement for existing signing solutions, working with NIP-07 and NIP-46 compatible applications.
+
 ## FAQ
 
 ### General Concepts
@@ -113,14 +130,33 @@ Creating a new keyset involves either generating a new private key (nsec) or imp
 #### What does it mean to recover a keyset?
 Recovering a keyset is the process of reconstructing your original private key (nsec) by combining a sufficient number of shares (meeting the threshold requirement) using polynomial interpolation. This is useful when you need to access your full private key, such as when migrating to a new system. The recovery process uses the FROST protocol's share combination algorithm to reconstruct the original private key.
 
-#### How do you rotate a keyset?
-Rotating a keyset involves creating a new keyset and transferring your assets/identity to the new one. This is a security best practice that helps protect against potential compromises of your existing keyset. The process is as follows:
-1. Create a new keyset (from the same nsec)
-2. Destroy all existing shares from the old keyset (remove them from signers and delete)
-3. Transfer your newly created shares and group public key into your signers.
-4. You have now effectively rotated your keyset. 
+### Key Rotation
 
-If any shares were lost or stolen from the old keyset they have now been orphaned by you destroying the other shares in the old keyset.
+#### How do you rotate a keyset?
+If one of your shares is lost or compromised, you can abandon it by replacing your existing shares with a new set. This renders the compromised share useless. The rotation process is simple:
+
+1. Re-import your nsec into Igloo and generate a new set of shares
+2. Destroy all existing shares from the old keyset (remove them from signers and delete)
+3. Transfer your newly created shares to your signing devices
+4. Your npub remains unchanged, and your online identity continues uninterrupted
+
+There is no limit to how many sets of shares your nsec can generate, and each new set is random. You can rotate as frequently as needed for security.
+
+#### Why would I rotate my shares?
+You should rotate your shares if:
+- You suspect one of your shares has been compromised
+- You've lost access to one or more shares
+- You want to change your threshold setup (e.g., from 2/3 to 3/5)
+- As a regular security practice, similar to changing passwords
+
+#### What are the benefits of using FROSTR?
+- Break up your nsec into fragments called "shares"
+- Create any kind of multi-signature setup (2/3, 3/5, etc.)
+- If one share is compromised, your secret key remains safe
+- Simple key rotation
+- Your npub doesn't change - maintain your existing nostr identity
+- Your signatures remain unchanged - nobody knows you're using multi-sig
+- End-to-end encrypted communication between signing nodes
 
 
 
