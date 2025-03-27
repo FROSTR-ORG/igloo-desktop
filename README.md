@@ -59,10 +59,10 @@ npm run start
 ShareList: detect existing share files in filesystem
 <img width="1124" alt="Screenshot 2025-03-05 at 3 38 49 PM" src="https://github.com/user-attachments/assets/4c5f30f8-9e2c-49b0-9eb1-b00c5a7faad4" />
 
-Create: create a new keyset by generating a new nsec or pasting in your own
+Create: create a new keyset by generating a new nsec or pasting in your own (nsec is in memory)
 <img width="1165" alt="Screenshot 2025-03-05 at 3 12 47 PM" src="https://github.com/user-attachments/assets/a80e0cba-5a2c-4c50-8623-1c4750517bb1" />
 
-Keyset: copy & save individual shares (only screen where entire keyset is in memory)
+Keyset: copy & save individual shares (keyset is in memory)
 <img width="1164" alt="Screenshot 2025-03-05 at 3 14 07 PM" src="https://github.com/user-attachments/assets/1b951ac1-9367-4be6-afe9-468d81875760" />
 
 SaveShare: add and confirm a password for each share (share will be encrypted using pbkdf2)
