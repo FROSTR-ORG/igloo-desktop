@@ -37,7 +37,7 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
 
 ### Download Release (Recommended)
 
-Download the latest release for your platform from our [GitHub Releases](https://github.com/austinkelsay/igloo/releases) page.
+Download the latest release for your platform from our [GitHub Releases](https://github.com/FROSTR-ORG/igloo/releases) page.
 
 All releases are GPG signed and include SHA256 checksums for verification. We strongly recommend verifying your download:
 1. See [VERIFICATION.md](VERIFICATION.md) for detailed verification instructions
