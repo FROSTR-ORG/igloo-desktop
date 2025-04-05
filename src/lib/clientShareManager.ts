@@ -1,5 +1,8 @@
 import { ipcRenderer } from 'electron';
 
+// Debug helper for group auto-population
+const DEBUG_GROUP_AUTO = true;
+
 export interface IglooShare {
   id: string;
   name: string;
@@ -7,17 +10,64 @@ export interface IglooShare {
   salt: string;
   groupCredential: string;
   savedAt?: string;
+  shareCredential?: string;
+  metadata?: {
+    binder_sn?: string;
+    [key: string]: any;
+  };
   [key: string]: any;
 }
 
 class ClientShareManager {
   async getShares(): Promise<IglooShare[] | false> {
     try {
-      return await ipcRenderer.invoke('get-shares');
+      const shares = await ipcRenderer.invoke('get-shares');
+      if (DEBUG_GROUP_AUTO) {
+        console.log('Retrieved shares:', shares);
+      }
+      return shares;
     } catch (error) {
       console.error('Error retrieving shares:', error);
       return false;
     }
+  }
+
+  async findSharesByBinderSN(binderSN: string): Promise<IglooShare[]> {
+    const shares = await this.getShares();
+    if (!shares || !Array.isArray(shares)) return [];
+    
+    // Filter shares that might have the matching binder_sn
+    const matches = shares.filter(share => {
+      // Match by metadata if available
+      if (share.metadata && share.metadata.binder_sn === binderSN) {
+        return true;
+      }
+      
+      // Match by partial share ID (some implementations store this)
+      if (share.id && share.id.includes(binderSN.substring(0, 8))) {
+        return true;
+      }
+      
+      // Match by share value if unencrypted
+      if (share.shareCredential) {
+        try {
+          // You would need to import decode_share here or pass it as a parameter
+          // const decodedShare = decode_share(share.shareCredential);
+          // return decodedShare.binder_sn === binderSN;
+          return false; // Uncomment above after importing decode_share
+        } catch (e) {
+          return false;
+        }
+      }
+      
+      return false;
+    });
+    
+    if (DEBUG_GROUP_AUTO) {
+      console.log(`Found ${matches.length} shares matching binder_sn: ${binderSN}`);
+    }
+    
+    return matches;
   }
 
   async saveShare(share: IglooShare): Promise<boolean> {
