@@ -120,6 +120,7 @@ const App: React.FC = () => {
               <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
                 <Recover 
                   initialShare={signerData?.share} 
+                  initialGroupCredential={signerData?.groupCredential}
                   threshold={signerData?.threshold}
                   totalShares={signerData?.totalShares}
                 />
