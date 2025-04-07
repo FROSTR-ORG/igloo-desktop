@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { derive_secret, decrypt_payload } from '@/lib/encryption';
+import { InputWithValidation } from '@/components/ui/input-with-validation';
+import { Button } from '@/components/ui/button';
 
 interface LoadShareProps {
   share: {
@@ -15,15 +17,29 @@ interface LoadShareProps {
 
 const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
   const [password, setPassword] = useState<string>('');
-  const [error, setError] = useState<string | null>(null);
+  const [isPasswordValid, setIsPasswordValid] = useState<boolean>(false);
+  const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handlePasswordChange = (value: string) => {
+    setPassword(value);
+    if (!value.trim()) {
+      setIsPasswordValid(false);
+      setPasswordError('Password is required');
+    } else {
+      setIsPasswordValid(true);
+      setPasswordError(undefined);
+    }
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!password) {
-      setError('Please enter your password');
+    if (!isPasswordValid) {
       return;
     }
+    
+    setIsSubmitting(true);
     
     try {
       // Derive key from password and stored salt
@@ -34,12 +50,11 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       
       // Validate the decrypted share format (should start with 'bfshare')
       if (!decryptedShare.startsWith('bfshare')) {
-        setError('Invalid password or corrupted share data');
+        setIsPasswordValid(false);
+        setPasswordError('Invalid password or corrupted share data');
+        setIsSubmitting(false);
         return;
       }
-      
-      // Clear any errors
-      setError(null);
       
       // Call the onLoad prop with decrypted data
       if (onLoad) {
@@ -48,8 +63,11 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       
       // Reset form
       setPassword('');
+      setIsSubmitting(false);
     } catch (err) {
-      setError('Failed to decrypt share: ' + (err instanceof Error ? err.message : String(err)));
+      setIsPasswordValid(false);
+      setPasswordError('Failed to decrypt share: ' + (err instanceof Error ? err.message : String(err)));
+      setIsSubmitting(false);
     }
   };
 
@@ -60,41 +78,37 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       </h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
-        {error && (
-          <div className="bg-red-900/40 border border-red-700 text-red-200 px-4 py-2 rounded-md text-sm">
-            {error}
-          </div>
-        )}
-        
-        <div className="space-y-2">
-          <label htmlFor="share-password" className="block text-blue-200 text-sm">
-            Password
-          </label>
-          <input
-            id="share-password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Enter password to decrypt this share"
-            className="w-full bg-gray-800 border border-gray-700 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-md px-4 py-2 text-blue-100 placeholder-gray-500"
-            autoFocus
-          />
-        </div>
+        <InputWithValidation
+          label="Password"
+          type="password"
+          value={password}
+          onChange={handlePasswordChange}
+          isValid={isPasswordValid}
+          errorMessage={passwordError}
+          placeholder="Enter password to decrypt this share"
+          className="bg-gray-800 border-gray-700 w-full"
+          isRequired={true}
+          disabled={isSubmitting}
+          autoFocus
+        />
         
         <div className="flex space-x-3">
-          <button
+          <Button
             type="button"
             onClick={onCancel}
-            className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-100 font-medium py-2 px-4 rounded-md transition-colors"
+            variant="outline"
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-100"
+            disabled={isSubmitting}
           >
             Cancel
-          </button>
-          <button
+          </Button>
+          <Button
             type="submit"
-            className="flex-1 bg-blue-600 hover:bg-blue-700 text-blue-100 font-medium py-2 px-4 rounded-md transition-colors"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-blue-100"
+            disabled={isSubmitting || !isPasswordValid}
           >
-            Load Share
-          </button>
+            {isSubmitting ? "Loading..." : "Load Share"}
+          </Button>
         </div>
       </form>
     </div>
