@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card"
+import { Card, CardContent } from "@/components/ui/card"
 import { get_node } from "@/lib/bifrost"
-import { Copy, Check, ChevronDown, ChevronUp } from "lucide-react"
+import { Copy, Check, X } from "lucide-react"
 import type { SignatureEntry } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
-import { InputWithValidation } from "@/components/ui/input-with-validation"
-import { RelayInput } from "@/components/ui/relay-input"
+import { Input } from "@/components/ui/input"
 import { validateShare, validateGroup } from "@/lib/validation"
 import { decode_share, decode_group } from "@/lib/bifrost"
 
@@ -26,6 +25,7 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const [shareError, setShareError] = useState<string | undefined>(undefined);
   
   const [relayUrls, setRelayUrls] = useState<string[]>([DEFAULT_RELAY]);
+  const [newRelayUrl, setNewRelayUrl] = useState("");
   
   const [groupCredential, setGroupCredential] = useState(initialData?.groupCredential || "");
   const [isGroupValid, setIsGroupValid] = useState(false);
@@ -204,6 +204,17 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     }
   };
 
+  const handleAddRelay = () => {
+    if (newRelayUrl && !relayUrls.includes(newRelayUrl)) {
+      setRelayUrls([...relayUrls, newRelayUrl]);
+      setNewRelayUrl("");
+    }
+  };
+
+  const handleRemoveRelay = (urlToRemove: string) => {
+    setRelayUrls(relayUrls.filter(url => url !== urlToRemove));
+  };
+
   const handleStartSigner = async () => {
     if (!isShareValid || !isGroupValid || relayUrls.length === 0) {
       addLog('error', 'Missing or invalid required fields');
@@ -313,117 +324,143 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   return (
     <div className="space-y-6">
       <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
-        <CardHeader>
-          <div className="flex flex-wrap justify-between items-center gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-blue-200">FROSTR Remote Signer</h2>
-              <CardDescription className="text-blue-400">
-                Sign events remotely from this device using your share
-              </CardDescription>
-            </div>
-            <div>
-              <Button
-                onClick={handleSignerButtonClick}
-                className={`px-6 py-2 ${
-                  isSignerRunning
-                    ? "bg-red-600 hover:bg-red-700"
-                    : "bg-blue-600 hover:bg-blue-700"
-                } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
-                disabled={!isShareValid || !isGroupValid || relayUrls.length === 0}
-              >
-                {isSignerRunning ? "Stop Signer" : "Start Signer"}
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-6">
-          <div className="space-y-6 w-full">
-            <div className="space-y-2 w-full">
-              <InputWithValidation
-                label="Share Credential"
-                type="password"
-                placeholder="Enter your bfshare1... credential"
-                value={signerSecret}
-                onChange={handleShareChange}
-                isValid={isShareValid}
-                errorMessage={shareError}
-                isRequired={true}
-                disabled={isSignerRunning}
-                className="w-full"
-              />
-
-              <div className="flex gap-2 items-center">
+        <CardContent className="p-8 space-y-8">
+          <h2 className="text-blue-300 text-lg">Start/Stop your remote signer</h2>
+          
+          <div className="space-y-6">
+            <div className="space-y-3">
+              <div className="flex">
+                <Input
+                  type="text"
+                  value={groupCredential}
+                  onChange={(e) => handleGroupChange(e.target.value)}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                  disabled={isSignerRunning}
+                />
                 <Button
                   variant="ghost"
-                  size="sm"
-                  onClick={() => handleCopy(signerSecret, 'share')}
-                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 h-8 px-2"
-                  title="Copy share"
-                >
-                  {copiedStates.share ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-2 w-full">
-              <InputWithValidation
-                label="Group Credential"
-                type="password"
-                placeholder="Enter your bfgroup1... credential"
-                value={groupCredential}
-                onChange={handleGroupChange}
-                isValid={isGroupValid}
-                errorMessage={groupError}
-                isRequired={true}
-                disabled={isSignerRunning}
-                className="w-full"
-              />
-
-              <div className="flex gap-2 items-center">
-                <Button
-                  variant="ghost"
-                  size="sm"
+                  size="icon"
                   onClick={() => handleCopy(groupCredential, 'group')}
-                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30 h-8 px-2"
-                  title="Copy group"
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!groupCredential || !isGroupValid}
                 >
-                  {copiedStates.group ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </Button>
+              </div>
+              {groupError && (
+                <p className="text-red-400 text-sm">{groupError}</p>
+              )}
+              
+              <div className="flex">
+                <Input
+                  type="password"
+                  value={signerSecret}
+                  onChange={(e) => handleShareChange(e.target.value)}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                  disabled={isSignerRunning}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopy(signerSecret, 'share')}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!signerSecret || !isShareValid}
+                >
+                  {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </Button>
+              </div>
+              {shareError && (
+                <p className="text-red-400 text-sm">{shareError}</p>
+              )}
+              
+              <div className="flex items-center justify-between mt-6">
+                <div className="flex items-center gap-2">
+                  <div className={`w-3 h-3 rounded-full ${isSignerRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <span className="text-gray-300">Signer {isSignerRunning ? 'Running' : 'Stopped'}</span>
+                </div>
+                <Button
+                  onClick={handleSignerButtonClick}
+                  className={`px-6 py-2 ${
+                    isSignerRunning
+                      ? "bg-red-600 hover:bg-red-700"
+                      : "bg-green-600 hover:bg-green-700"
+                  } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
+                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0}
+                >
+                  {isSignerRunning ? "Stop Signer" : "Start Signer"}
                 </Button>
               </div>
             </div>
-
-            <RelayInput
-              relays={relayUrls}
-              onChange={setRelayUrls}
-              className="space-y-4 w-full"
-            />
+            
+            <div className="space-y-3">
+              <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
+              <div className="flex">
+                <Input
+                  type="text"
+                  placeholder="Add relay URL"
+                  value={newRelayUrl}
+                  onChange={(e) => setNewRelayUrl(e.target.value)}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
+                  disabled={isSignerRunning}
+                />
+                <Button
+                  onClick={handleAddRelay}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!newRelayUrl.trim() || isSignerRunning}
+                >
+                  Add
+                </Button>
+              </div>
+              
+              <div className="space-y-2">
+                {relayUrls.map((relay, index) => (
+                  <div key={index} className="flex justify-between items-center bg-gray-800/30 py-2 px-3 rounded-md">
+                    <span className="text-blue-300 text-sm font-mono">{relay}</span>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleRemoveRelay(relay)}
+                      className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-full"
+                      disabled={isSignerRunning || relayUrls.length <= 1}
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold text-blue-200">Event Log</h2>
-            <Button
-              variant="ghost"
-              onClick={() => setShowEventLog(!showEventLog)}
-              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-            >
-              {showEventLog ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
-            </Button>
+          
+          <div 
+            className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
+            onClick={() => setShowEventLog(!showEventLog)}
+          >
+            <div className="flex items-center gap-2">
+              {showEventLog ? 
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                  <path d="m18 15-6-6-6 6"/>
+                </svg> : 
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
+                  <path d="m6 9 6 6 6-6"/>
+                </svg>
+              }
+              <span className="text-blue-300 text-sm font-medium">Event Log</span>
+              <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
+                <div className={`w-2 h-2 rounded-full ${logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"}`} />
+                <span className="text-gray-400">{logs.length} events</span>
+              </div>
+            </div>
+            <span className="text-xs text-gray-500 italic">Click to expand</span>
           </div>
-        </CardHeader>
-        {showEventLog && (
-          <CardContent>
+          
+          {showEventLog && (
             <EventLog 
               logs={logs} 
               isSignerRunning={isSignerRunning} 
               onClearLogs={() => setLogs([])}
             />
-          </CardContent>
-        )}
+          )}
+        </CardContent>
       </Card>
     </div>
   );
