@@ -6,7 +6,7 @@ import {
   generate_dealer_pkg,
   recover_secret_key
 } from '@frostr/bifrost/lib'
-import { BifrostNode, BifrostNodeEvent, SignatureEntry } from '@frostr/bifrost'
+import { BifrostNode, SignatureEntry } from '@frostr/bifrost'
 import type {
   GroupPackage,
   SharePackage
