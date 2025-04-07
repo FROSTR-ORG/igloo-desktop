@@ -27,9 +27,9 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
 - [x] Build pipeline
 - [x] Event Log for Signer
 - [x] FAQ
+- [x] Better Form Validation for Share, Group, Relay, Nsec, Hex Privkey
 
 ### TODO
-- [ ] Better Form Validation for Share, Group, Relay, Nsec, Hex Privkey.
 - [ ] Better Error Messages and Fallbacks
 - [ ] Keep Alive / Auto Reconnect
 
