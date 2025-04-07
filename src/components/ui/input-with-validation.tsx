@@ -30,7 +30,6 @@ const InputWithValidation: React.FC<InputWithValidationProps> = ({
       {label && (
         <label htmlFor={inputId} className="text-blue-200 text-sm font-medium flex">
           {label}
-          {isRequired && <span className="text-red-400 ml-1">*</span>}
         </label>
       )}
       <Input
