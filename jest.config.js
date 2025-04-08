@@ -4,7 +4,8 @@ module.exports = {
   testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test).ts?(x)'],
   testPathIgnorePatterns: [
     '/node_modules/',
-    '/__tests__/mocks/'
+    '/__tests__/mocks/',
+    '/__tests__/__mocks__/'
   ],
   transform: {
     '^.+\\.tsx?$': 'ts-jest',
