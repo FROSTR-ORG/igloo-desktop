@@ -1,6 +1,6 @@
 # Igloo Test Suite
 
-This directory contains the tests for the Igloo application. The testing approach follows these principles:
+This directory contains the tests for the Igloo application, which focuses on key management and signing using the FROSTR protocol. Our testing approach emphasizes thorough test coverage, realistic mocking, and clear organization.
 
 ## Testing Strategy
 
@@ -8,13 +8,25 @@ This directory contains the tests for the Igloo application. The testing approac
 2. **Component Tests**: Testing UI components (to be added)
 3. **Integration Tests**: Testing workflows across multiple components (to be added)
 
+## Best Practices
+
+We follow these best practices for our tests:
+
+1. **Complete Test Coverage**: Test both success cases and error conditions
+2. **Realistic Mocks**: Create mocks that simulate real behavior, not just return fixed values
+3. **Type Safety**: Use TypeScript interfaces to maintain type checking in mocks
+4. **Clear Organization**: Group related tests with descriptive `describe` and `it` blocks
+5. **Independent Tests**: Each test should be independent and not rely on state from other tests
+6. **Clean Setup/Teardown**: Reset mocks between tests to prevent test pollution
+7. **Meaningful Assertions**: Verify both the structure and values of test results
+8. **Documentation**: Include clear comments explaining the testing approach
+
 ## Directory Structure
 
 ```
 __tests__/               # Main testing directory
 ├── mocks/               # Mock implementations for dependencies
-│   ├── bifrost.mock.ts  # Bifrost library mocks
-│   └── nostr-tools.mock.ts # Nostr-tools mocks
+│   └── .gitkeep         # Empty file to ensure directory is versioned
 ├── bifrost.test.ts      # Tests for Bifrost functionality
 ├── encryption.test.ts   # Tests for encryption utilities
 ├── validation.test.ts   # Tests for validation functions
@@ -23,9 +35,11 @@ __tests__/               # Main testing directory
 
 ## Current Test Coverage
 
-- **Validation**: Tests for input validation functions (nsec, hex privkey, share, group, relay)
-- **Encryption**: Tests for the encryption and decryption utilities 
-- **Bifrost**: Tests for the Bifrost integration and key management functions
+Our current test suite covers:
+
+- **Validation**: Input validation for various formats (nsec, hex privkey, share, group, relay)
+- **Encryption**: Secret derivation, encryption, and decryption operations
+- **Bifrost**: Key management, share generation, and secret recovery
 
 ## Running Tests
 
@@ -45,20 +59,21 @@ npm test -- encryption.test.ts
 
 ## Mock Strategy
 
-We use Jest's mocking capabilities to:
+Our approach to mocking:
 
-1. Mock external dependencies like `nostr-tools` and `@frostr/bifrost`
-2. Provide predictable test data 
-3. Isolate tests from network requests and other side effects
+1. **Inline Mocking**: Mock dependencies directly in test files using `jest.mock()`
+2. **Realistic Behavior**: Mocks return different values based on inputs
+3. **Spy Functions**: Track function calls and parameters for verification
+4. **Error Simulation**: Mocks can throw errors to test error handling
+5. **State Management**: Use `beforeEach` to reset mocks between tests
 
-All mocks are centralized in the `__tests__/mocks` directory and imported where needed. This keeps the mocks organized, reusable, and makes them easy to maintain.
+## Handling External Dependencies
 
-## Future Improvements
+We've implemented special handling for ESM modules like `@frostr/bifrost`:
 
-1. Add UI component testing with React Testing Library
-2. Add E2E tests for complete workflows
-3. Implement test coverage requirements
-4. Add snapshot testing for UI components
+1. **Direct Mocking**: We fully mock the interfaces we need, avoiding actual imports
+2. **Interface Definitions**: We define TypeScript interfaces to maintain type safety
+3. **Jest Configuration**: We've configured Jest to handle ESM modules with custom transformers
 
 ## Adding New Tests
 
@@ -67,8 +82,18 @@ When adding new tests:
 1. Follow the naming convention: `*.test.ts` or `*.test.tsx`
 2. Group related tests with `describe` blocks
 3. Use clear test descriptions with `it` statements
-4. If you need mocks, use or add to the existing ones in the `mocks` directory
-5. Focus on behavior, not implementation details
+4. Reset mocks in `beforeEach` blocks
+5. Test both success cases and error conditions
+6. Verify function calls and parameters with `expect().toHaveBeenCalledWith()`
+7. Include edge cases and input validation tests
+
+## Future Improvements
+
+1. Add UI component testing with React Testing Library
+2. Add E2E tests for complete workflows
+3. Implement test coverage requirements and reports
+4. Add snapshot testing for UI components
+5. Implement integration tests for cross-component interaction
 
 ## Configuration
 
