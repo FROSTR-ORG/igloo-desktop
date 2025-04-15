@@ -490,6 +490,7 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
               logs={logs} 
               isSignerRunning={isSignerRunning} 
               onClearLogs={() => setLogs([])}
+              hideHeader={true}
             />
           )}
         </CardContent>

@@ -15,6 +15,7 @@ interface EventLogProps {
   logs: LogEntryData[];
   isSignerRunning: boolean;
   onClearLogs: () => void;
+  hideHeader?: boolean;
 }
 
 interface LogEntryProps {
@@ -104,8 +105,8 @@ const LogEntryComponent: React.FC<LogEntryProps> = memo(({ log }) => {
 
 LogEntryComponent.displayName = 'LogEntryComponent';
 
-export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, onClearLogs }) => {
-  const [isLogExpanded, setIsLogExpanded] = React.useState(false);
+export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, onClearLogs, hideHeader = false }) => {
+  const [isLogExpanded, setIsLogExpanded] = React.useState(hideHeader || false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -137,44 +138,48 @@ export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, 
   }, []);
 
   return (
-    <div className="space-y-2 mt-8 pt-6 border-t border-gray-800/30">
-      <div 
-        className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-        onClick={toggleExpanded}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            toggleExpanded();
-          }
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {isLogExpanded ? <ChevronUp className="h-4 w-4 text-blue-400" /> : <ChevronDown className="h-4 w-4 text-blue-400" />}
-          <label className="text-blue-200 text-sm font-medium select-none">Event Log</label>
-          <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"
-            )} />
-            <span className="text-gray-400">{logs.length} events</span>
+    <div className={cn(
+      hideHeader ? "space-y-0" : "space-y-2 mt-8 pt-6 border-t border-gray-800/30"
+    )}>
+      {!hideHeader && (
+        <div 
+          className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
+          onClick={toggleExpanded}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              toggleExpanded();
+            }
+          }}
+        >
+          <div className="flex items-center gap-2">
+            {isLogExpanded ? <ChevronUp className="h-4 w-4 text-blue-400" /> : <ChevronDown className="h-4 w-4 text-blue-400" />}
+            <label className="text-blue-200 text-sm font-medium select-none">Event Log</label>
+            <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
+              <div className={cn(
+                "w-2 h-2 rounded-full",
+                logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"
+              )} />
+              <span className="text-gray-400">{logs.length} events</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 italic">
+              {isLogExpanded ? "Click to collapse" : "Click to expand"}
+            </span>
+            <Button
+              onClick={handleClearClick}
+              className="bg-gray-700/50 hover:bg-gray-600/50 h-6 w-6 p-0"
+              title="Clear logs"
+              aria-label="Clear logs"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 italic">
-            {isLogExpanded ? "Click to collapse" : "Click to expand"}
-          </span>
-          <Button
-            onClick={handleClearClick}
-            className="bg-gray-700/50 hover:bg-gray-600/50 h-6 w-6 p-0"
-            title="Clear logs"
-            aria-label="Clear logs"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
-      </div>
+      )}
       <div 
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",
@@ -197,6 +202,16 @@ export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, 
           <div ref={logEndRef} />
         </div>
       </div>
+
+      {!hideHeader && hideHeader === false && (
+        <Button
+          onClick={handleClearClick}
+          variant="ghost"
+          className="text-xs text-gray-500 hover:text-gray-400 p-0 h-auto"
+        >
+          Clear log
+        </Button>
+      )}
     </div>
   );
 });
