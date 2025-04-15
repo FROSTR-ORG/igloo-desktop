@@ -6,6 +6,7 @@ import Signer from "@/components/Signer"
 import Recover from "@/components/Recover"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { HelpCircle } from "lucide-react"
 
 interface KeysetData {
   groupCredential: string;
@@ -25,6 +26,7 @@ const App: React.FC = () => {
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
+  const [showTooltip, setShowTooltip] = useState(false);
 
   const handleKeysetCreated = (data: KeysetData) => {
     setKeysetData(data);
@@ -68,6 +70,20 @@ const App: React.FC = () => {
           <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-blue-300">New Keyset Created</h2>
+              <div 
+                className="text-blue-400 cursor-pointer relative"
+                onMouseEnter={() => setShowTooltip(true)}
+                onMouseLeave={() => setShowTooltip(false)}
+              >
+                <HelpCircle size={20} />
+                {showTooltip && (
+                  <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                    <p className="mb-2 font-semibold">Important!</p>
+                    <p className="mb-2">This is the only screen where your complete keyset is shown. You must save each share you want to keep on this device (each with its own password) and/or copy and move individual shares to other devices, like our browser extension signer <a href="https://github.com/FROSTR-ORG/frost2x" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Frost2x</a>.</p>
+                    <p>Once you click "Finish", the keyset will be removed from memory and remain distributed where you manually saved them.</p>
+                  </div>
+                )}
+              </div>
             </div>
             <Keyset 
               name={keysetData.name}
