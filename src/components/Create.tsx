@@ -6,6 +6,8 @@ import { generateKeysetWithSecret } from "@/lib/bifrost"
 import { generateNsec, nsecToHex } from "@/lib/nostr"
 import { ArrowLeft } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
+import { InputWithValidation } from "@/components/ui/input-with-validation"
+import { validateNsec } from "@/lib/validation"
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
@@ -20,8 +22,10 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const [keysetName, setKeysetName] = useState("");
   const [nsec, setNsec] = useState("");
   const [isValidNsec, setIsValidNsec] = useState(false);
+  const [nsecError, setNsecError] = useState<string | undefined>(undefined);
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [isNameValid, setIsNameValid] = useState(true);
+  const [nameError, setNameError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const loadExistingNames = async () => {
@@ -38,9 +42,12 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
     setKeysetName(value);
     if (value.trim()) {
       const nameWithoutShare = value.split(' share ')[0];
-      setIsNameValid(!existingNames.includes(nameWithoutShare));
+      const valid = !existingNames.includes(nameWithoutShare);
+      setIsNameValid(valid);
+      setNameError(valid ? undefined : 'This keyset name already exists');
     } else {
       setIsNameValid(false);
+      setNameError('Name is required');
     }
   };
 
@@ -66,16 +73,31 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
 
   const handleNsecChange = (value: string) => {
     setNsec(value);
-    if (value.trim()) {
+    const validation = validateNsec(value);
+    
+    // If basic validation passes, try to actually use the nsec
+    if (validation.isValid && value.trim()) {
       try {
-        // Try to convert to hex to validate the nsec
-        nsecToHex(value);
+        // Try to convert to hex to validate the nsec - this will throw if invalid
+        const hex = nsecToHex(value);
+        
+        // Verify the hex is 64 chars (32 bytes)
+        if (hex.length !== 64) {
+          setIsValidNsec(false);
+          setNsecError('Invalid nsec: resulting private key is not 32 bytes');
+          return;
+        }
+        
         setIsValidNsec(true);
+        setNsecError(undefined);
       } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
         setIsValidNsec(false);
+        setNsecError(`Invalid nsec: ${errorMessage}`);
       }
     } else {
-      setIsValidNsec(false);
+      setIsValidNsec(validation.isValid);
+      setNsecError(validation.message);
     }
   };
 
@@ -122,56 +144,47 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
       <CardContent className="space-y-6">
         <div className="space-y-4">
           <div className="space-y-2">
-            <label htmlFor="keyset-name" className="text-blue-200 text-sm font-medium">
-              Keyset Name
-            </label>
-            <Input
-              id="keyset-name"
-              type="text"
+            <InputWithValidation
+              label="Keyset Name"
               placeholder="Enter a name for this keyset"
               value={keysetName}
-              onChange={(e) => handleNameChange(e.target.value)}
-              className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm ${
-                keysetName && !isNameValid ? 'border-red-500' : ''
-              }`}
+              onChange={handleNameChange}
+              isValid={isNameValid}
+              errorMessage={nameError}
+              isRequired={true}
               disabled={isGenerating}
+              className="w-full"
             />
-            {keysetName && !isNameValid && (
-              <p className="text-red-400 text-sm">This keyset name already exists</p>
-            )}
           </div>
 
-          <div className="space-y-2">
-            <label htmlFor="nsec" className="text-blue-200 text-sm font-medium">
-              nsec or hex private key
-            </label>
-            <div className="flex gap-2">
-              <Input
-                id="nsec"
+          <div className="space-y-2 w-full">
+            <div className="flex gap-2 w-full">
+              <InputWithValidation
+                label="Nostr Private Key (nsec)"
                 type="password"
                 placeholder="Enter your nsec or generate a new one"
                 value={nsec}
-                onChange={(e) => handleNsecChange(e.target.value)}
-                className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm flex-1 ${
-                  nsec && !isValidNsec ? 'border-red-500' : ''
-                }`}
+                onChange={handleNsecChange}
+                isValid={isValidNsec}
+                errorMessage={nsecError}
+                isRequired={true}
                 disabled={isGenerating}
+                className="flex-1 w-full"
               />
-              <Button
-                onClick={handleGenerateNsec}
-                className="bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-                disabled={isGenerating}
-              >
-                Generate
-              </Button>
+              <div className="flex items-end">
+                <Button
+                  onClick={handleGenerateNsec}
+                  className="bg-blue-600 hover:bg-blue-700 transition-colors duration-200 h-10"
+                  disabled={isGenerating}
+                >
+                  Generate
+                </Button>
+              </div>
             </div>
-            {nsec && !isValidNsec && (
-              <p className="text-red-400 text-sm">Invalid nsec format</p>
-            )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-4 w-full">
+            <div className="space-y-2 w-full">
               <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
                 Total Keys
               </label>
@@ -181,11 +194,11 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
                 min={2}
                 value={totalKeys}
                 onChange={(e) => setTotalKeys(Number(e.target.value))}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
                 disabled={isGenerating}
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 w-full">
               <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
                 Threshold
               </label>
@@ -196,7 +209,7 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
                 max={totalKeys}
                 value={threshold}
                 onChange={(e) => setThreshold(Number(e.target.value))}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm"
+                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
                 disabled={isGenerating}
               />
             </div>

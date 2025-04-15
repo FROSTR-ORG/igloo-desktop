@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
-import { FolderOpen, Plus, Trash2 } from 'lucide-react';
+import { FolderOpen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import LoadShare from './LoadShare';
 import ConfirmModal from './ui/ConfirmModal';
@@ -62,17 +62,6 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
 
   return (
     <>
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
-        <Button
-          onClick={onNewKeyset}
-          className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
-        >
-          <Plus className="w-4 h-4 mr-2" />
-          Create New
-        </Button>
-      </div>
-
       {isLoading ? (
         <div className="text-center py-4">
           <div className="animate-pulse text-gray-400">Loading shares...</div>
