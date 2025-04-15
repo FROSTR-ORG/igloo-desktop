@@ -169,7 +169,7 @@ describe('Input Validation Functions', () => {
       const result = validateRelay('http://relay.damus.io');
       // Modifying expectation based on the actual code behavior
       expect(result.isValid).toBe(true);
-      expect(result.normalized).toBe('wss://http://relay.damus.io'); // Based on actual implementation
+      expect(result.normalized).toBe('wss://relay.damus.io'); // Should replace http:// with wss://
     });
 
     it('should reject malformed URLs', () => {
