@@ -39,7 +39,10 @@ export class MockBuff extends Uint8Array {
   get str() {
     // For tests where we need to control the output
     if (this.length === 0) return '';
-    // Check for the exact string 'invalid' rather than includes
+    
+    // Intentional error case: The string 'invalid' is a special test marker
+    // that triggers an error to simulate how the library might handle corrupt data.
+    // This behavior is expected and tested specifically in buff.test.ts.
     const content = Buffer.from(this).toString();
     if (content === 'invalid') {
       throw new Error('Invalid data');
