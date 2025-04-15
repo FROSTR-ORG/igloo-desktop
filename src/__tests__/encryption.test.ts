@@ -101,10 +101,18 @@ describe('Encryption Functions', () => {
       
       // When we encrypt and then decrypt
       const encrypted = encrypt_payload(secret, data);
+      const decrypted = decrypt_payload(secret, encrypted);
       
       // Since our mock is setup to return a fixed decryption value,
       // we can only test that we get a string result back
       expect(typeof encrypted).toBe('string');
+      expect(typeof decrypted).toBe('string');
+      
+      // Import the mocked gcm function to verify it was called correctly
+      const { gcm } = require('@noble/ciphers/aes');
+      
+      // Verify that encryption was called
+      expect(gcm).toHaveBeenCalledTimes(2);  // Once for encrypt, once for decrypt
     });
   });
 }); 
