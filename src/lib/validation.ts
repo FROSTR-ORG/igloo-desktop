@@ -169,8 +169,12 @@ export function validateRelay(relay: string): { isValid: boolean; message?: stri
   // Normalize the relay URL
   let normalized = relay.trim();
   
-  // Add wss:// prefix if missing
-  if (!normalized.startsWith('wss://') && !normalized.startsWith('ws://')) {
+  // Replace http:// or https:// with wss://, or add wss:// if no protocol is present
+  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
+    // Extract the part after the protocol
+    const urlWithoutProtocol = normalized.split('//')[1];
+    normalized = `wss://${urlWithoutProtocol}`;
+  } else if (!normalized.startsWith('wss://') && !normalized.startsWith('ws://')) {
     normalized = `wss://${normalized}`;
   }
   
