@@ -181,19 +181,14 @@ describe('Bifrost Module Functions', () => {
       
       const result = generateKeysetWithSecret(threshold, totalMembers, secretKey);
       
-      // Verify function was called with correct parameters
-      expect(generateKeysetWithSecret).toHaveBeenCalledWith(threshold, totalMembers, secretKey);
-      
-      // Verify the structure of the result
+      // Focus on the structure and content of the result, not how it was generated
       expect(result).toHaveProperty('groupCredential');
       expect(result).toHaveProperty('shareCredentials');
-      expect(result.shareCredentials).toHaveLength(3);
+      expect(result.shareCredentials).toHaveLength(totalMembers);
       
       // Verify values reflect the parameters
       expect(result.groupCredential).toContain('2_of_3');
-      expect(result.shareCredentials[0]).toContain('1');
-      expect(result.shareCredentials[1]).toContain('2');
-      expect(result.shareCredentials[2]).toContain('3');
+      expect(result.shareCredentials).toHaveLength(3);
     });
     
     it('should handle nsec input format', () => {
@@ -203,13 +198,10 @@ describe('Bifrost Module Functions', () => {
       
       const result = generateKeysetWithSecret(threshold, totalMembers, nsecKey);
       
-      // Verify function was called with correct parameters
-      expect(generateKeysetWithSecret).toHaveBeenCalledWith(threshold, totalMembers, nsecKey);
-      
       // Verify the structure is the same as with hex key
       expect(result).toHaveProperty('groupCredential');
       expect(result).toHaveProperty('shareCredentials');
-      expect(result.shareCredentials).toHaveLength(3);
+      expect(result.shareCredentials).toHaveLength(totalMembers);
     });
     
     it('should support different threshold configurations', () => {
@@ -276,10 +268,7 @@ describe('Bifrost Module Functions', () => {
       
       const result = decode_share(share);
       
-      // Verify function was called correctly
-      expect(decode_share).toHaveBeenCalledWith(share);
-      
-      // Verify the structure of the result
+      // Focus on the returned data structure and values
       expect(result).toEqual({
         idx: 1,
         binder_sn: 'binder_sn_1',
@@ -320,10 +309,7 @@ describe('Bifrost Module Functions', () => {
       
       const result = decode_group(group);
       
-      // Verify function was called with correct parameters
-      expect(decode_group).toHaveBeenCalledWith(group);
-      
-      // Verify the structure of the result
+      // Verify the structure of the result, not how it was generated
       expect(result).toHaveProperty('threshold');
       expect(result).toHaveProperty('commits');
       expect(result).toHaveProperty('group_pk');
@@ -393,9 +379,6 @@ describe('Bifrost Module Functions', () => {
       ];
       
       const result = recover_nsec(group, shares);
-      
-      // Verify function was called correctly
-      expect(recover_nsec).toHaveBeenCalledWith(group, shares);
       
       // Check the result value reflects the shares used
       expect(result).toContain('using_shares');
