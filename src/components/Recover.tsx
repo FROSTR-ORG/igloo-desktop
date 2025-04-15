@@ -5,6 +5,7 @@ import { recover_nsec, decode_share, decode_group } from "@/lib/bifrost"
 import { InputWithValidation } from "@/components/ui/input-with-validation"
 import { validateShare, validateGroup } from "@/lib/validation"
 import { clientShareManager, type IglooShare } from "@/lib/clientShareManager"
+import { HelpCircle } from "lucide-react"
 
 interface RecoverProps {
   initialShare?: string;
@@ -103,6 +104,8 @@ const Recover: React.FC<RecoverProps> = ({
     message: null 
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  const [showRecoverTooltip, setShowRecoverTooltip] = useState(false);
 
   // Validate the shares form
   useEffect(() => {
@@ -416,7 +419,23 @@ const Recover: React.FC<RecoverProps> = ({
   return (
     <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
       <CardHeader>
-        <CardTitle className="text-xl text-blue-200">Recover NSEC</CardTitle>
+        <div className="flex items-center">
+          <CardTitle className="text-xl text-blue-200">Recover NSEC</CardTitle>
+          <div 
+            className="ml-2 text-blue-400 cursor-pointer relative"
+            onMouseEnter={() => setShowRecoverTooltip(true)}
+            onMouseLeave={() => setShowRecoverTooltip(false)}
+          >
+            <HelpCircle size={18} />
+            {showRecoverTooltip && (
+              <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                <p className="mb-2 font-semibold">How to recover your NSEC:</p>
+                <p className="mb-2">You can always recover your NSEC with the threshold number of shares. The share that has already been loaded is autopopulated along with the group key.</p>
+                <p>Just add the remaining shares needed to meet the threshold to recover your original private key.</p>
+              </div>
+            )}
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="space-y-8">
         <form onSubmit={handleSubmit}>
@@ -439,7 +458,7 @@ const Recover: React.FC<RecoverProps> = ({
                   )}
                 </div>
               }
-              type="password"
+              type="text"
               placeholder="Enter bfgroup1... credential"
               value={groupCredential}
               onChange={handleGroupChange}
