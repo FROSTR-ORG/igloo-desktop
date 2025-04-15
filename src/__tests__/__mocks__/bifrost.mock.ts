@@ -1,3 +1,11 @@
+/**
+ * Shared mock implementation for the Bifrost library
+ */
+
+// Jest will try to treat this file as a test, but it's not a test file
+/* istanbul ignore file */
+/* eslint-disable */
+
 // Mock implementations for Bifrost library functions
 export const encode_group_pkg = jest.fn().mockReturnValue('mocked_group_pkg');
 
@@ -61,4 +69,21 @@ export class BifrostSigner {
 
   pubkey = 'mocked_pubkey';
   sign = jest.fn().mockResolvedValue('mocked_signature');
+}
+
+/**
+ * This function sets up the mock for the Bifrost library
+ * Call this function in your test file before importing Bifrost
+ */
+export function setupBifrostMock() {
+  jest.mock('../lib/bifrost', () => ({
+    encode_group_pkg,
+    decode_group_pkg,
+    encode_share_pkg,
+    decode_share_pkg,
+    generate_dealer_pkg,
+    recover_secret_key,
+    BifrostNode,
+    BifrostSigner
+  }));
 } 

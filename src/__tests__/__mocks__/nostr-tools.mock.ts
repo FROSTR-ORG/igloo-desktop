@@ -1,3 +1,11 @@
+/**
+ * Shared mock implementation for the nostr-tools library
+ */
+
+// Jest will try to treat this file as a test, but it's not a test file
+/* istanbul ignore file */
+/* eslint-disable */
+
 export const nip19 = {
   decode: jest.fn().mockImplementation((input: string) => {
     if (!input || typeof input !== 'string') {
@@ -92,4 +100,19 @@ export const signEvent = jest.fn().mockImplementation((event: any, privateKey: s
 });
 
 // Simple mock for verifying signatures
-export const verifySignature = jest.fn().mockReturnValue(true); 
+export const verifySignature = jest.fn().mockReturnValue(true);
+
+/**
+ * This function sets up the mock for the nostr-tools library
+ * Call this function in your test file before importing nostr-tools
+ */
+export function setupNostrToolsMock() {
+  jest.mock('nostr-tools', () => ({
+    nip19,
+    Relay,
+    generatePrivateKey,
+    getPublicKey,
+    signEvent,
+    verifySignature
+  }));
+} 
