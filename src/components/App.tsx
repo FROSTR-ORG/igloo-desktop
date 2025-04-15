@@ -1,4 +1,4 @@
-import React, { useState } from "react"
+import React, { useState, useEffect } from "react"
 import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
@@ -6,7 +6,8 @@ import Signer from "@/components/Signer"
 import Recover from "@/components/Recover"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { HelpCircle } from "lucide-react"
+import { HelpCircle, Plus } from "lucide-react"
+import { clientShareManager } from "@/lib/clientShareManager"
 
 interface KeysetData {
   groupCredential: string;
@@ -27,6 +28,18 @@ const App: React.FC = () => {
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [hasShares, setHasShares] = useState(false);
+  const [showMainTooltip, setShowMainTooltip] = useState(false);
+
+  useEffect(() => {
+    // Check if there are any shares saved
+    const checkForShares = async () => {
+      const shares = await clientShareManager.getShares();
+      setHasShares(Array.isArray(shares) && shares.length > 0);
+    };
+    
+    checkForShares();
+  }, []);
 
   const handleKeysetCreated = (data: KeysetData) => {
     setKeysetData(data);
@@ -164,7 +177,37 @@ const App: React.FC = () => {
           {showingCreate ? (
             <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
           ) : (
-            <ShareList onShareLoaded={handleShareLoaded} onNewKeyset={() => setShowingCreate(true)} />
+            <>
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
+                <div className="flex items-center gap-2">
+                  {hasShares && (
+                    <div 
+                      className="text-blue-400 cursor-pointer relative mr-2"
+                      onMouseEnter={() => setShowMainTooltip(true)}
+                      onMouseLeave={() => setShowMainTooltip(false)}
+                    >
+                      <HelpCircle size={20} />
+                      {showMainTooltip && (
+                        <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                          <p className="mb-2 font-semibold">How to use Igloo:</p>
+                          <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
+                          <p>Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  <Button
+                    onClick={() => setShowingCreate(true)}
+                    className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create New
+                  </Button>
+                </div>
+              </div>
+              <ShareList onShareLoaded={handleShareLoaded} onNewKeyset={() => setShowingCreate(true)} />
+            </>
           )}
         </div>
       </div>
