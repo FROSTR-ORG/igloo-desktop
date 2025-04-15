@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { get_node } from "@/lib/bifrost"
-import { Copy, Check, X } from "lucide-react"
+import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -37,6 +37,8 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
   const [showEventLog, setShowEventLog] = useState(false);
+  const [showSignerTooltip, setShowSignerTooltip] = useState(false);
+  const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
   const nodeRef = useRef<any>(null);
 
@@ -325,7 +327,22 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     <div className="space-y-6">
       <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
         <CardContent className="p-8 space-y-8">
-          <h2 className="text-blue-300 text-lg">Start/Stop your remote signer</h2>
+          <div className="flex items-center">
+            <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
+            <div 
+              className="ml-2 text-blue-400 cursor-pointer relative"
+              onMouseEnter={() => setShowSignerTooltip(true)}
+              onMouseLeave={() => setShowSignerTooltip(false)}
+            >
+              <HelpCircle size={18} />
+              {showSignerTooltip && (
+                <div className="absolute right-0 w-64 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                  <p className="mb-2 font-semibold">Important:</p>
+                  <p>The signer must be running to handle signature requests from clients. When active, it will communicate with other nodes through your configured relays.</p>
+                </div>
+              )}
+            </div>
+          </div>
           
           <div className="space-y-6">
             <div className="space-y-3">
@@ -393,7 +410,22 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
             </div>
             
             <div className="space-y-3">
-              <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
+              <div className="flex items-center">
+                <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
+                <div 
+                  className="ml-2 text-blue-400 cursor-pointer relative"
+                  onMouseEnter={() => setShowRelayTooltip(true)}
+                  onMouseLeave={() => setShowRelayTooltip(false)}
+                >
+                  <HelpCircle size={16} />
+                  {showRelayTooltip && (
+                    <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                      <p className="mb-2 font-semibold">Important:</p>
+                      <p>You must be connected to at least one relay to communicate with other signers. Ensure all signers have at least one common relay to coordinate successfully.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
               <div className="flex">
                 <Input
                   type="text"
