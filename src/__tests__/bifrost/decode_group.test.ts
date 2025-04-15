@@ -4,59 +4,13 @@
 
 // Import the shared mock setup
 import { setupBuffMock } from '../__mocks__/buff.mock';
+import { createDecodeGroupMock } from '../__mocks__/bifrost.mock';
+
+// Setup buff mock first (needed for Bifrost functions)
 setupBuffMock();
 
 // Create decode_group mock
-const decode_group = jest.fn().mockImplementation((group: string) => {
-  // Check for valid input
-  if (!group || typeof group !== 'string') {
-    throw new Error('Invalid group format');
-  }
-  
-  if (!group.startsWith('bfgroup')) {
-    throw new Error('Invalid group format (should start with bfgroup)');
-  }
-  
-  // Test for invalid threshold/member count format
-  if (group === 'bfgroup1_0_of_0') {
-    throw new Error('Invalid group format');
-  }
-  
-  // Parse the threshold and total from the mock format (e.g., "mocked_group_pkg_2_of_3")
-  const parts = group.split('_');
-  
-  // Look for threshold in the format pattern
-  let threshold = 2; // Default value
-  let totalMembers = 3; // Default value
-  
-  if (group.includes('3_of_5')) {
-    threshold = 3;
-    totalMembers = 5;
-  } else if (group.includes('2_of_3')) {
-    threshold = 2;
-    totalMembers = 3;
-  } else if (parts.length >= 4 && !isNaN(parseInt(parts[3]))) {
-    // Try to extract from pattern like 'bfgroup_3_of_5'
-    threshold = parseInt(parts[3]);
-    if (parts.length >= 6 && !isNaN(parseInt(parts[5]))) {
-      totalMembers = parseInt(parts[5]);
-    }
-  }
-  
-  // Generate commits based on the total
-  const commits = Array(totalMembers).fill(0).map((_, i) => ({
-    idx: i + 1,
-    pubkey: `pubkey${i + 1}`,
-    hidden_pn: `hidden${i + 1}`,
-    binder_pn: `binder${i + 1}`
-  }));
-  
-  return {
-    threshold,
-    commits,
-    group_pk: 'group_pubkey'
-  };
-});
+const decode_group = createDecodeGroupMock();
 
 // Mock the module
 jest.mock('../../lib/bifrost', () => ({

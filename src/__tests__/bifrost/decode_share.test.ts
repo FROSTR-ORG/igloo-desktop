@@ -4,34 +4,13 @@
 
 // Import the shared mock setup
 import { setupBuffMock } from '../__mocks__/buff.mock';
+import { createDecodeShareMock } from '../__mocks__/bifrost.mock';
+
+// Setup buff mock first (needed for Bifrost functions)
 setupBuffMock();
 
 // Create decode_share mock
-const decode_share = jest.fn().mockImplementation((share: string) => {
-  // Check for valid input
-  if (!share || typeof share !== 'string') {
-    throw new Error('Invalid share format');
-  }
-  
-  if (!share.startsWith('bfshare')) {
-    throw new Error('Invalid share format (should start with bfshare)');
-  }
-  
-  // Test for invalid format
-  if (!share.includes('1') && share !== 'bfshare1_1') {
-    throw new Error('Invalid share format');
-  }
-  
-  // Return different values based on input to simulate decoding different shares
-  const shareNumber = parseInt(share.split('_').pop() || '1');
-  
-  return {
-    idx: shareNumber,
-    binder_sn: `binder_sn_${shareNumber}`,
-    hidden_sn: `hidden_sn_${shareNumber}`,
-    seckey: `share_seckey_${shareNumber}`
-  };
-});
+const decode_share = createDecodeShareMock();
 
 // Mock the module
 jest.mock('../../lib/bifrost', () => ({
