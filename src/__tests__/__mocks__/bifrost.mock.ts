@@ -49,10 +49,7 @@ export const recover_secret_key = jest.fn().mockReturnValue('0123456789abcdef012
 
 export class BifrostNode {
   constructor() {
-    this.on = jest.fn();
-    this.emit = jest.fn();
-    this.connect = jest.fn().mockResolvedValue(this);
-    this.close = jest.fn().mockResolvedValue(this);
+    // Properties now defined as class properties
   }
 
   on = jest.fn();
@@ -63,8 +60,7 @@ export class BifrostNode {
 
 export class BifrostSigner {
   constructor() {
-    this.pubkey = 'mocked_pubkey';
-    this.sign = jest.fn().mockResolvedValue('mocked_signature');
+    // Properties now defined as class properties
   }
 
   pubkey = 'mocked_pubkey';
