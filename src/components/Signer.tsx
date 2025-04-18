@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { get_node } from "@/lib/bifrost"
@@ -16,9 +16,14 @@ interface SignerProps {
   } | null;
 }
 
+// Export the handle type for type safety
+export interface SignerHandle {
+  stopSigner: () => Promise<void>;
+}
+
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
-const Signer: React.FC<SignerProps> = ({ initialData }) => {
+const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
   const [isShareValid, setIsShareValid] = useState(false);
@@ -42,6 +47,57 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   
   const nodeRef = useRef<any>(null);
 
+  // Add effect to cleanup on unmount
+  useEffect(() => {
+    console.log('Signer component mounted');
+    
+    // Cleanup function that runs when component unmounts
+    return () => {
+      console.log('Signer component unmounting, cleanup starting...');
+      if (isSignerRunning) {
+        addLog('info', 'Signer stopped due to page navigation');
+        cleanupNode();
+        setIsSignerRunning(false);
+      }
+      console.log('Signer component unmount cleanup completed');
+    };
+  }, []);  // Only run on mount/unmount, not when isSignerRunning changes
+
+  // Add heartbeat effect to monitor signer status
+  useEffect(() => {
+    let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
+    
+    if (isSignerRunning) {
+      console.log('🟢 Signer heartbeat started');
+      
+      // Set up interval to log heartbeat every 5 seconds
+      heartbeatInterval = setInterval(() => {
+        const timestamp = new Date().toLocaleTimeString();
+        console.log(`🟢 Signer heartbeat: running at ${timestamp}`);
+      }, 5000);
+    } else {
+      console.log('🔴 Signer heartbeat not running');
+    }
+    
+    // Cleanup interval when component unmounts or signer stops
+    return () => {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+        console.log('🔴 Signer heartbeat interval cleared');
+      }
+    };
+  }, [isSignerRunning]);
+
+  // Expose the stopSigner method to parent components through ref
+  useImperativeHandle(ref, () => ({
+    stopSigner: async () => {
+      console.log('External stopSigner method called');
+      if (isSignerRunning) {
+        await handleStopSigner();
+      }
+    }
+  }));
+
   const addLog = (type: string, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
@@ -52,6 +108,8 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const cleanupNode = () => {
     if (nodeRef.current) {
       try {
+        console.log('Running signer cleanup...');
+        
         // Remove event listeners
         if (nodeRef.current.listeners) {
           const { ready, message, error, disconnect } = nodeRef.current.listeners;
@@ -62,37 +120,67 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
         }
 
         // Remove Bifrost specific listeners
-        nodeRef.current.off('ready');
-        nodeRef.current.off('closed');
-        nodeRef.current.off('message');
-        nodeRef.current.off('bounced');
+        try {
+          nodeRef.current.off('ready');
+          nodeRef.current.off('closed');
+          nodeRef.current.off('message');
+          nodeRef.current.off('bounced');
 
-        // Remove ECDH events
-        nodeRef.current.off('/ecdh/sender/req');
-        nodeRef.current.off('/ecdh/sender/res');
-        nodeRef.current.off('/ecdh/sender/rej');
-        nodeRef.current.off('/ecdh/sender/ret');
-        nodeRef.current.off('/ecdh/sender/err');
-        nodeRef.current.off('/ecdh/handler/req');
-        nodeRef.current.off('/ecdh/handler/res');
-        nodeRef.current.off('/ecdh/handler/rej');
+          // Remove ECDH events
+          nodeRef.current.off('/ecdh/sender/req');
+          nodeRef.current.off('/ecdh/sender/res');
+          nodeRef.current.off('/ecdh/sender/rej');
+          nodeRef.current.off('/ecdh/sender/ret');
+          nodeRef.current.off('/ecdh/sender/err');
+          nodeRef.current.off('/ecdh/handler/req');
+          nodeRef.current.off('/ecdh/handler/res');
+          nodeRef.current.off('/ecdh/handler/rej');
 
-        // Remove Signature events
-        nodeRef.current.off('/sign/sender/req');
-        nodeRef.current.off('/sign/sender/res');
-        nodeRef.current.off('/sign/sender/rej');
-        nodeRef.current.off('/sign/sender/ret');
-        nodeRef.current.off('/sign/sender/err');
-        nodeRef.current.off('/sign/handler/req');
-        nodeRef.current.off('/sign/handler/res');
-        nodeRef.current.off('/sign/handler/rej');
+          // Remove Signature events
+          nodeRef.current.off('/sign/sender/req');
+          nodeRef.current.off('/sign/sender/res');
+          nodeRef.current.off('/sign/sender/rej');
+          nodeRef.current.off('/sign/sender/ret');
+          nodeRef.current.off('/sign/sender/err');
+          nodeRef.current.off('/sign/handler/req');
+          nodeRef.current.off('/sign/handler/res');
+          nodeRef.current.off('/sign/handler/rej');
+        } catch (e) {
+          console.warn('Error removing event listeners:', e);
+        }
 
-        // Disconnect the node
-        nodeRef.current.disconnect();
+        // Thoroughly attempt to disconnect the node
+        try {
+          // Try calling disconnect on the node itself (if available)
+          if (typeof nodeRef.current.disconnect === 'function') {
+            nodeRef.current.disconnect();
+          }
+          
+          // Disconnect the client
+          if (nodeRef.current.client) {
+            // Try force close method if it exists
+            if (typeof nodeRef.current.client.close === 'function') {
+              nodeRef.current.client.close();
+            }
+            
+            // Try normal disconnect
+            if (typeof nodeRef.current.client.disconnect === 'function') {
+              nodeRef.current.client.disconnect();
+            }
+            
+            // Null out the client reference
+            nodeRef.current.client = null;
+          }
+        } catch (e) {
+          console.warn('Error disconnecting:', e);
+        }
+        
+        console.log('Signer cleanup completed');
       } catch (error) {
         console.error('Error during cleanup:', error);
       }
       
+      // Completely clear the node reference
       nodeRef.current = null;
     }
   };
@@ -496,6 +584,6 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
       </Card>
     </div>
   );
-};
+});
 
 export default Signer; 
