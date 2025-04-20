@@ -8,6 +8,7 @@ import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import { validateShare, validateGroup } from "@/lib/validation"
 import { decode_share, decode_group } from "@/lib/bifrost"
+import { CopyButton } from "@/components/ui/copy-button"
 
 interface SignerProps {
   initialData?: {
@@ -31,10 +32,6 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
   const [isGroupValid, setIsGroupValid] = useState(false);
   const [groupError, setGroupError] = useState<string | undefined>(undefined);
   
-  const [copiedStates, setCopiedStates] = useState({
-    group: false,
-    share: false
-  });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
   const [showSignerTooltip, setShowSignerTooltip] = useState(false);
   const [showRelayTooltip, setShowRelayTooltip] = useState(false);
@@ -110,18 +107,6 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
       setGroupError(validation.message);
     }
   }, [initialData]);
-
-  const handleCopy = async (text: string, field: 'group' | 'share') => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopiedStates(prev => ({ ...prev, [field]: true }));
-      setTimeout(() => {
-        setCopiedStates(prev => ({ ...prev, [field]: false }));
-      }, 2000);
-    } catch (err) {
-      console.error('Failed to copy:', err);
-    }
-  };
 
   const handleShareChange = (value: string) => {
     setSignerSecret(value);
@@ -353,15 +338,14 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
                   disabled={isSignerRunning}
                 />
-                <Button
+                <CopyButton
+                  value={groupCredential}
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleCopy(groupCredential, 'group')}
+                  iconOnly
                   className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
                   disabled={!groupCredential || !isGroupValid}
-                >
-                  {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                />
               </div>
               {groupError && (
                 <p className="text-red-400 text-sm">{groupError}</p>
@@ -375,15 +359,14 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
                   disabled={isSignerRunning}
                 />
-                <Button
+                <CopyButton
+                  value={signerSecret}
                   variant="ghost"
                   size="icon"
-                  onClick={() => handleCopy(signerSecret, 'share')}
+                  iconOnly
                   className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
                   disabled={!signerSecret || !isShareValid}
-                >
-                  {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                />
               </div>
               {shareError && (
                 <p className="text-red-400 text-sm">{shareError}</p>
@@ -408,7 +391,7 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
               </div>
             </div>
             
-            <div className="space-y-0">
+            <div className="space-y-2">
               <div className="flex items-center">
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
                 <div 

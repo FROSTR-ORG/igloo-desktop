@@ -6,6 +6,7 @@ import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
+import { CopyButton } from '@/components/ui/copy-button';
 
 interface KeysetProps {
   groupCredential: string;
@@ -31,14 +32,6 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     shareIndex: null
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-
-  const handleCopy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-    } catch (err) {
-      console.error('Failed to copy text:', err);
-    }
-  };
 
   const handleSave = (shareIndex: number) => {
     setShowSaveDialog({ show: true, shareIndex });
@@ -158,14 +151,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               <div className="flex justify-between items-center">
                 <h3 className="text-blue-200 text-sm font-medium">Group Credential</h3>
                 <div className="flex space-x-2">
-                  <Button
-                    variant="ghost"
+                  <CopyButton
+                    value={groupCredential}
                     size="sm"
-                    onClick={() => handleCopy(groupCredential)}
-                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-                  >
-                    Copy
-                  </Button>
+                  />
                   <Button
                     variant="ghost"
                     size="sm"
@@ -208,14 +197,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                           </div>
                         </div>
                         <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
+                          <CopyButton
+                            value={share}
                             size="sm"
-                            onClick={() => handleCopy(share)}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-                          >
-                            Copy
-                          </Button>
+                          />
                           {savedShares[index] ? (
                             <div className="flex items-center justify-center w-[54px] text-emerald-400">
                               <CheckCircle2 className="w-5 h-5" />
