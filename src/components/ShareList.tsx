@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import { FolderOpen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -58,6 +58,30 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
 
   const handleDeleteCancel = () => {
     setShareToDelete(null);
+  };
+
+  const closeLoadingModal = useCallback(() => {
+    setLoadingShare(null);
+  }, []);
+
+  // Handle escape key press
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && loadingShare) {
+        closeLoadingModal();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+    };
+  }, [loadingShare, closeLoadingModal]);
+
+  const handleOutsideClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closeLoadingModal();
+    }
   };
 
   return (
@@ -120,7 +144,10 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
       )}
 
       {loadingShare && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm z-50"
+          onClick={handleOutsideClick}
+        >
           <div className="w-full max-w-md mx-4">
             <LoadShare 
               share={{
@@ -128,7 +155,7 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
                 encryptedShare: loadingShare.share
               }}
               onLoad={handleLoadComplete}
-              onCancel={() => setLoadingShare(null)}
+              onCancel={closeLoadingModal}
             />
           </div>
         </div>

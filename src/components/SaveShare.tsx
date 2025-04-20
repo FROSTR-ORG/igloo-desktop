@@ -7,9 +7,10 @@ import { Button } from '@/components/ui/button';
 interface SaveShareProps {
   onSave?: (password: string, salt: string, encryptedShare: string) => void;
   shareToEncrypt?: string;
+  onCancel?: () => void;
 }
 
-const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
+const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt, onCancel }) => {
   const [password, setPassword] = useState<string>('');
   const [isPasswordValid, setIsPasswordValid] = useState<boolean>(false);
   const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
@@ -33,9 +34,9 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
     if (!value.trim()) {
       setIsPasswordValid(false);
       setPasswordError('Password is required');
-    } else if (value.length < 8) {
+    } else if (value.length < 6) {
       setIsPasswordValid(false);
-      setPasswordError('Password must be at least 8 characters');
+      setPasswordError('Password must be at least 6 characters');
     } else {
       setIsPasswordValid(true);
       setPasswordError(undefined);
@@ -131,14 +132,27 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
           isRequired={true}
           disabled={isSubmitting}
         />
-        
-        <Button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-blue-100"
-          disabled={isSubmitting || !isPasswordValid || !isConfirmValid || !shareToEncrypt}
-        >
-          {isSubmitting ? "Saving..." : "Save Share"}
-        </Button>
+
+        <div className="flex space-x-3 pt-2">
+          <Button
+            type="submit"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-blue-100"
+            disabled={isSubmitting || !isPasswordValid || !isConfirmValid || !shareToEncrypt}
+          >
+            {isSubmitting ? "Saving..." : "Save Share"}
+          </Button>
+          
+          {onCancel && (
+            <Button
+              type="button"
+              onClick={onCancel}
+              className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-100"
+              disabled={isSubmitting}
+            >
+              Cancel
+            </Button>
+          )}
+        </div>
       </form>
     </div>
   );

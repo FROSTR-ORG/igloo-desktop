@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { decode_group, decode_share } from "@/lib/bifrost";
@@ -44,6 +44,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setShowSaveDialog({ show: true, shareIndex });
   };
 
+  const closeSaveDialog = useCallback(() => {
+    setShowSaveDialog({ show: false, shareIndex: null });
+  }, []);
+
   const handleSaveComplete = async (password: string, salt: string, encryptedShare: string) => {
     if (showSaveDialog.shareIndex === null) return;
 
@@ -70,7 +74,27 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     }
 
     // Close the dialog
-    setShowSaveDialog({ show: false, shareIndex: null });
+    closeSaveDialog();
+  };
+
+  // Handle escape key press for save dialog
+  useEffect(() => {
+    const handleEscKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && showSaveDialog.show) {
+        closeSaveDialog();
+      }
+    };
+
+    window.addEventListener('keydown', handleEscKey);
+    return () => {
+      window.removeEventListener('keydown', handleEscKey);
+    };
+  }, [showSaveDialog.show, closeSaveDialog]);
+
+  const handleOutsideClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (event.target === event.currentTarget) {
+      closeSaveDialog();
+    }
   };
 
   const handleFinish = () => {
@@ -240,11 +264,15 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       </Card>
 
       {showSaveDialog.show && showSaveDialog.shareIndex !== null && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+        <div 
+          className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm z-50"
+          onClick={handleOutsideClick}
+        >
           <div className="w-full max-w-md mx-4">
             <SaveShare 
               onSave={handleSaveComplete}
               shareToEncrypt={shareCredentials[showSaveDialog.shareIndex]}
+              onCancel={closeSaveDialog}
             />
           </div>
         </div>
