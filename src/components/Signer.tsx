@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { get_node } from "@/lib/bifrost"
-import { Copy, Check, X, HelpCircle } from "lucide-react"
+import { Copy, Check, X, HelpCircle, ChevronUp, ChevronDown } from "lucide-react"
 import type { SignatureEntry } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -469,12 +469,8 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
           >
             <div className="flex items-center gap-2">
               {showEventLog ? 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m18 15-6-6-6 6"/>
-                </svg> : 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
+                <ChevronUp className="h-4 w-4 text-blue-400" /> : 
+                <ChevronDown className="h-4 w-4 text-blue-400" />
               }
               <span className="text-blue-300 text-sm font-medium">Event Log</span>
               <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">

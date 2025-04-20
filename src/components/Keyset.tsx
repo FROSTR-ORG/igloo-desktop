@@ -4,7 +4,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { decode_group, decode_share } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 
 interface KeysetProps {
@@ -148,7 +148,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                     onClick={() => toggleExpanded('group')}
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                   >
-                    {expandedItems['group'] ? '▼' : '▶'}
+                    {expandedItems['group'] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                   </Button>
                 </div>
               </div>
@@ -212,7 +212,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                             onClick={() => toggleExpanded(`${name}-share-${index}`)}
                             className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                           >
-                            {expandedItems[`${name}-share-${index}`] ? '▼' : '▶'}
+                            {expandedItems[`${name}-share-${index}`] ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                           </Button>
                         </div>
                       </div>
