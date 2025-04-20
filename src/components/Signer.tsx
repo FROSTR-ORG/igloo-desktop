@@ -36,7 +36,6 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showEventLog, setShowEventLog] = useState(false);
   const [showSignerTooltip, setShowSignerTooltip] = useState(false);
   const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
@@ -409,7 +408,7 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
               </div>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-0">
               <div className="flex items-center">
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
                 <div 
@@ -463,31 +462,11 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
             </div>
           </div>
           
-          <div 
-            className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-            onClick={() => setShowEventLog(!showEventLog)}
-          >
-            <div className="flex items-center gap-2">
-              {showEventLog ? 
-                <ChevronUp className="h-4 w-4 text-blue-400" /> : 
-                <ChevronDown className="h-4 w-4 text-blue-400" />
-              }
-              <span className="text-blue-300 text-sm font-medium">Event Log</span>
-              <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-                <div className={`w-2 h-2 rounded-full ${logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-gray-400">{logs.length} events</span>
-              </div>
-            </div>
-            <span className="text-xs text-gray-500 italic">Click to expand</span>
-          </div>
-          
-          {showEventLog && (
-            <EventLog 
-              logs={logs} 
-              isSignerRunning={isSignerRunning} 
-              onClearLogs={() => setLogs([])}
-            />
-          )}
+          <EventLog 
+            logs={logs} 
+            isSignerRunning={isSignerRunning} 
+            onClearLogs={() => setLogs([])}
+          />
         </CardContent>
       </Card>
     </div>
