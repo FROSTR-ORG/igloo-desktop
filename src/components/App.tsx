@@ -65,7 +65,6 @@ const App: React.FC = () => {
   const handleBackToShares = () => {
     // Stop signer before navigating away
     if (signerRef.current) {
-      console.log("App: Stopping signer before navigating back to shares");
       signerRef.current.stopSigner();
     }
     setSignerData(null);
@@ -75,7 +74,6 @@ const App: React.FC = () => {
   const handleTabChange = (value: string) => {
     // If switching away from signer tab, stop the signer
     if (activeTab === "signer" && value !== "signer" && signerRef.current) {
-      console.log("App: Stopping signer before switching to", value, "tab");
       signerRef.current.stopSigner();
     }
     setActiveTab(value);
