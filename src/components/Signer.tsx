@@ -49,44 +49,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
   // Add effect to cleanup on unmount
   useEffect(() => {
-    console.log('Signer component mounted');
-    
     // Cleanup function that runs when component unmounts
     return () => {
-      console.log('Signer component unmounting, cleanup starting...');
       if (isSignerRunning) {
         addLog('info', 'Signer stopped due to page navigation');
         cleanupNode();
         setIsSignerRunning(false);
       }
-      console.log('Signer component unmount cleanup completed');
     };
   }, []);  // Only run on mount/unmount, not when isSignerRunning changes
-
-  // Add heartbeat effect to monitor signer status
-  useEffect(() => {
-    let heartbeatInterval: ReturnType<typeof setInterval> | undefined;
-    
-    if (isSignerRunning) {
-      console.log('🟢 Signer heartbeat started');
-      
-      // Set up interval to log heartbeat every 5 seconds
-      heartbeatInterval = setInterval(() => {
-        const timestamp = new Date().toLocaleTimeString();
-        console.log(`🟢 Signer heartbeat: running at ${timestamp}`);
-      }, 5000);
-    } else {
-      console.log('🔴 Signer heartbeat not running');
-    }
-    
-    // Cleanup interval when component unmounts or signer stops
-    return () => {
-      if (heartbeatInterval) {
-        clearInterval(heartbeatInterval);
-        console.log('🔴 Signer heartbeat interval cleared');
-      }
-    };
-  }, [isSignerRunning]);
 
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
@@ -108,8 +79,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const cleanupNode = () => {
     if (nodeRef.current) {
       try {
-        console.log('Running signer cleanup...');
-        
         // Remove event listeners
         if (nodeRef.current.listeners) {
           const { ready, message, error, disconnect } = nodeRef.current.listeners;
@@ -174,8 +143,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         } catch (e) {
           console.warn('Error disconnecting:', e);
         }
-        
-        console.log('Signer cleanup completed');
       } catch (error) {
         console.error('Error during cleanup:', error);
       }
