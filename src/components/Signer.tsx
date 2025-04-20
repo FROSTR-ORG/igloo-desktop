@@ -9,6 +9,29 @@ import { Input } from "@/components/ui/input"
 import { validateShare, validateGroup } from "@/lib/validation"
 import { decode_share, decode_group } from "@/lib/bifrost"
 
+// Add CSS for the pulse animation
+const pulseStyle = `
+  @keyframes pulse {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.1);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .pulse-animation {
+    animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 5px 2px rgba(34, 197, 94, 0.6);
+  }
+`;
+
 interface SignerProps {
   initialData?: {
     share: string;
@@ -380,6 +403,9 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
   return (
     <div className="space-y-6">
+      {/* Add the pulse style */}
+      <style>{pulseStyle}</style>
+      
       <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
         <CardContent className="p-8 space-y-8">
           <div className="flex items-center">
@@ -447,7 +473,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
               
               <div className="flex items-center justify-between mt-6">
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${isSignerRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <div className={`w-3 h-3 rounded-full ${
+                    isSignerRunning 
+                      ? 'bg-green-500 pulse-animation' 
+                      : 'bg-red-500'
+                  }`}></div>
                   <span className="text-gray-300">Signer {isSignerRunning ? 'Running' : 'Stopped'}</span>
                 </div>
                 <Button
