@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from "react"
+import React, { useState, useEffect, useRef } from "react"
 import ShareList from "@/components/ShareList"
 import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
-import Signer from "@/components/Signer"
+import Signer, { SignerHandle } from "@/components/Signer"
 import Recover from "@/components/Recover"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -30,6 +30,9 @@ const App: React.FC = () => {
   const [showTooltip, setShowTooltip] = useState(false);
   const [hasShares, setHasShares] = useState(false);
   const [showMainTooltip, setShowMainTooltip] = useState(false);
+  const [activeTab, setActiveTab] = useState("signer");
+  // Reference to the Signer component to call its stop method
+  const signerRef = useRef<SignerHandle>(null);
 
   useEffect(() => {
     // Check if there are any shares saved
@@ -60,8 +63,20 @@ const App: React.FC = () => {
   };
 
   const handleBackToShares = () => {
+    // Stop signer before navigating away
+    if (signerRef.current) {
+      signerRef.current.stopSigner();
+    }
     setSignerData(null);
     setShowingCreate(false);
+  };
+
+  const handleTabChange = (value: string) => {
+    // If switching away from signer tab, stop the signer
+    if (activeTab === "signer" && value !== "signer" && signerRef.current) {
+      signerRef.current.stopSigner();
+    }
+    setActiveTab(value);
   };
 
   const handleFinish = () => {
@@ -132,7 +147,12 @@ const App: React.FC = () => {
               </Button>
             </div>
             
-            <Tabs defaultValue="signer" className="w-full">
+            <Tabs 
+              defaultValue="signer" 
+              className="w-full"
+              value={activeTab}
+              onValueChange={handleTabChange}
+            >
               <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/50 w-full">
                 <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
                   Signer
@@ -143,7 +163,10 @@ const App: React.FC = () => {
               </TabsList>
               
               <TabsContent value="signer" className="border border-blue-900/30 rounded-lg p-4">
-                <Signer initialData={signerData} />
+                <Signer 
+                  initialData={signerData} 
+                  ref={signerRef}
+                />
               </TabsContent>
               
               <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
