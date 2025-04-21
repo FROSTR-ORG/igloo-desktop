@@ -1,5 +1,6 @@
 import React from 'react';
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 
 interface ConfirmModalProps {
   isOpen: boolean;
@@ -16,13 +17,16 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
   onConfirm,
   onCancel
 }) => {
-  if (!isOpen) return null;
-
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
-      <div className="bg-gray-900 p-6 rounded-lg shadow-xl max-w-md w-full mx-4">
-        <h3 className="text-xl font-semibold text-blue-200 mb-4">{title}</h3>
-        <div className="text-gray-300 mb-6 space-y-4">
+    <Modal
+      isOpen={isOpen}
+      onClose={onCancel}
+      title={title}
+      maxWidth="max-w-md"
+      showCloseButton={false}
+    >
+      <div className="space-y-6">
+        <div className="text-gray-300 space-y-4">
           {body}
         </div>
         <div className="flex justify-end space-x-3">
@@ -41,7 +45,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({
           </Button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 
