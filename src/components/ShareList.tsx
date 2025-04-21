@@ -1,7 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import { FolderOpen, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { IconButton } from '@/components/ui/icon-button';
+import { Modal } from '@/components/ui/modal';
 import LoadShare from './LoadShare';
 import ConfirmModal from './ui/ConfirmModal';
 
@@ -60,6 +62,10 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
     setShareToDelete(null);
   };
 
+  const closeLoadingModal = useCallback(() => {
+    setLoadingShare(null);
+  }, []);
+
   return (
     <>
       {isLoading ? (
@@ -85,22 +91,21 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <Button
+                <IconButton
                   variant="ghost"
                   size="sm"
+                  icon={<FolderOpen className="h-4 w-4" />}
                   onClick={() => handleOpenLocation(share)}
+                  tooltip="Open location"
                   className="text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
-                >
-                  <FolderOpen className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant="ghost"
+                />
+                <IconButton
+                  variant="destructive"
                   size="sm"
+                  icon={<Trash2 className="h-4 w-4" />}
                   onClick={() => handleDeleteClick(share)}
-                  className="text-red-400 hover:text-red-300 hover:bg-red-900/30"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
+                  tooltip="Delete share"
+                />
                 <Button
                   onClick={() => handleLoad(share)}
                   className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
@@ -119,20 +124,23 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
         </div>
       )}
 
-      {loadingShare && (
-        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
-          <div className="w-full max-w-md mx-4">
-            <LoadShare 
-              share={{
-                ...loadingShare,
-                encryptedShare: loadingShare.share
-              }}
-              onLoad={handleLoadComplete}
-              onCancel={() => setLoadingShare(null)}
-            />
-          </div>
-        </div>
-      )}
+      <Modal
+        isOpen={!!loadingShare}
+        onClose={closeLoadingModal}
+        maxWidth="max-w-md"
+        showCloseButton={false}
+      >
+        {loadingShare && (
+          <LoadShare 
+            share={{
+              ...loadingShare,
+              encryptedShare: loadingShare.share
+            }}
+            onLoad={handleLoadComplete}
+            onCancel={closeLoadingModal}
+          />
+        )}
+      </Modal>
 
       <ConfirmModal
         isOpen={!!shareToDelete}

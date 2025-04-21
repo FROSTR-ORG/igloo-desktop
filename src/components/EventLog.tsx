@@ -1,6 +1,10 @@
-import React, { useRef, useEffect, useCallback, memo } from "react"
+import React, { useRef, useEffect, useCallback, memo, useState } from "react"
 import { Button } from "@/components/ui/button"
-import { Trash2, ChevronDown, ChevronUp, ChevronRight, Info } from "lucide-react"
+import { IconButton } from "@/components/ui/icon-button"
+import { Badge } from "@/components/ui/badge"
+import { StatusIndicator } from "@/components/ui/status-indicator"
+import { Collapsible } from "@/components/ui/collapsible"
+import { Trash2, ChevronRight, ChevronDown, ChevronUp, Info } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 export interface LogEntryData {
@@ -20,6 +24,19 @@ interface EventLogProps {
 interface LogEntryProps {
   log: LogEntryData;
 }
+
+// Map log types to badge variants
+const getLogVariant = (type: string) => {
+  switch(type) {
+    case 'error': return 'error';
+    case 'ready': return 'success';
+    case 'disconnect': return 'warning';
+    case 'bifrost': return 'info';
+    case 'ecdh': return 'purple';
+    case 'sign': return 'orange';
+    default: return 'default';
+  }
+};
 
 // Separate component for log entries
 const LogEntryComponent: React.FC<LogEntryProps> = memo(({ log }) => {
@@ -74,18 +91,9 @@ const LogEntryComponent: React.FC<LogEntryProps> = memo(({ log }) => {
           </div>
         )}
         <span className="text-gray-500 text-xs font-light">{log.timestamp}</span>
-        <span className={cn(
-          "px-1.5 py-0.5 rounded text-xs font-medium",
-          log.type === 'error' ? "bg-red-500/20 text-red-400" :
-          log.type === 'ready' ? "bg-green-500/20 text-green-400" :
-          log.type === 'disconnect' ? "bg-yellow-500/20 text-yellow-400" :
-          log.type === 'bifrost' ? "bg-blue-500/20 text-blue-400" :
-          log.type === 'ecdh' ? "bg-purple-500/20 text-purple-400" :
-          log.type === 'sign' ? "bg-orange-500/20 text-orange-400" :
-          "bg-gray-500/20 text-gray-400"
-        )}>
+        <Badge variant={getLogVariant(log.type)}>
           {log.type.toUpperCase()}
-        </span>
+        </Badge>
         <span className="text-gray-300">{log.message}</span>
       </div>
       {hasData && (
@@ -105,9 +113,9 @@ const LogEntryComponent: React.FC<LogEntryProps> = memo(({ log }) => {
 LogEntryComponent.displayName = 'LogEntryComponent';
 
 export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, onClearLogs }) => {
-  const [isLogExpanded, setIsLogExpanded] = React.useState(false);
   const logEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isExpanded, setIsExpanded] = useState(false);
 
   const scrollToBottom = useCallback(() => {
     if (!containerRef.current) return;
@@ -122,63 +130,73 @@ export const EventLog: React.FC<EventLogProps> = memo(({ logs, isSignerRunning, 
   }, []);
 
   useEffect(() => {
-    if (isLogExpanded) {
+    if (isExpanded) {
       scrollToBottom();
     }
-  }, [logs, isLogExpanded, scrollToBottom]);
+  }, [logs, isExpanded, scrollToBottom]);
 
   const handleClearClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
     onClearLogs();
   }, [onClearLogs]);
 
-  const toggleExpanded = useCallback(() => {
-    setIsLogExpanded(prev => !prev);
-  }, []);
+  const getStatusIndicator = () => {
+    if (logs.length === 0) return 'success';
+    return isSignerRunning ? 'success' : 'error';
+  };
+
+  const actions = (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-gray-500 italic">
+        {isExpanded ? "Click to collapse" : "Click to expand"}
+      </span>
+      <IconButton
+        variant="default"
+        size="sm"
+        icon={<Trash2 className="h-4 w-4" />}
+        onClick={handleClearClick}
+        tooltip="Clear logs"
+      />
+    </div>
+  );
+
+  const handleToggle = () => {
+    setIsExpanded(prev => !prev);
+  };
 
   return (
     <div className="space-y-2 mt-8 pt-6 border-t border-gray-800/30">
       <div 
         className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-        onClick={toggleExpanded}
+        onClick={handleToggle}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault();
-            toggleExpanded();
+            handleToggle();
           }
         }}
       >
         <div className="flex items-center gap-2">
-          {isLogExpanded ? <ChevronUp className="h-4 w-4 text-blue-400" /> : <ChevronDown className="h-4 w-4 text-blue-400" />}
-          <label className="text-blue-200 text-sm font-medium select-none">Event Log</label>
-          <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-            <div className={cn(
-              "w-2 h-2 rounded-full",
-              logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"
-            )} />
-            <span className="text-gray-400">{logs.length} events</span>
-          </div>
+          {isExpanded ? 
+            <ChevronUp className="h-4 w-4 text-blue-400" /> : 
+            <ChevronDown className="h-4 w-4 text-blue-400" />
+          }
+          <span className="text-blue-200 text-sm font-medium select-none">Event Log</span>
+          <StatusIndicator 
+            status={getStatusIndicator()}
+            count={logs.length}
+          />
         </div>
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-500 italic">
-            {isLogExpanded ? "Click to collapse" : "Click to expand"}
-          </span>
-          <Button
-            onClick={handleClearClick}
-            className="bg-gray-700/50 hover:bg-gray-600/50 h-6 w-6 p-0"
-            title="Clear logs"
-            aria-label="Clear logs"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+        <div onClick={e => e.stopPropagation()}>
+          {actions}
         </div>
       </div>
       <div 
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",
-          isLogExpanded ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0"
+          isExpanded ? "max-h-[300px] opacity-100" : "max-h-0 opacity-0"
         )}
       >
         <div 

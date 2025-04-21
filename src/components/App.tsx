@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HelpCircle, Plus } from "lucide-react"
 import { clientShareManager } from "@/lib/clientShareManager"
+import { Tooltip } from "@/components/ui/tooltip"
 
 interface KeysetData {
   groupCredential: string;
@@ -92,26 +93,22 @@ const App: React.FC = () => {
         <div className="w-full max-w-3xl">
           <div className="flex items-center justify-center mb-8">
             <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
+            <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
           </div>
           
           <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-xl font-semibold text-blue-300">New Keyset Created</h2>
-              <div 
-                className="text-blue-400 cursor-pointer relative"
-                onMouseEnter={() => setShowTooltip(true)}
-                onMouseLeave={() => setShowTooltip(false)}
-              >
-                <HelpCircle size={20} />
-                {showTooltip && (
-                  <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+              <Tooltip 
+                trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
+                content={
+                  <>
                     <p className="mb-2 font-semibold">Important!</p>
                     <p className="mb-2">This is the only screen where your complete keyset is shown. You must save each share you want to keep on this device (each with its own password) and/or copy and move individual shares to other devices, like our browser extension signer <a href="https://github.com/FROSTR-ORG/frost2x" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Frost2x</a>.</p>
                     <p>Once you click "Finish", the keyset will be removed from memory and remain distributed where you manually saved them.</p>
-                  </div>
-                )}
-              </div>
+                  </>
+                }
+              />
             </div>
             <Keyset 
               name={keysetData.name}
@@ -132,7 +129,7 @@ const App: React.FC = () => {
         <div className="w-full max-w-3xl">
           <div className="flex items-center justify-center mb-8">
             <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
+            <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
           </div>
           
           <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
@@ -190,7 +187,7 @@ const App: React.FC = () => {
       <div className="w-full max-w-3xl">
         <div className="flex items-center justify-center mb-8">
           <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-          <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
+          <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
         </div>
         <p className="mb-8 text-blue-400 text-center max-w-xl mx-auto text-sm">
           Frostr keyset manager and remote signer.
@@ -205,20 +202,16 @@ const App: React.FC = () => {
                 <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
                 <div className="flex items-center gap-2">
                   {hasShares && (
-                    <div 
-                      className="text-blue-400 cursor-pointer relative mr-2"
-                      onMouseEnter={() => setShowMainTooltip(true)}
-                      onMouseLeave={() => setShowMainTooltip(false)}
-                    >
-                      <HelpCircle size={20} />
-                      {showMainTooltip && (
-                        <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                    <Tooltip 
+                      trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer mr-2" />}
+                      content={
+                        <>
                           <p className="mb-2 font-semibold">How to use Igloo:</p>
                           <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
                           <p>Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
-                        </div>
-                      )}
-                    </div>
+                        </>
+                      }
+                    />
                   )}
                   <Button
                     onClick={() => setShowingCreate(true)}
