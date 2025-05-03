@@ -9,6 +9,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HelpCircle, Plus } from "lucide-react"
 import { clientShareManager } from "@/lib/clientShareManager"
 import { Tooltip } from "@/components/ui/tooltip"
+import { PageLayout } from "@/components/ui/page-layout"
+import { AppHeader } from "@/components/ui/app-header"
+import { ContentCard } from "@/components/ui/content-card"
 
 interface KeysetData {
   groupCredential: string;
@@ -89,145 +92,128 @@ const App: React.FC = () => {
   // Show new keyset view
   if (showingNewKeyset && keysetData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
-        <div className="w-full max-w-3xl">
-          <div className="flex items-center justify-center mb-8">
-            <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-            <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
-          </div>
-          
-          <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-blue-300">New Keyset Created</h2>
-              <Tooltip 
-                trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
-                content={
-                  <>
-                    <p className="mb-2 font-semibold">Important!</p>
-                    <p className="mb-2">This is the only screen where your complete keyset is shown. You must save each share you want to keep on this device (each with its own password) and/or copy and move individual shares to other devices, like our browser extension signer <a href="https://github.com/FROSTR-ORG/frost2x" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Frost2x</a>.</p>
-                    <p>Once you click "Finish", the keyset will be removed from memory and remain distributed where you manually saved them.</p>
-                  </>
-                }
-              />
-            </div>
-            <Keyset 
-              name={keysetData.name}
-              groupCredential={keysetData.groupCredential}
-              shareCredentials={keysetData.shareCredentials}
-              onFinish={handleFinish}
+      <PageLayout>
+        <AppHeader />
+        
+        <ContentCard
+          title="New Keyset Created"
+          headerRight={
+            <Tooltip 
+              trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
+              content={
+                <>
+                  <p className="mb-2 font-semibold">Important!</p>
+                  <p className="mb-2">This is the only screen where your complete keyset is shown. You must save each share you want to keep on this device (each with its own password) and/or copy and move individual shares to other devices, like our browser extension signer <a href="https://github.com/FROSTR-ORG/frost2x" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Frost2x</a>.</p>
+                  <p>Once you click "Finish", the keyset will be removed from memory and remain distributed where you manually saved them.</p>
+                </>
+              }
             />
-          </div>
-        </div>
-      </div>
+          }
+        >
+          <Keyset 
+            name={keysetData.name}
+            groupCredential={keysetData.groupCredential}
+            shareCredentials={keysetData.shareCredentials}
+            onFinish={handleFinish}
+          />
+        </ContentCard>
+      </PageLayout>
     );
   }
 
   // Show signer view when share is loaded
   if (signerData) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
-        <div className="w-full max-w-3xl">
-          <div className="flex items-center justify-center mb-8">
-            <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-            <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
-          </div>
-          
-          <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-xl font-semibold text-blue-300">Signer</h2>
-              <Button
-                variant="ghost"
-                onClick={handleBackToShares}
-                className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-              >
-                Back to Shares
-              </Button>
-            </div>
-            
-            <Tabs 
-              defaultValue="signer" 
-              className="w-full"
-              value={activeTab}
-              onValueChange={handleTabChange}
+      <PageLayout>
+        <AppHeader />
+        
+        <ContentCard
+          title="Signer"
+          headerRight={
+            <Button
+              variant="ghost"
+              onClick={handleBackToShares}
+              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
             >
-              <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/50 w-full">
-                <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
-                  Signer
-                </TabsTrigger>
-                <TabsTrigger value="recover" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
-                  Recover
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="signer" className="border border-blue-900/30 rounded-lg p-4">
-                <Signer 
-                  initialData={signerData} 
-                  ref={signerRef}
-                />
-              </TabsContent>
-              
-              <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
-                <Recover 
-                  initialShare={signerData?.share} 
-                  initialGroupCredential={signerData?.groupCredential}
-                  threshold={signerData?.threshold}
-                  totalShares={signerData?.totalShares}
-                />
-              </TabsContent>
-            </Tabs>
-          </div>
-        </div>
-      </div>
+              Back to Shares
+            </Button>
+          }
+        >
+          <Tabs 
+            defaultValue="signer" 
+            className="w-full"
+            value={activeTab}
+            onValueChange={handleTabChange}
+          >
+            <TabsList className="grid grid-cols-2 mb-4 bg-gray-800/50 w-full">
+              <TabsTrigger value="signer" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
+                Signer
+              </TabsTrigger>
+              <TabsTrigger value="recover" className="text-sm py-2 text-blue-400 data-[state=active]:bg-blue-900/60 data-[state=active]:text-blue-200">
+                Recover
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="signer" className="border border-blue-900/30 rounded-lg p-4">
+              <Signer 
+                initialData={signerData} 
+                ref={signerRef}
+              />
+            </TabsContent>
+            
+            <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
+              <Recover 
+                initialShare={signerData?.share} 
+                initialGroupCredential={signerData?.groupCredential}
+                threshold={signerData?.threshold}
+                totalShares={signerData?.totalShares}
+              />
+            </TabsContent>
+          </Tabs>
+        </ContentCard>
+      </PageLayout>
     );
   }
 
   // Show main view
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-950 to-blue-950 text-blue-100 p-8 flex flex-col items-center">
-      <div className="w-full max-w-3xl">
-        <div className="flex items-center justify-center mb-8">
-          <img src="./src/assets/frostr-logo-transparent.png" alt="Frostr Logo" className="w-12 h-12 mr-2" />
-          <h1 className="text-4xl font-bold font-orbitron bg-clip-text text-transparent bg-gradient-to-r from-blue-300 to-cyan-300">Igloo</h1>
-        </div>
-        <p className="mb-8 text-blue-400 text-center max-w-xl mx-auto text-sm">
-          Frostr keyset manager and remote signer.
-        </p>
+    <PageLayout>
+      <AppHeader subtitle="Frostr keyset manager and remote signer." />
 
-        <div className="bg-gray-900/40 rounded-lg p-6 shadow-lg">
-          {showingCreate ? (
-            <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
-          ) : (
-            <>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
-                <div className="flex items-center gap-2">
-                  {hasShares && (
-                    <Tooltip 
-                      trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer mr-2" />}
-                      content={
-                        <>
-                          <p className="mb-2 font-semibold">How to use Igloo:</p>
-                          <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
-                          <p>Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
-                        </>
-                      }
-                    />
-                  )}
-                  <Button
-                    onClick={() => setShowingCreate(true)}
-                    className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create New
-                  </Button>
-                </div>
+      <ContentCard>
+        {showingCreate ? (
+          <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
+        ) : (
+          <>
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
+              <div className="flex items-center gap-2">
+                {hasShares && (
+                  <Tooltip 
+                    trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer mr-2" />}
+                    content={
+                      <>
+                        <p className="mb-2 font-semibold">How to use Igloo:</p>
+                        <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
+                        <p>Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
+                      </>
+                    }
+                  />
+                )}
+                <Button
+                  onClick={() => setShowingCreate(true)}
+                  className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+                >
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create New
+                </Button>
               </div>
-              <ShareList onShareLoaded={handleShareLoaded} onNewKeyset={() => setShowingCreate(true)} />
-            </>
-          )}
-        </div>
-      </div>
-    </div>
+            </div>
+            <ShareList onShareLoaded={handleShareLoaded} onNewKeyset={() => setShowingCreate(true)} />
+          </>
+        )}
+      </ContentCard>
+    </PageLayout>
   )
 }
 
