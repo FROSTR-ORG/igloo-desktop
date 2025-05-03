@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
+import { IconButton } from "@/components/ui/icon-button"
 import { Input } from "@/components/ui/input"
+import { Tooltip } from "@/components/ui/tooltip"
+import { Alert } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { generateKeysetWithSecret } from "@/lib/bifrost"
 import { generateNsec, nsecToHex } from "@/lib/nostr"
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { InputWithValidation } from "@/components/ui/input-with-validation"
 import { validateNsec } from "@/lib/validation"
@@ -130,14 +133,13 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         <div className="flex items-center justify-between">
           <div className="flex items-center w-full justify-between">
             <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
-            <Button
+            <IconButton
               variant="ghost"
+              icon={<ArrowLeft className="w-4 h-4" />}
               onClick={onBack}
+              tooltip="Back to shares"
               className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back
-            </Button>
+            />
           </div>
         </div>
       </CardHeader>
@@ -185,9 +187,18 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
 
           <div className="grid grid-cols-2 gap-4 w-full">
             <div className="space-y-2 w-full">
-              <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
-                Total Keys
-              </label>
+              <div className="flex items-center gap-1">
+                <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
+                  Total Keys
+                </label>
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
+                  content={
+                    <p>The total number of key shares that will be created. Each share can be stored on a different device.</p>
+                  }
+                  width="w-60"
+                />
+              </div>
               <Input
                 id="total-keys"
                 type="number"
@@ -199,9 +210,18 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               />
             </div>
             <div className="space-y-2 w-full">
-              <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
-                Threshold
-              </label>
+              <div className="flex items-center gap-1">
+                <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
+                  Threshold
+                </label>
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
+                  content={
+                    <p>The minimum number of shares required to sign. Must be at least 2 and no more than the total number of keys.</p>
+                  }
+                  width="w-60"
+                />
+              </div>
               <Input
                 id="threshold"
                 type="number"
@@ -225,9 +245,12 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         </Button>
 
         {keysetGenerated.location && (
-          <div className={`mt-4 p-3 rounded-lg ${keysetGenerated.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'}`}>
+          <Alert 
+            variant={keysetGenerated.success ? 'success' : 'error'}
+            className="mt-4"
+          >
             {keysetGenerated.location}
-          </div>
+          </Alert>
         )}
       </CardContent>
     </Card>

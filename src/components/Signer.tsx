@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
+import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tooltip } from "@/components/ui/tooltip"
 import { get_node } from "@/lib/bifrost"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry } from '@frostr/bifrost'
@@ -64,7 +66,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showEventLog, setShowEventLog] = useState(false);
   const [showSignerTooltip, setShowSignerTooltip] = useState(false);
   const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
@@ -410,19 +411,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         <CardContent className="p-8 space-y-8">
           <div className="flex items-center">
             <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
-            <div 
-              className="ml-2 text-blue-400 cursor-pointer relative"
-              onMouseEnter={() => setShowSignerTooltip(true)}
-              onMouseLeave={() => setShowSignerTooltip(false)}
-            >
-              <HelpCircle size={18} />
-              {showSignerTooltip && (
-                <div className="absolute right-0 w-64 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+            <Tooltip 
+              trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+              content={
+                <>
                   <p className="mb-2 font-semibold">Important:</p>
                   <p>The signer must be running to handle signature requests from clients. When active, it will communicate with other nodes through your configured relays.</p>
-                </div>
-              )}
-            </div>
+                </>
+              }
+            />
           </div>
           
           <div className="space-y-6">
@@ -497,19 +494,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             <div className="space-y-3">
               <div className="flex items-center">
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
-                <div 
-                  className="ml-2 text-blue-400 cursor-pointer relative"
-                  onMouseEnter={() => setShowRelayTooltip(true)}
-                  onMouseLeave={() => setShowRelayTooltip(false)}
-                >
-                  <HelpCircle size={16} />
-                  {showRelayTooltip && (
-                    <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  content={
+                    <>
                       <p className="mb-2 font-semibold">Important:</p>
                       <p>You must be connected to at least one relay to communicate with other signers. Ensure all signers have at least one common relay to coordinate successfully.</p>
-                    </div>
-                  )}
-                </div>
+                    </>
+                  }
+                />
               </div>
               <div className="flex">
                 <Input
@@ -533,50 +526,25 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                 {relayUrls.map((relay, index) => (
                   <div key={index} className="flex justify-between items-center bg-gray-800/30 py-2 px-3 rounded-md">
                     <span className="text-blue-300 text-sm font-mono">{relay}</span>
-                    <Button
-                      variant="ghost"
+                    <IconButton
+                      variant="destructive"
                       size="sm"
+                      icon={<X className="h-4 w-4" />}
                       onClick={() => handleRemoveRelay(relay)}
-                      className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-full"
+                      tooltip="Remove relay"
                       disabled={isSignerRunning || relayUrls.length <= 1}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    />
                   </div>
                 ))}
               </div>
             </div>
           </div>
           
-          <div 
-            className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-            onClick={() => setShowEventLog(!showEventLog)}
-          >
-            <div className="flex items-center gap-2">
-              {showEventLog ? 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m18 15-6-6-6 6"/>
-                </svg> : 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              }
-              <span className="text-blue-300 text-sm font-medium">Event Log</span>
-              <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-                <div className={`w-2 h-2 rounded-full ${logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-gray-400">{logs.length} events</span>
-              </div>
-            </div>
-            <span className="text-xs text-gray-500 italic">Click to expand</span>
-          </div>
-          
-          {showEventLog && (
-            <EventLog 
-              logs={logs} 
-              isSignerRunning={isSignerRunning} 
-              onClearLogs={() => setLogs([])}
-            />
-          )}
+          <EventLog 
+            logs={logs} 
+            isSignerRunning={isSignerRunning} 
+            onClearLogs={() => setLogs([])}
+          />
         </CardContent>
       </Card>
     </div>
