@@ -66,7 +66,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showEventLog, setShowEventLog] = useState(false);
   const [showSignerTooltip, setShowSignerTooltip] = useState(false);
   const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
@@ -541,35 +540,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             </div>
           </div>
           
-          <div 
-            className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-            onClick={() => setShowEventLog(!showEventLog)}
-          >
-            <div className="flex items-center gap-2">
-              {showEventLog ? 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m18 15-6-6-6 6"/>
-                </svg> : 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              }
-              <span className="text-blue-300 text-sm font-medium">Event Log</span>
-              <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-                <div className={`w-2 h-2 rounded-full ${logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-gray-400">{logs.length} events</span>
-              </div>
-            </div>
-            <span className="text-xs text-gray-500 italic">Click to expand</span>
-          </div>
-          
-          {showEventLog && (
-            <EventLog 
-              logs={logs} 
-              isSignerRunning={isSignerRunning} 
-              onClearLogs={() => setLogs([])}
-            />
-          )}
+          <EventLog 
+            logs={logs} 
+            isSignerRunning={isSignerRunning} 
+            onClearLogs={() => setLogs([])}
+          />
         </CardContent>
       </Card>
     </div>
