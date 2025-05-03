@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Modal } from '@/components/ui/modal';
 import LoadShare from './LoadShare';
-import ConfirmModal from './ui/ConfirmModal';
+import ConfirmModal from '@/components/ui/ConfirmModal';
 
 interface ShareListProps {
   onShareLoaded?: (share: string, groupCredential: string) => void;
