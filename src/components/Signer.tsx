@@ -81,8 +81,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         setIsSignerRunning(false);
       }
     };
-  }, []);  // Only run on mount/unmount, not when isSignerRunning changes
-
+  }, [isSignerRunning]);
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
