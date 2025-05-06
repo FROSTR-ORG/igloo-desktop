@@ -66,19 +66,17 @@ const App: React.FC = () => {
     }
   };
 
-  const handleBackToShares = () => {
+  const handleBackToShares = async () => {
     // Stop signer before navigating away
-    if (signerRef.current) {
-      signerRef.current.stopSigner();
-    }
+    await signerRef.current?.stopSigner().catch(console.error);
     setSignerData(null);
     setShowingCreate(false);
   };
 
-  const handleTabChange = (value: string) => {
+  const handleTabChange = async (value: string) => {
     // If switching away from signer tab, stop the signer
-    if (activeTab === "signer" && value !== "signer" && signerRef.current) {
-      signerRef.current.stopSigner();
+    if (activeTab === "signer" && value !== "signer") {
+      await signerRef.current?.stopSigner().catch(console.error);
     }
     setActiveTab(value);
   };
