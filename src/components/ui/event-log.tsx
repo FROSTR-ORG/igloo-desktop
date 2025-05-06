@@ -11,13 +11,15 @@ interface EventLogProps {
   isSignerRunning?: boolean;
   onClearLogs: () => void;
   title?: string;
+  hideHeader?: boolean;
 }
 
 export const EventLog = memo(({ 
   logs, 
   isSignerRunning = false, 
   onClearLogs,
-  title = "Event Log"
+  title = "Event Log",
+  hideHeader = false
 }: EventLogProps) => {
   const logEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -72,33 +74,35 @@ export const EventLog = memo(({
 
   return (
     <div className="space-y-2 mt-8 pt-6 border-t border-gray-800/30">
-      <div 
-        className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-        onClick={handleToggle}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleToggle();
-          }
-        }}
-      >
-        <div className="flex items-center gap-2">
-          {isExpanded ? 
-            <ChevronUp className="h-4 w-4 text-blue-400" /> : 
-            <ChevronDown className="h-4 w-4 text-blue-400" />
-          }
-          <span className="text-blue-200 text-sm font-medium select-none">{title}</span>
-          <StatusIndicator 
-            status={getStatusIndicator()}
-            count={logs.length}
-          />
+      {!hideHeader && (
+        <div 
+          className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
+          onClick={handleToggle}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              handleToggle();
+            }
+          }}
+        >
+          <div className="flex items-center gap-2">
+            {isExpanded ? 
+              <ChevronUp className="h-4 w-4 text-blue-400" /> : 
+              <ChevronDown className="h-4 w-4 text-blue-400" />
+            }
+            <span className="text-blue-200 text-sm font-medium select-none">{title}</span>
+            <StatusIndicator 
+              status={getStatusIndicator()}
+              count={logs.length}
+            />
+          </div>
+          <div onClick={e => e.stopPropagation()}>
+            {actions}
+          </div>
         </div>
-        <div onClick={e => e.stopPropagation()}>
-          {actions}
-        </div>
-      </div>
+      )}
       <div 
         className={cn(
           "transition-all duration-300 ease-in-out overflow-hidden",

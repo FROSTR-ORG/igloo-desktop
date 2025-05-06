@@ -11,12 +11,13 @@ export interface EventLogProps {
   hideHeader?: boolean;
 }
 
-export const EventLog: React.FC<EventLogProps> = ({ logs, isSignerRunning, onClearLogs }) => {
+export const EventLog: React.FC<EventLogProps> = ({ logs, isSignerRunning, onClearLogs, hideHeader }) => {
   return (
     <UIEventLog
       logs={logs}
       isSignerRunning={isSignerRunning}
       onClearLogs={onClearLogs}
+      hideHeader={hideHeader}
     />
   );
 }; 
