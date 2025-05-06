@@ -1,6 +1,8 @@
-import React, { useState, useEffect, useRef } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
 import { Button } from "@/components/ui/button"
+import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
+import { Tooltip } from "@/components/ui/tooltip"
 import { get_node } from "@/lib/bifrost"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry } from '@frostr/bifrost'
@@ -9,6 +11,29 @@ import { Input } from "@/components/ui/input"
 import { validateShare, validateGroup } from "@/lib/validation"
 import { decode_share, decode_group } from "@/lib/bifrost"
 
+// Add CSS for the pulse animation
+const pulseStyle = `
+  @keyframes pulse {
+    0% {
+      opacity: 1;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.6;
+      transform: scale(1.1);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  
+  .pulse-animation {
+    animation: pulse 1.5s ease-in-out infinite;
+    box-shadow: 0 0 5px 2px rgba(34, 197, 94, 0.6);
+  }
+`;
+
 interface SignerProps {
   initialData?: {
     share: string;
@@ -16,9 +41,14 @@ interface SignerProps {
   } | null;
 }
 
+// Export the handle type for type safety
+export interface SignerHandle {
+  stopSigner: () => Promise<void>;
+}
+
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
-const Signer: React.FC<SignerProps> = ({ initialData }) => {
+const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
   const [isShareValid, setIsShareValid] = useState(false);
@@ -36,11 +66,31 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showEventLog, setShowEventLog] = useState(false);
   const [showSignerTooltip, setShowSignerTooltip] = useState(false);
   const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
   const nodeRef = useRef<any>(null);
+
+  // Add effect to cleanup on unmount
+  useEffect(() => {
+    // Cleanup function that runs when component unmounts
+    return () => {
+      if (isSignerRunning) {
+        addLog('info', 'Signer stopped due to page navigation');
+        cleanupNode();
+        setIsSignerRunning(false);
+      }
+    };
+  }, [isSignerRunning]);
+  // Expose the stopSigner method to parent components through ref
+  useImperativeHandle(ref, () => ({
+    stopSigner: async () => {
+      console.log('External stopSigner method called');
+      if (isSignerRunning) {
+        await handleStopSigner();
+      }
+    }
+  }));
 
   const addLog = (type: string, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
@@ -62,37 +112,65 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
         }
 
         // Remove Bifrost specific listeners
-        nodeRef.current.off('ready');
-        nodeRef.current.off('closed');
-        nodeRef.current.off('message');
-        nodeRef.current.off('bounced');
+        try {
+          nodeRef.current.off('ready');
+          nodeRef.current.off('closed');
+          nodeRef.current.off('message');
+          nodeRef.current.off('bounced');
 
-        // Remove ECDH events
-        nodeRef.current.off('/ecdh/sender/req');
-        nodeRef.current.off('/ecdh/sender/res');
-        nodeRef.current.off('/ecdh/sender/rej');
-        nodeRef.current.off('/ecdh/sender/ret');
-        nodeRef.current.off('/ecdh/sender/err');
-        nodeRef.current.off('/ecdh/handler/req');
-        nodeRef.current.off('/ecdh/handler/res');
-        nodeRef.current.off('/ecdh/handler/rej');
+          // Remove ECDH events
+          nodeRef.current.off('/ecdh/sender/req');
+          nodeRef.current.off('/ecdh/sender/res');
+          nodeRef.current.off('/ecdh/sender/rej');
+          nodeRef.current.off('/ecdh/sender/ret');
+          nodeRef.current.off('/ecdh/sender/err');
+          nodeRef.current.off('/ecdh/handler/req');
+          nodeRef.current.off('/ecdh/handler/res');
+          nodeRef.current.off('/ecdh/handler/rej');
 
-        // Remove Signature events
-        nodeRef.current.off('/sign/sender/req');
-        nodeRef.current.off('/sign/sender/res');
-        nodeRef.current.off('/sign/sender/rej');
-        nodeRef.current.off('/sign/sender/ret');
-        nodeRef.current.off('/sign/sender/err');
-        nodeRef.current.off('/sign/handler/req');
-        nodeRef.current.off('/sign/handler/res');
-        nodeRef.current.off('/sign/handler/rej');
+          // Remove Signature events
+          nodeRef.current.off('/sign/sender/req');
+          nodeRef.current.off('/sign/sender/res');
+          nodeRef.current.off('/sign/sender/rej');
+          nodeRef.current.off('/sign/sender/ret');
+          nodeRef.current.off('/sign/sender/err');
+          nodeRef.current.off('/sign/handler/req');
+          nodeRef.current.off('/sign/handler/res');
+          nodeRef.current.off('/sign/handler/rej');
+        } catch (e) {
+          console.warn('Error removing event listeners:', e);
+        }
 
-        // Disconnect the node
-        nodeRef.current.disconnect();
+        // Thoroughly attempt to disconnect the node
+        try {
+          // Try calling disconnect on the node itself (if available)
+          if (typeof nodeRef.current.disconnect === 'function') {
+            nodeRef.current.disconnect();
+          }
+          
+          // Disconnect the client
+          if (nodeRef.current.client) {
+            // Try force close method if it exists
+            if (typeof nodeRef.current.client.close === 'function') {
+              nodeRef.current.client.close();
+            }
+            
+            // Try normal disconnect
+            if (typeof nodeRef.current.client.disconnect === 'function') {
+              nodeRef.current.client.disconnect();
+            }
+            
+            // Null out the client reference
+            nodeRef.current.client = null;
+          }
+        } catch (e) {
+          console.warn('Error disconnecting:', e);
+        }
       } catch (error) {
         console.error('Error during cleanup:', error);
       }
       
+      // Completely clear the node reference
       nodeRef.current = null;
     }
   };
@@ -325,23 +403,22 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
 
   return (
     <div className="space-y-6">
+      {/* Add the pulse style */}
+      <style>{pulseStyle}</style>
+      
       <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
         <CardContent className="p-8 space-y-8">
           <div className="flex items-center">
             <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
-            <div 
-              className="ml-2 text-blue-400 cursor-pointer relative"
-              onMouseEnter={() => setShowSignerTooltip(true)}
-              onMouseLeave={() => setShowSignerTooltip(false)}
-            >
-              <HelpCircle size={18} />
-              {showSignerTooltip && (
-                <div className="absolute right-0 w-64 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+            <Tooltip 
+              trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+              content={
+                <>
                   <p className="mb-2 font-semibold">Important:</p>
                   <p>The signer must be running to handle signature requests from clients. When active, it will communicate with other nodes through your configured relays.</p>
-                </div>
-              )}
-            </div>
+                </>
+              }
+            />
           </div>
           
           <div className="space-y-6">
@@ -392,7 +469,11 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
               
               <div className="flex items-center justify-between mt-6">
                 <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${isSignerRunning ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                  <div className={`w-3 h-3 rounded-full ${
+                    isSignerRunning 
+                      ? 'bg-green-500 pulse-animation' 
+                      : 'bg-red-500'
+                  }`}></div>
                   <span className="text-gray-300">Signer {isSignerRunning ? 'Running' : 'Stopped'}</span>
                 </div>
                 <Button
@@ -412,19 +493,15 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
             <div className="space-y-3">
               <div className="flex items-center">
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
-                <div 
-                  className="ml-2 text-blue-400 cursor-pointer relative"
-                  onMouseEnter={() => setShowRelayTooltip(true)}
-                  onMouseLeave={() => setShowRelayTooltip(false)}
-                >
-                  <HelpCircle size={16} />
-                  {showRelayTooltip && (
-                    <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  content={
+                    <>
                       <p className="mb-2 font-semibold">Important:</p>
                       <p>You must be connected to at least one relay to communicate with other signers. Ensure all signers have at least one common relay to coordinate successfully.</p>
-                    </div>
-                  )}
-                </div>
+                    </>
+                  }
+                />
               </div>
               <div className="flex">
                 <Input
@@ -448,55 +525,29 @@ const Signer: React.FC<SignerProps> = ({ initialData }) => {
                 {relayUrls.map((relay, index) => (
                   <div key={index} className="flex justify-between items-center bg-gray-800/30 py-2 px-3 rounded-md">
                     <span className="text-blue-300 text-sm font-mono">{relay}</span>
-                    <Button
-                      variant="ghost"
+                    <IconButton
+                      variant="destructive"
                       size="sm"
+                      icon={<X className="h-4 w-4" />}
                       onClick={() => handleRemoveRelay(relay)}
-                      className="h-8 w-8 p-0 text-red-400 hover:text-red-300 hover:bg-red-900/30 rounded-full"
+                      tooltip="Remove relay"
                       disabled={isSignerRunning || relayUrls.length <= 1}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
+                    />
                   </div>
                 ))}
               </div>
             </div>
           </div>
           
-          <div 
-            className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
-            onClick={() => setShowEventLog(!showEventLog)}
-          >
-            <div className="flex items-center gap-2">
-              {showEventLog ? 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m18 15-6-6-6 6"/>
-                </svg> : 
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-400">
-                  <path d="m6 9 6 6 6-6"/>
-                </svg>
-              }
-              <span className="text-blue-300 text-sm font-medium">Event Log</span>
-              <div className="flex items-center gap-1.5 bg-gray-900/70 px-2 py-0.5 rounded text-xs">
-                <div className={`w-2 h-2 rounded-full ${logs.length === 0 ? "bg-green-500" : isSignerRunning ? "bg-green-500" : "bg-red-500"}`} />
-                <span className="text-gray-400">{logs.length} events</span>
-              </div>
-            </div>
-            <span className="text-xs text-gray-500 italic">Click to expand</span>
-          </div>
-          
-          {showEventLog && (
-            <EventLog 
-              logs={logs} 
-              isSignerRunning={isSignerRunning} 
-              onClearLogs={() => setLogs([])}
-              hideHeader={true}
-            />
-          )}
+          <EventLog 
+            logs={logs} 
+            isSignerRunning={isSignerRunning} 
+            onClearLogs={() => setLogs([])}
+          />
         </CardContent>
       </Card>
     </div>
   );
-};
+});
 
 export default Signer; 
