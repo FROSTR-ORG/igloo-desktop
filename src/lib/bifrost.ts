@@ -49,8 +49,8 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
     throw new Error('At least one relay URL must be provided')
   }
 
-  const decodedGroup  = decode_group_pkg(group)
-  const decodedShare  = decode_share_pkg(share)
+  const decodedGroup = decode_group_pkg(group)
+  const decodedShare = decode_share_pkg(share)
 
   const node = new BifrostNode(decodedGroup, decodedShare, relays)
 
@@ -126,4 +126,36 @@ function validateKeysetParams(threshold: number, totalMembers: number) {
   if (threshold > totalMembers) {
     throw new Error('Threshold cannot be greater than total members');
   }
+}
+
+/**
+ * A temporary mock of a ping response for QR code sharing
+ * 
+ * In a real implementation, this would use actual Bifrost ping functionality
+ * when it becomes available in the library
+ * 
+ * @param shareData The share credential that was shared via QR
+ * @param timeout Timeout in milliseconds
+ * @returns Promise that resolves when the "ping" is successful
+ */
+export function pingShare(shareData: string, groupCredential: string, relays: string[] = ["wss://relay.damus.io"], timeout = 30000): Promise<boolean> {
+  // This is a mock implementation that simulates a response after a delay
+  // In a real implementation, this would use actual Bifrost protocol communication
+  return new Promise((resolve, reject) => {
+    // For demonstration purposes, we'll just resolve after a random delay
+    // In reality, this would involve actual network communication with a device
+    // that scanned the QR code
+    const delay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds delay
+    
+    setTimeout(() => {
+      // 50% chance of success for demo purposes
+      const isSuccess = Math.random() < 0.5;
+      
+      if (isSuccess) {
+        resolve(true);
+      } else {
+        reject(new Error("Failed to receive ping confirmation"));
+      }
+    }, delay);
+  });
 }
