@@ -4,8 +4,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { decode_group, decode_share } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
-import { CheckCircle2 } from 'lucide-react';
+import { CheckCircle2, QrCode } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
+import { QRCodeSVG } from 'qrcode.react';
 
 interface KeysetProps {
   groupCredential: string;
@@ -31,6 +32,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     shareIndex: null
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showQrCode, setShowQrCode] = useState<{show: boolean, shareData: string | null}>({
+    show: false,
+    shareData: null
+  });
 
   const handleCopy = async (text: string) => {
     try {
@@ -89,6 +94,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       ...prev,
       [id]: !prev[id]
     }));
+  };
+
+  const handleShowQrCode = (shareData: string) => {
+    setShowQrCode({ show: true, shareData });
+  };
+
+  const handleCloseQrCode = () => {
+    setShowQrCode({ show: false, shareData: null });
   };
 
   useEffect(() => {
@@ -192,6 +205,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                           >
                             Copy
                           </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleShowQrCode(share)}
+                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                          >
+                            <QrCode className="w-4 h-4" />
+                          </Button>
                           {savedShares[index] ? (
                             <div className="flex items-center justify-center w-[54px] text-emerald-400">
                               <CheckCircle2 className="w-5 h-5" />
@@ -246,6 +267,32 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               onSave={handleSaveComplete}
               shareToEncrypt={shareCredentials[showSaveDialog.shareIndex]}
             />
+          </div>
+        </div>
+      )}
+
+      {showQrCode.show && showQrCode.shareData && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 className="text-xl font-semibold text-blue-200 mb-4">Share QR Code</h3>
+            <div className="flex justify-center bg-white p-4 rounded-lg">
+              <QRCodeSVG 
+                value={showQrCode.shareData} 
+                size={250}
+                level="H"
+              />
+            </div>
+            <p className="text-gray-400 text-xs mt-4 text-center">
+              Scan this QR code to import the share on another device
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={handleCloseQrCode}
+                className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+              >
+                Close
+              </Button>
+            </div>
           </div>
         </div>
       )}
