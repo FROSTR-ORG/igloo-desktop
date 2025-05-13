@@ -1,10 +1,10 @@
 import React, {useEffect, useState} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share } from "@/lib/bifrost";
+import { decode_group, decode_share, pingShare } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
-import { CheckCircle2, QrCode } from 'lucide-react';
+import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -27,15 +27,26 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   const [decodedGroup, setDecodedGroup] = useState<any>(null);
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [savedShares, setSavedShares] = useState<{[key: number]: boolean}>({});
+  const [flashingShares, setFlashingShares] = useState<{[key: number]: boolean}>({});
   const [showSaveDialog, setShowSaveDialog] = useState<{show: boolean, shareIndex: number | null}>({
     show: false,
     shareIndex: null
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [showQrCode, setShowQrCode] = useState<{show: boolean, shareData: string | null}>({
+  const [showQrCode, setShowQrCode] = useState<{
+    show: boolean, 
+    shareData: string | null, 
+    shareIndex: number | null,
+    status: 'waiting' | 'success' | 'error',
+    message: string
+  }>({
     show: false,
-    shareData: null
+    shareData: null,
+    shareIndex: null,
+    status: 'waiting',
+    message: 'Waiting for share to be scanned...'
   });
+  const [pingTimeout, setPingTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const handleCopy = async (text: string) => {
     try {
@@ -72,6 +83,20 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         ...prev,
         [showSaveDialog.shareIndex!]: true
       }));
+      
+      // Trigger flashing animation
+      setFlashingShares(prev => ({
+        ...prev,
+        [showSaveDialog.shareIndex!]: true
+      }));
+      
+      // Remove flash after animation completes
+      setTimeout(() => {
+        setFlashingShares(prev => ({
+          ...prev,
+          [showSaveDialog.shareIndex!]: false
+        }));
+      }, 1500);
     }
 
     // Close the dialog
@@ -96,12 +121,106 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     }));
   };
 
-  const handleShowQrCode = (shareData: string) => {
-    setShowQrCode({ show: true, shareData });
+  const handleShowQrCode = (shareData: string, shareIndex: number) => {
+    setShowQrCode({ 
+      show: true, 
+      shareData, 
+      shareIndex,
+      status: 'waiting',
+      message: 'Waiting for share to be scanned...'
+    });
+
+    // Start listening for a ping response
+    startPingListener(shareData, shareIndex);
+  };
+
+  const startPingListener = (shareData: string, shareIndex: number) => {
+    // Reset the QR code modal to waiting state first
+    setShowQrCode(prev => ({
+      ...prev,
+      status: 'waiting',
+      message: 'Waiting for share to be scanned...'
+    }));
+
+    // Clear any existing ping timeouts
+    if (pingTimeout) {
+      clearTimeout(pingTimeout);
+    }
+
+    // Set a timeout to prevent infinite waiting
+    const timeout = setTimeout(() => {
+      setShowQrCode(prev => ({
+        ...prev,
+        status: 'error',
+        message: 'No response received. Please try again.'
+      }));
+    }, 60000); // 1 minute timeout
+
+    setPingTimeout(timeout);
+
+    // Start listening for ping
+    pingShare(shareData, groupCredential)
+      .then(() => {
+        // If ping successful, clear timeout and update state
+        if (pingTimeout) clearTimeout(pingTimeout);
+        setPingTimeout(null);
+        
+        // Update the QR code modal with success status
+        setShowQrCode(prev => ({
+          ...prev,
+          status: 'success',
+          message: 'Share successfully transferred!'
+        }));
+
+        // Mark the share as saved
+        setSavedShares(prev => ({
+          ...prev,
+          [shareIndex]: true
+        }));
+        
+        // Trigger flashing animation
+        setFlashingShares(prev => ({
+          ...prev,
+          [shareIndex]: true
+        }));
+        
+        // Remove flash after animation completes
+        setTimeout(() => {
+          setFlashingShares(prev => ({
+            ...prev,
+            [shareIndex]: false
+          }));
+        }, 1500);
+
+        // Let the user close the modal manually instead of auto-closing
+      })
+      .catch(error => {
+        // If ping fails, clear timeout and update state with error
+        if (pingTimeout) clearTimeout(pingTimeout);
+        setPingTimeout(null);
+        
+        setShowQrCode(prev => ({
+          ...prev,
+          status: 'error',
+          message: `Error: ${error.message}`
+        }));
+      });
   };
 
   const handleCloseQrCode = () => {
-    setShowQrCode({ show: false, shareData: null });
+    // Clear any ongoing ping timeouts
+    if (pingTimeout) {
+      clearTimeout(pingTimeout);
+      setPingTimeout(null);
+    }
+    
+    setShowQrCode({
+      show: false,
+      shareData: null,
+      shareIndex: null,
+      status: 'waiting',
+      message: 'Waiting for share to be scanned...'
+    });
   };
 
   useEffect(() => {
@@ -185,56 +304,90 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               <div className="space-y-3">
                 {shareCredentials.map((share, index) => {
                   const decodedShare = decodedShares[index];
+                  const isFlashing = flashingShares[index];
                   return (
                     <div key={index} className="space-y-2">
-                      <div className="bg-gray-800/50 p-3 rounded text-xs flex items-start justify-between group">
-                        <div className="flex-1 space-y-1">
-                          <div className="text-gray-400 font-medium">
-                            {name}_share_{decodedShare?.idx || index + 1}
-                          </div>
-                          <div className="break-all text-blue-300 font-mono mr-4">
-                            {formatShare(share)}
-                          </div>
-                        </div>
-                        <div className="flex space-x-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleCopy(share)}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-                          >
-                            Copy
-                          </Button>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleShowQrCode(share)}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-                          >
-                            <QrCode className="w-4 h-4" />
-                          </Button>
-                          {savedShares[index] ? (
-                            <div className="flex items-center justify-center w-[54px] text-emerald-400">
-                              <CheckCircle2 className="w-5 h-5" />
+                      <div 
+                        className={`
+                          relative bg-gray-800/50 p-3 rounded text-xs flex items-start group 
+                          ${savedShares[index] ? 'border-2 border-green-500/30 bg-green-900/10' : ''}
+                          ${isFlashing ? 'animate-pulse' : ''}
+                          transition-all duration-300
+                        `}
+                        style={{
+                          boxShadow: isFlashing ? '0 0 20px rgba(16, 185, 129, 0.7)' : 'none'
+                        }}
+                      >
+                        {savedShares[index] && isFlashing && (
+                          <div className="absolute inset-0 bg-green-500/10 rounded z-0 animate-pulse"></div>
+                        )}
+                        
+                        {/* Main content area with fixed layout */}
+                        <div className="flex flex-row items-center w-full">
+                          {/* Left side with share info */}
+                          <div className="flex-1 min-w-0 relative z-10">
+                            {/* Share title with badge */}
+                            <div className="flex flex-col">
+                              <div className="flex items-center gap-2 mb-1">
+                                <span className={`font-medium ${savedShares[index] ? 'text-green-400' : 'text-gray-400'}`}>
+                                  {name}_share_{decodedShare?.idx || index + 1}
+                                </span>
+                                {savedShares[index] && (
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded text-xs bg-green-900/50 text-green-400 border border-green-600/30">
+                                    <CheckCircle2 className="w-3 h-3 mr-1" />
+                                    Saved
+                                  </span>
+                                )}
+                              </div>
+                              
+                              {/* Share content */}
+                              <div className="break-all text-blue-300 font-mono truncate pr-2">
+                                {formatShare(share)}
+                              </div>
                             </div>
-                          ) : (
+                          </div>
+                          
+                          {/* Right side with fixed-width button container */}
+                          <div className="flex items-center space-x-2 shrink-0">
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleSave(index)}
-                              className="text-green-400 hover:text-green-300 hover:bg-green-900/30"
+                              onClick={() => handleCopy(share)}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                             >
-                              Save
+                              Copy
                             </Button>
-                          )}
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => toggleExpanded(`${name}-share-${index}`)}
-                            className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
-                          >
-                            {expandedItems[`${name}-share-${index}`] ? '▼' : '▶'}
-                          </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleShowQrCode(share, index)}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                            >
+                              <QrCode className="w-4 h-4" />
+                            </Button>
+                            {savedShares[index] ? (
+                              <div className="flex items-center justify-center w-[54px] text-green-400">
+                                <CheckCircle2 className="w-5 h-5" />
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSave(index)}
+                                className="text-green-400 hover:text-green-300 hover:bg-green-900/30 w-[54px]"
+                              >
+                                Save
+                              </Button>
+                            )}
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => toggleExpanded(`${name}-share-${index}`)}
+                              className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                            >
+                              {expandedItems[`${name}-share-${index}`] ? '▼' : '▶'}
+                            </Button>
+                          </div>
                         </div>
                       </div>
                       {expandedItems[`${name}-share-${index}`] && decodedShare && (
@@ -275,22 +428,110 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 className="text-xl font-semibold text-blue-200 mb-4">Share QR Code</h3>
-            <div className="flex justify-center bg-white p-4 rounded-lg">
+            
+            <div className={`relative flex justify-center p-6 rounded-lg ${
+              showQrCode.status === 'success' ? 'bg-green-900/20 border-2 border-green-500/50' : 
+              showQrCode.status === 'error' ? 'bg-red-900/20 border-2 border-red-500/50' : 
+              'bg-white'
+            }`}>
+              {showQrCode.status === 'waiting' && (
+                <div className="absolute -top-3 -right-3 animate-pulse">
+                  <Loader2 className="w-6 h-6 text-blue-400 animate-spin" />
+                </div>
+              )}
+              
+              {showQrCode.status === 'success' && (
+                <div className="absolute -top-4 -right-4 bg-green-500 rounded-full p-1">
+                  <CheckCircle2 className="w-7 h-7 text-white" />
+                </div>
+              )}
+              
+              {showQrCode.status === 'error' && (
+                <div className="absolute -top-4 -right-4 bg-red-500 rounded-full p-1">
+                  <AlertCircle className="w-7 h-7 text-white" />
+                </div>
+              )}
+              
               <QRCodeSVG 
                 value={showQrCode.shareData} 
                 size={250}
                 level="H"
+                className={showQrCode.status === 'error' ? 'opacity-50' : ''}
               />
+              
+              {showQrCode.status === 'success' && (
+                <div className="absolute inset-0 flex items-center justify-center bg-black/10 rounded-lg">
+                  <div className="bg-green-500 rounded-full p-3 shadow-lg">
+                    <CheckCircle2 className="w-12 h-12 text-white" />
+                  </div>
+                </div>
+              )}
             </div>
-            <p className="text-gray-400 text-xs mt-4 text-center">
-              Scan this QR code to import the share on another device
-            </p>
-            <div className="mt-6 flex justify-end">
+            
+            <div className={`mt-5 text-center p-3 rounded-md ${
+              showQrCode.status === 'waiting' ? 'bg-blue-900/30 border border-blue-700/50' : 
+              showQrCode.status === 'success' ? 'bg-green-900/30 border border-green-700/50' : 
+              'bg-red-900/30 border border-red-700/50'
+            }`}>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                {showQrCode.status === 'waiting' && (
+                  <Loader2 className="w-4 h-4 text-blue-400 animate-spin" />
+                )}
+                {showQrCode.status === 'success' && (
+                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+                )}
+                {showQrCode.status === 'error' && (
+                  <AlertCircle className="w-5 h-5 text-red-400" />
+                )}
+                <p className={`text-sm font-medium ${
+                  showQrCode.status === 'waiting' ? 'text-blue-300' : 
+                  showQrCode.status === 'success' ? 'text-green-300' : 
+                  'text-red-300'
+                }`}>
+                  {showQrCode.message}
+                </p>
+              </div>
+              
+              {showQrCode.status === 'waiting' && (
+                <p className="text-xs mt-1 text-gray-400">
+                  When another device scans this QR code, the share will be imported
+                </p>
+              )}
+              
+              {showQrCode.status === 'error' && (
+                <p className="text-xs mt-1 text-gray-400">
+                  The device may not have successfully received the share
+                </p>
+              )}
+              
+              {showQrCode.status === 'success' && (
+                <p className="text-xs mt-1 text-gray-400">
+                  The share has been successfully transferred to another device
+                </p>
+              )}
+            </div>
+            
+            <div className="mt-6 flex justify-end space-x-3">
+              {showQrCode.status === 'error' && (
+                <Button
+                  onClick={() => startPingListener(showQrCode.shareData!, showQrCode.shareIndex!)}
+                  className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+                >
+                  Try Again
+                </Button>
+              )}
+              
               <Button
                 onClick={handleCloseQrCode}
-                className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+                className={`transition-colors ${
+                  showQrCode.status === 'success' ? 
+                  'bg-green-600 hover:bg-green-700 text-green-100' : 
+                  showQrCode.status === 'error' ?
+                  'bg-gray-600 hover:bg-gray-700 text-gray-100' :
+                  'bg-blue-600 hover:bg-blue-700 text-blue-100'
+                }`}
               >
-                Close
+                {showQrCode.status === 'success' ? 'Done' : 'Close'}
               </Button>
             </div>
           </div>
