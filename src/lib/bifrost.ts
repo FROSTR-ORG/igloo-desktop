@@ -1,12 +1,5 @@
-import { 
-  encode_group_pkg,
-  decode_group_pkg,
-  encode_share_pkg, 
-  decode_share_pkg,
-  generate_dealer_pkg,
-  recover_secret_key
-} from '@frostr/bifrost/lib'
-import { BifrostNode, SignatureEntry } from '@frostr/bifrost'
+import { BifrostNode, SignatureEntry, PackageEncoder } from '@frostr/bifrost'
+import { generate_dealer_pkg, recover_secret_key } from '@frostr/bifrost/lib'
 import type {
   GroupPackage,
   SharePackage
@@ -30,7 +23,6 @@ export function generateKeysetWithSecret(threshold: number, totalMembers: number
     secretKey = nip19.decode(secretKey).data as string
   }
 
-  // Generate the threshold signing group using provided secret
   const { group, shares } = generate_dealer_pkg(
     threshold,
     totalMembers,
@@ -39,8 +31,8 @@ export function generateKeysetWithSecret(threshold: number, totalMembers: number
 
   // Encode the group and shares as bech32 strings
   return {
-    groupCredential: encode_group_pkg(group),
-    shareCredentials: shares.map(encode_share_pkg)
+    groupCredential: PackageEncoder.group.encode(group),
+    shareCredentials: shares.map((share: SharePackage) => PackageEncoder.share.encode(share))
   }
 }
 
@@ -49,8 +41,8 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
     throw new Error('At least one relay URL must be provided')
   }
 
-  const decodedGroup = decode_group_pkg(group)
-  const decodedShare = decode_share_pkg(share)
+  const decodedGroup = PackageEncoder.group.decode(group)
+  const decodedShare = PackageEncoder.share.decode(share)
 
   const node = new BifrostNode(decodedGroup, decodedShare, relays)
 
@@ -83,12 +75,31 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   return node
 }
 
-export function decode_share(share: string) {
-  return decode_share_pkg(share)
+export function decode_share(share: string): SharePackage {
+  return PackageEncoder.share.decode(share)
 }
 
-export function decode_group(group: string) {
-  return decode_group_pkg(group)
+export function decode_group(group: string): GroupPackage {
+  return PackageEncoder.group.decode(group)
+}
+
+/**
+ * Encodes a group and share package into a single bfcred string.
+ * @param groupPkg The group package.
+ * @param sharePkg The share package.
+ * @returns The bfcred encoded string.
+ */
+export function encode_credential_string(groupPkg: GroupPackage, sharePkg: SharePackage): string {
+  return PackageEncoder.cred.encode(groupPkg, sharePkg);
+}
+
+/**
+ * Decodes a bfcred string into its constituent group and share packages.
+ * @param credStr The bfcred encoded string.
+ * @returns An object containing the group and share packages.
+ */
+export function decode_credential_string(credStr: string): { group: GroupPackage, share: SharePackage } {
+  return PackageEncoder.cred.decode(credStr);
 }
 
 /**
@@ -107,7 +118,6 @@ export function recover_nsec(group: GroupPackage, shares: SharePackage[]): strin
   }
 
   try {
-    // todo: ??
     const hex_secret = recover_secret_key(group, shares);
     console.log('hex_secret', hex_secret)
     const secretBytes = Buffer.from(hex_secret, 'hex');
@@ -134,13 +144,17 @@ function validateKeysetParams(threshold: number, totalMembers: number) {
  * In a real implementation, this would use actual Bifrost ping functionality
  * when it becomes available in the library
  * 
- * @param shareData The share credential that was shared via QR
+ * @param credentialData The bfcred string
  * @param timeout Timeout in milliseconds
  * @returns Promise that resolves when the "ping" is successful
  */
-export function pingShare(shareData: string, groupCredential: string, relays: string[] = ["wss://relay.damus.io"], timeout = 30000): Promise<boolean> {
+export function pingShare(credentialData: string, relays: string[] = ["wss://relay.damus.io"], timeout = 30000): Promise<boolean> {
   // This is a mock implementation that simulates a response after a delay
   // In a real implementation, this would use actual Bifrost protocol communication
+  // You might want to decode and use parts of the credential for actual ping logic:
+  // const { group, share } = decode_credential_string(credentialData);
+  // console.log('Pinging with credential for group id:', group.id, 'and share index:', share.idx, 'on relays:', relays);
+  
   return new Promise((resolve, reject) => {
     // For demonstration purposes, we'll just resolve after a random delay
     // In reality, this would involve actual network communication with a device
