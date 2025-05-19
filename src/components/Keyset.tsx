@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share, pingShare } from "@/lib/bifrost";
+import { decode_group, decode_share, pingShare, encode_credential_string } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
@@ -35,13 +35,13 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState<{
     show: boolean, 
-    shareData: string | null, 
+    credentialData: string | null,
     shareIndex: number | null,
     status: 'waiting' | 'success' | 'error',
     message: string
   }>({
     show: false,
-    shareData: null,
+    credentialData: null,
     shareIndex: null,
     status: 'waiting',
     message: 'Waiting for share to be scanned...'
@@ -121,20 +121,25 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     }));
   };
 
-  const handleShowQrCode = (shareData: string, shareIndex: number) => {
-    setShowQrCode({ 
-      show: true, 
-      shareData, 
-      shareIndex,
-      status: 'waiting',
-      message: 'Waiting for share to be scanned...'
-    });
-
-    // Start listening for a ping response
-    startPingListener(shareData, shareIndex);
+  const handleShowQrCode = (shareIndex: number) => {
+    if (decodedGroup && decodedShares[shareIndex]) {
+      const credential = encode_credential_string(decodedGroup, decodedShares[shareIndex]);
+      setShowQrCode({ 
+        show: true, 
+        credentialData: credential, 
+        shareIndex,
+        status: 'waiting',
+        message: 'Waiting for share to be scanned...'
+      });
+      // Start listening for a ping response
+      startPingListener(credential, shareIndex);
+    } else {
+      console.error("Group or share not decoded yet, cannot generate QR code");
+      // Optionally, show an error to the user
+    }
   };
 
-  const startPingListener = (shareData: string, shareIndex: number) => {
+  const startPingListener = (credentialData: string, shareIndex: number) => {
     // Reset the QR code modal to waiting state first
     setShowQrCode(prev => ({
       ...prev,
@@ -159,7 +164,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setPingTimeout(timeout);
 
     // Start listening for ping
-    pingShare(shareData, groupCredential)
+    pingShare(credentialData)
       .then(() => {
         // If ping successful, clear timeout and update state
         if (pingTimeout) clearTimeout(pingTimeout);
@@ -216,7 +221,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     
     setShowQrCode({
       show: false,
-      shareData: null,
+      credentialData: null,
       shareIndex: null,
       status: 'waiting',
       message: 'Waiting for share to be scanned...'
@@ -360,7 +365,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => handleShowQrCode(share, index)}
+                              onClick={() => handleShowQrCode(index)}
                               className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                             >
                               <QrCode className="w-4 h-4" />
@@ -424,7 +429,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         </div>
       )}
 
-      {showQrCode.show && showQrCode.shareData && (
+      {showQrCode.show && showQrCode.credentialData && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 className="text-xl font-semibold text-blue-200 mb-4">Share QR Code</h3>
@@ -453,7 +458,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               )}
               
               <QRCodeSVG 
-                value={showQrCode.shareData} 
+                value={showQrCode.credentialData}
                 size={250}
                 level="H"
                 className={showQrCode.status === 'error' ? 'opacity-50' : ''}
@@ -514,7 +519,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             <div className="mt-6 flex justify-end space-x-3">
               {showQrCode.status === 'error' && (
                 <Button
-                  onClick={() => startPingListener(showQrCode.shareData!, showQrCode.shareIndex!)}
+                  onClick={() => startPingListener(showQrCode.credentialData!, showQrCode.shareIndex!)}
                   className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
                 >
                   Try Again
