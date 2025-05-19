@@ -3,11 +3,6 @@ Frostr keyset manager and remote signer for secure distributed key management.
 
 Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key management protocol for nostr, using the powers of FROST (Flexible Round-Optimized Schnorr Threshold signatures).
 
-<video width="640" height="360" controls>
-  <source src="https://plebdevs-bucket.nyc3.cdn.digitaloceanspaces.com/videos/random/frostr-signing-demonstration.mp4" type="video/mp4">
-  Your browser does not support the video tag.
-</video>
-
 ## Table of Contents
 - [Implemented Features](#implemented-features)
 - [TODO](#todo)
