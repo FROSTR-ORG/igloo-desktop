@@ -139,37 +139,132 @@ function validateKeysetParams(threshold: number, totalMembers: number) {
 }
 
 /**
- * A temporary mock of a ping response for QR code sharing
+ * Uses Bifrost ping functionality to confirm network readiness for a given credential.
+ * Initializes a BifrostNode with the provided credential and performs a self-ping.
  * 
- * In a real implementation, this would use actual Bifrost ping functionality
- * when it becomes available in the library
- * 
- * @param credentialData The bfcred string
- * @param timeout Timeout in milliseconds
- * @returns Promise that resolves when the "ping" is successful
+ * @param credentialData The bfcred string containing group and share packages.
+ * @param relays Optional array of relay URLs to use. Defaults to ["wss://relay.damus.io"].
+ * @param operationTimeout Optional timeout in milliseconds for the entire operation (node ready + ping). Defaults to 30000ms.
+ * @returns Promise that resolves to true if the self-ping is successful, rejects otherwise.
  */
-export function pingShare(credentialData: string, relays: string[] = ["wss://relay.damus.io"], timeout = 30000): Promise<boolean> {
-  // This is a mock implementation that simulates a response after a delay
-  // In a real implementation, this would use actual Bifrost protocol communication
-  // You might want to decode and use parts of the credential for actual ping logic:
-  // const { group, share } = decode_credential_string(credentialData);
-  // console.log('Pinging with credential for group id:', group.id, 'and share index:', share.idx, 'on relays:', relays);
-  
-  return new Promise((resolve, reject) => {
-    // For demonstration purposes, we'll just resolve after a random delay
-    // In reality, this would involve actual network communication with a device
-    // that scanned the QR code
-    const delay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds delay
-    
-    setTimeout(() => {
-      // 50% chance of success for demo purposes
-      const isSuccess = Math.random() < 0.5;
+export function pingShare(
+  credentialData: string,
+  relays: string[] = ["wss://relay.damus.io"],
+  operationTimeout: number = 30000
+): Promise<boolean> {
+  return new Promise(async (resolve, reject) => {
+    let node: BifrostNode | null = null;
+    let timer: NodeJS.Timeout | null = null;
+    let hasCleanedUp = false;
+
+    const cleanupAndReject = (reason: string, error?: any) => {
+      if (hasCleanedUp) return;
+      hasCleanedUp = true;
       
-      if (isSuccess) {
-        resolve(true);
-      } else {
-        reject(new Error("Failed to receive ping confirmation"));
+      console.log(`[pingShare] Cleaning up and rejecting. Reason: ${reason}`);
+      if (error) console.error(`[pingShare] Associated error:`, error);
+
+      if (timer) clearTimeout(timer);
+      timer = null;
+
+      if (node) {
+        const tempNode = node;
+        node = null; // Prevent re-entrancy if close is synchronous and emits events
+        if (typeof (tempNode as any).removeAllListeners === 'function') {
+          (tempNode as any).removeAllListeners();
+        }
+        try {
+          (tempNode as any).close();
+          console.log('[pingShare] BifrostNode closed via cleanupAndReject.');
+        } catch (closeError) {
+          console.error('[pingShare] Error during node.close() in cleanupAndReject:', closeError);
+        }
       }
-    }, delay);
+      reject(new Error(`[pingShare] ${reason}`));
+    };
+
+    const cleanupAndResolve = (reason: string) => {
+      if (hasCleanedUp) return;
+      hasCleanedUp = true;
+
+      console.log(`[pingShare] Cleaning up and resolving. Reason: ${reason}`);
+      if (timer) clearTimeout(timer);
+      timer = null;
+
+      if (node) {
+        const tempNode = node;
+        node = null;
+        if (typeof (tempNode as any).removeAllListeners === 'function') {
+          (tempNode as any).removeAllListeners();
+        }
+        try {
+          (tempNode as any).close();
+          console.log('[pingShare] BifrostNode closed via cleanupAndResolve.');
+        } catch (closeError) {
+          console.error('[pingShare] Error during node.close() in cleanupAndResolve:', closeError);
+        }
+      }
+      resolve(true);
+    };
+
+    timer = setTimeout(() => {
+      cleanupAndReject(`Operation timed out after ${operationTimeout}ms`);
+    }, operationTimeout);
+
+    try {
+      console.log('[pingShare] Decoding credential string...');
+      const { group, share } = PackageEncoder.cred.decode(credentialData);
+      const groupId = (group as any).id;
+      console.log(`[pingShare] Credential decoded. Group ID: ${groupId}, Share Index: ${share.idx}`);
+
+      if (!relays || relays.length === 0) {
+        cleanupAndReject('At least one relay URL must be provided');
+        return;
+      }
+      
+      console.log('[pingShare] Initializing BifrostNode with relays:', relays);
+      node = new BifrostNode(group, share, relays);
+      const nodeId = (node as any).id as string;
+      const nodeRelays = (node as any).relays as string[] | undefined;
+
+      node.on('ready', async () => {
+        if (hasCleanedUp) return; // Already handled by timeout or other error
+        console.log(`[pingShare] BifrostNode ready. Node ID (pubkey): ${nodeId}. Performing self-ping...`);
+        if (!nodeId) {
+          cleanupAndReject('Node became ready but ID is missing.');
+          return;
+        }
+        try {
+          const pingRelaysToUse = Array.isArray(nodeRelays) && nodeRelays.length > 0 ? nodeRelays : relays;
+          const pingTimeout = operationTimeout / 2; // Use a portion for the ping itself
+          await (node as any).ping(nodeId, pingRelaysToUse, pingTimeout); 
+          cleanupAndResolve('Self-ping successful.');
+        } catch (pingError: any) {
+          cleanupAndReject(`Self-ping failed: ${pingError.message || String(pingError)}`, pingError);
+        }
+      });
+
+      node.on('error', (err: any) => {
+        if (hasCleanedUp) return;
+        const errorMessage = err instanceof Error ? err.message : String(err);
+        cleanupAndReject(`BifrostNode error: ${errorMessage}`, err);
+      });
+
+      node.on('closed', () => {
+        // This event can be triggered by an explicit node.close() or an unexpected disconnection.
+        // If hasCleanedUp is false, it means it was likely an unexpected closure.
+        if (!hasCleanedUp) {
+          console.log('[pingShare] BifrostNode connection closed unexpectedly event received.');
+          cleanupAndReject('BifrostNode connection closed unexpectedly');
+        } else {
+          console.log("[pingShare] BifrostNode 'closed' event received after cleanup initiated.");
+        }
+      });
+
+    } catch (error: any) {
+      // This catches errors from PackageEncoder.cred.decode or BifrostNode constructor
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      cleanupAndReject(`Setup error: ${errorMessage}`, error);
+    }
   });
 }
