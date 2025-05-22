@@ -1,4 +1,4 @@
-import { BifrostNode, SignatureEntry, PackageEncoder } from '@frostr/bifrost'
+import { BifrostNode, SignatureEntry, PackageEncoder, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { generate_dealer_pkg, recover_secret_key } from '@frostr/bifrost/lib'
 import { encode_credentials, decode_credentials } from '@frostr/bifrost/encoder'
 import type {
@@ -51,27 +51,27 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   node.on('ready', () => console.log('Bifrost node is ready'))
   node.on('closed', () => console.log('Bifrost node is closed'))
   node.on('message', (msg: any) => console.log('Received message:', msg))
-  node.on('bounced', ([reason, msg]: [string, any]) => console.log('Message bounced:', reason, msg))
+  node.on('bounced', (reason: string, msg: any) => console.log('Message bounced:', reason, msg))
 
   // ECDH events
   node.on('/ecdh/sender/req', (msg: any) => console.log('ECDH request sent:', msg))
-  node.on('/ecdh/sender/res', (msgs: any[]) => console.log('ECDH responses received:', msgs))
-  node.on('/ecdh/sender/rej', ([reason, pkg]: [string, any]) => console.log('ECDH request rejected:', reason, pkg))
-  node.on('/ecdh/sender/ret', ([reason, pkgs]: [string, string]) => console.log('ECDH shares aggregated:', reason, pkgs))
-  node.on('/ecdh/sender/err', ([reason, msgs]: [string, any[]]) => console.log('ECDH share aggregation failed:', reason, msgs))
+  node.on('/ecdh/sender/res', (...msgs: any[]) => console.log('ECDH responses received:', msgs))
+  node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => console.log('ECDH request rejected:', reason, pkg))
+  node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => console.log('ECDH shares aggregated:', reason, pkgs))
+  node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => console.log('ECDH share aggregation failed:', reason, msgs))
   node.on('/ecdh/handler/req', (msg: any) => console.log('ECDH request received:', msg))
   node.on('/ecdh/handler/res', (msg: any) => console.log('ECDH response sent:', msg))
-  node.on('/ecdh/handler/rej', ([reason, msg]: [string, any]) => console.log('ECDH rejection sent:', reason, msg))
+  node.on('/ecdh/handler/rej', (reason: string, msg: any) => console.log('ECDH rejection sent:', reason, msg))
 
   // Signature events
   node.on('/sign/sender/req', (msg: any) => console.log('Signature request sent:', msg))
-  node.on('/sign/sender/res', (msgs: any[]) => console.log('Signature responses received:', msgs))
-  node.on('/sign/sender/rej', ([reason, pkg]: [string, any]) => console.log('Signature request rejected:', reason, pkg))
-  node.on('/sign/sender/ret', ([reason, msgs]: [string, SignatureEntry[]]) => console.log('Signature shares aggregated:', reason, msgs))
-  node.on('/sign/sender/err', ([reason, msgs]: [string, any[]]) => console.log('Signature share aggregation failed:', reason, msgs))
+  node.on('/sign/sender/res', (...msgs: any[]) => console.log('Signature responses received:', msgs))
+  node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => console.log('Signature request rejected:', reason, pkg))
+  node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => console.log('Signature shares aggregated:', reason, msgs))
+  node.on('/sign/sender/err', (reason: string, msgs: any[]) => console.log('Signature share aggregation failed:', reason, msgs))
   node.on('/sign/handler/req', (msg: any) => console.log('Signature request received:', msg))
   node.on('/sign/handler/res', (msg: any) => console.log('Signature response sent:', msg))
-  node.on('/sign/handler/rej', ([reason, msg]: [string, any]) => console.log('Signature rejection sent:', reason, msg))
+  node.on('/sign/handler/rej', (reason: string, msg: any) => console.log('Signature rejection sent:', reason, msg))
 
   return node
 }
