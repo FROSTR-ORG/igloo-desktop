@@ -1,11 +1,10 @@
 import { BifrostNode, SignatureEntry, PackageEncoder, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { generate_dealer_pkg, recover_secret_key } from '@frostr/bifrost/lib'
-import { encode_credentials, decode_credentials } from '@frostr/bifrost/encoder'
+import { nip19 } from 'nostr-tools'
 import type {
   GroupPackage,
   SharePackage
 } from '@frostr/bifrost'
-import { nip19 } from 'nostr-tools'
 
 /**
  * Generates a keyset with a provided secret
@@ -18,10 +17,6 @@ export function generateKeysetWithSecret(threshold: number, totalMembers: number
   validateKeysetParams(threshold, totalMembers);
   if (!secretKey || typeof secretKey !== 'string') {
     throw new Error('Secret key must be a non-empty string');
-  }
-  // check if nsec
-  if (secretKey.startsWith('nsec')) {
-    secretKey = nip19.decode(secretKey).data as string
   }
 
   const { group, shares } = generate_dealer_pkg(
@@ -48,7 +43,7 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   const node = new BifrostNode(decodedGroup, decodedShare, relays)
 
   // Base events
-  node.on('ready', () => console.log('Bifrost node is ready'))
+  node.on('ready', (node: BifrostNode) => console.log('Bifrost node is ready, node:', node))
   node.on('closed', () => console.log('Bifrost node is closed'))
   node.on('message', (msg: any) => console.log('Received message:', msg))
   node.on('bounced', (reason: string, msg: any) => console.log('Message bounced:', reason, msg))
@@ -72,6 +67,22 @@ export function get_node ({ group, share, relays }: { group: string, share: stri
   node.on('/sign/handler/req', (msg: any) => console.log('Signature request received:', msg))
   node.on('/sign/handler/res', (msg: any) => console.log('Signature response sent:', msg))
   node.on('/sign/handler/rej', (reason: string, msg: any) => console.log('Signature rejection sent:', reason, msg))
+  
+  // ping events
+  node.on('/ping/handler/req', (msg: any) => console.log('Ping request received:', msg))
+  node.on('/ping/handler/res', (msg: any) => console.log('Ping response sent:', msg))
+  node.on('/ping/handler/rej', (reason: string, msg: any) => console.log('Ping rejection sent:', reason, msg))
+  node.on('/ping/sender/req', (msg: any) => console.log('Ping request sent:', msg))
+  node.on('/ping/sender/res', (msg: any) => console.log('Ping response received:', msg))
+  node.on('/ping/sender/rej', (reason: string, msg: any) => console.log('Ping request rejected:', reason, msg))
+
+  // echo events
+  node.on('/echo/handler/req', (msg: any) => console.log('Echo request received:', msg))
+  node.on('/echo/handler/res', (msg: any) => console.log('Echo response sent:', msg))
+  node.on('/echo/handler/rej', (reason: string, msg: any) => console.log('Echo rejection sent:', reason, msg))
+  node.on('/echo/sender/req', (msg: any) => console.log('Echo request sent:', msg))
+  node.on('/echo/sender/res', (msg: any) => console.log('Echo response received:', msg))
+  node.on('/echo/sender/rej', (reason: string, msg: any) => console.log('Echo request rejected:', reason, msg))
 
   return node
 }
@@ -82,25 +93,6 @@ export function decode_share(share: string): SharePackage {
 
 export function decode_group(group: string): GroupPackage {
   return PackageEncoder.group.decode(group)
-}
-
-/**
- * Encodes a group and share package into a single bfcred string.
- * @param groupPkg The group package.
- * @param sharePkg The share package.
- * @returns The bfcred encoded string.
- */
-export function encode_credential_string(groupPkg: GroupPackage, sharePkg: SharePackage): string {
-  return encode_credentials(groupPkg, sharePkg);
-}
-
-/**
- * Decodes a bfcred string into its constituent group and share packages.
- * @param credStr The bfcred encoded string.
- * @returns An object containing the group and share packages.
- */
-export function decode_credential_string(credStr: string): { group: GroupPackage, share: SharePackage } {
-  return decode_credentials(credStr);
 }
 
 /**
@@ -140,37 +132,97 @@ function validateKeysetParams(threshold: number, totalMembers: number) {
 }
 
 /**
- * A temporary mock of a ping response for QR code sharing
- * 
- * In a real implementation, this would use actual Bifrost ping functionality
- * when it becomes available in the library
- * 
- * @param credentialData The bfcred string
- * @param timeout Timeout in milliseconds
- * @returns Promise that resolves when the "ping" is successful
+ * Waits for an echo event on a specific share.
+ * This function sets up a Bifrost node to listen for an incoming echo request,
+ * which signals that another device has successfully imported and is interacting with the share.
+ *
+ * @param groupCredential The bfgroup string for the keyset.
+ * @param shareCredential The bfshare string being shared (e.g., via QR).
+ * @param relays Optional array of relay URLs to use.
+ * @param timeout Optional timeout in milliseconds to wait for the echo.
+ * @returns Promise that resolves to true if an echo is successfully received, or rejects on timeout/error.
  */
-export function pingShare(credentialData: string, relays: string[] = ["wss://relay.damus.io"], timeout = 30000): Promise<boolean> {
-  // This is a mock implementation that simulates a response after a delay
-  // In a real implementation, this would use actual Bifrost protocol communication
-  // You might want to decode and use parts of the credential for actual ping logic:
-  // const { group, share } = decode_credential_string(credentialData);
-  // console.log('Pinging with credential for group id:', group.id, 'and share index:', share.idx, 'on relays:', relays);
-  
-  return new Promise((resolve, reject) => {
-    // For demonstration purposes, we'll just resolve after a random delay
-    // In reality, this would involve actual network communication with a device
-    // that scanned the QR code
-    const delay = Math.floor(Math.random() * 3000) + 2000; // 2-5 seconds delay
-    
-    setTimeout(() => {
-      // 50% chance of success for demo purposes
-      const isSuccess = Math.random() < 0.5;
-      
-      if (isSuccess) {
+export function awaitShareEcho(groupCredential: string, shareCredential: string, relays: string[] = ["wss://relay.damus.io", "wss://relay.primal.net"], timeout = 30000): Promise<boolean> {
+  return new Promise(async (resolve, reject) => {
+    let node: BifrostNode | null = null;
+    let timeoutId_for_promise_itself: NodeJS.Timeout | null = null;
+
+    // Define handlers to allow removal in cleanup
+    const onMessageHandler = (messagePayload: any) => {
+      const shareDetails = decode_share(shareCredential);
+      // Check if the message is the specific echo we are waiting for
+      if (messagePayload && messagePayload.data === 'echo' && messagePayload.tag === '/echo/req') {
+        console.log(`[awaitShareEcho] DEBUG: Relevant 'message' event (echo request) received. Share Index: ${shareDetails.idx}. Payload:`, messagePayload);
         resolve(true);
+        cleanup();
       } else {
-        reject(new Error("Failed to receive ping confirmation"));
+        // Log other messages if needed for debugging, but don't resolve/reject unless it's our target echo
+        // console.log(`[awaitShareEcho] INFO: Received other message type. Share Index: ${shareDetails.idx}. Payload:`, messagePayload);
       }
-    }, delay);
+    };
+
+    const onClosedHandler = () => {
+      const shareDetails = decode_share(shareCredential);
+      console.log(`[awaitShareEcho] Node connection closed for share index: ${shareDetails.idx}.`);
+      if (timeoutId_for_promise_itself) { // Check if promise is still pending
+        reject(new Error('Connection closed before echo was received'));
+        cleanup();
+      }
+    };
+
+    const onErrorHandler = (errorPayload: unknown) => {
+      const shareDetails = decode_share(shareCredential);
+      console.error(`[awaitShareEcho] Node error for share index: ${shareDetails.idx}:`, errorPayload);
+      if (timeoutId_for_promise_itself) { // Check if promise is still pending
+         reject(new Error(`Node error: ${errorPayload}`))
+         cleanup();
+      }
+    };
+
+    const cleanup = () => {
+      if (timeoutId_for_promise_itself) {
+        clearTimeout(timeoutId_for_promise_itself);
+        timeoutId_for_promise_itself = null;
+      }
+      if (node) {
+        // Detach specific listeners
+        node.off('message', onMessageHandler);
+        node.off('closed', onClosedHandler);
+        node.off('error', onErrorHandler);
+        // Detach wildcard if it was programmatically added and needs removal
+        // For now, assuming user's added '*' listener is ad-hoc for debugging
+        node.close();
+        node = null;
+      }
+    };
+
+    try {
+      console.log(`[awaitShareEcho] Getting node for share: ${shareCredential} using relays: ${relays.join(', ')}`);
+      node = get_node({ group: groupCredential, share: shareCredential, relays });
+
+      // Attach listeners BEFORE connecting
+      // We listen to the generic 'message' event because, in this specific QR code context,
+      // the BifrostNode instance emits this event with the echo payload,
+      // rather than a more specific '/echo/handler/req' event.
+      node.on('message', onMessageHandler);
+      node.on('closed', onClosedHandler);
+      node.on('error', onErrorHandler);
+
+      timeoutId_for_promise_itself = setTimeout(() => {
+        const shareDetails = decode_share(shareCredential);
+        console.warn(`[awaitShareEcho] Overall operation timed out after ${timeout/1000}s for share index: ${shareDetails.idx}`);
+        reject(new Error(`No echo received within ${timeout / 1000} seconds (overall timeout)`));
+        cleanup();
+      }, timeout);
+
+      console.log(`[awaitShareEcho] Connecting node to relays...`);
+      await node.connect();
+      console.log(`[awaitShareEcho] Node connected. Listening for incoming echo.`);
+
+    } catch (error: any) {
+      console.error('[awaitShareEcho] General error during setup or connection:', error);
+      reject(error); 
+      cleanup(); 
+    }
   });
 }

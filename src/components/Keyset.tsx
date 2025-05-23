@@ -1,7 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share, pingShare, encode_credential_string } from "@/lib/bifrost";
+import { decode_group, decode_share, awaitShareEcho } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
@@ -35,18 +35,18 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   const [showConfirmModal, setShowConfirmModal] = useState(false);
   const [showQrCode, setShowQrCode] = useState<{
     show: boolean, 
-    credentialData: string | null,
+    shareData: string | null,
     shareIndex: number | null,
     status: 'waiting' | 'success' | 'error',
     message: string
   }>({
     show: false,
-    credentialData: null,
+    shareData: null,
     shareIndex: null,
     status: 'waiting',
     message: 'Waiting for share to be scanned...'
   });
-  const [pingTimeout, setPingTimeout] = useState<NodeJS.Timeout | null>(null);
+  const [echoTimeout, setEchoTimeout] = useState<NodeJS.Timeout | null>(null);
 
   const handleCopy = async (text: string) => {
     try {
@@ -122,24 +122,23 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   };
 
   const handleShowQrCode = (shareIndex: number) => {
-    if (decodedGroup && decodedShares[shareIndex]) {
-      const credential = encode_credential_string(decodedGroup, decodedShares[shareIndex]);
+    const selectedShareCredential = shareCredentials[shareIndex];
+    if (selectedShareCredential) {
       setShowQrCode({ 
         show: true, 
-        credentialData: credential, 
+        shareData: selectedShareCredential,
         shareIndex,
         status: 'waiting',
         message: 'Waiting for share to be scanned...'
       });
-      // Start listening for a ping response
-      startPingListener(credential, shareIndex);
+      // Start listening for a ping response, passing group and the specific share
+      startEchoListener(groupCredential, selectedShareCredential, shareIndex);
     } else {
-      console.error("Group or share not decoded yet, cannot generate QR code");
-      // Optionally, show an error to the user
+      console.error("Selected share credential not found, cannot generate QR code");
     }
   };
 
-  const startPingListener = (credentialData: string, shareIndex: number) => {
+  const startEchoListener = (currentGroupCredential: string, currentShareCredential: string, shareIndex: number) => {
     // Reset the QR code modal to waiting state first
     setShowQrCode(prev => ({
       ...prev,
@@ -148,8 +147,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     }));
 
     // Clear any existing ping timeouts
-    if (pingTimeout) {
-      clearTimeout(pingTimeout);
+    if (echoTimeout) {
+      clearTimeout(echoTimeout);
     }
 
     // Set a timeout to prevent infinite waiting
@@ -157,18 +156,19 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       setShowQrCode(prev => ({
         ...prev,
         status: 'error',
-        message: 'No response received. Please try again.'
+        message: 'No echo response received. Please try again.'
       }));
     }, 60000); // 1 minute timeout
 
-    setPingTimeout(timeout);
+    setEchoTimeout(timeout);
 
-    // Start listening for ping
-    pingShare(credentialData)
+    // Start listening for echo, now passing group and share credentials
+    awaitShareEcho(currentGroupCredential, currentShareCredential, decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"])
       .then(() => {
-        // If ping successful, clear timeout and update state
-        if (pingTimeout) clearTimeout(pingTimeout);
-        setPingTimeout(null);
+        console.log("[Keyset.tsx] DEBUG: awaitShareEcho promise resolved (then block entered).");
+        // If echo successful, clear timeout and update state
+        clearTimeout(timeout);
+        setEchoTimeout(null);
         
         // Update the QR code modal with success status
         setShowQrCode(prev => ({
@@ -200,9 +200,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         // Let the user close the modal manually instead of auto-closing
       })
       .catch(error => {
-        // If ping fails, clear timeout and update state with error
-        if (pingTimeout) clearTimeout(pingTimeout);
-        setPingTimeout(null);
+        console.log("[Keyset.tsx] DEBUG: awaitShareEcho promise rejected (catch block entered). Error:", error);
+        // If echo fails, clear timeout and update state with error
+        clearTimeout(timeout);
+        setEchoTimeout(null);
         
         setShowQrCode(prev => ({
           ...prev,
@@ -214,14 +215,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
 
   const handleCloseQrCode = () => {
     // Clear any ongoing ping timeouts
-    if (pingTimeout) {
-      clearTimeout(pingTimeout);
-      setPingTimeout(null);
+    if (echoTimeout) {
+      clearTimeout(echoTimeout);
+      setEchoTimeout(null);
     }
     
     setShowQrCode({
       show: false,
-      credentialData: null,
+      shareData: null,
       shareIndex: null,
       status: 'waiting',
       message: 'Waiting for share to be scanned...'
@@ -429,7 +430,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         </div>
       )}
 
-      {showQrCode.show && showQrCode.credentialData && (
+      {showQrCode.show && showQrCode.shareData && (
         <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
           <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
             <h3 className="text-xl font-semibold text-blue-200 mb-4">Share QR Code</h3>
@@ -458,7 +459,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               )}
               
               <QRCodeSVG 
-                value={showQrCode.credentialData}
+                value={showQrCode.shareData}
                 size={250}
                 level="H"
                 className={showQrCode.status === 'error' ? 'opacity-50' : ''}
@@ -519,7 +520,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             <div className="mt-6 flex justify-end space-x-3">
               {showQrCode.status === 'error' && (
                 <Button
-                  onClick={() => startPingListener(showQrCode.credentialData!, showQrCode.shareIndex!)}
+                  onClick={() => startEchoListener(groupCredential, showQrCode.shareData!, showQrCode.shareIndex!)}
                   className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
                 >
                   Try Again
