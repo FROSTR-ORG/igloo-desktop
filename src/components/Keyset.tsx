@@ -1,7 +1,7 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share, awaitShareEcho } from "@/lib/bifrost";
+import { decode_group, decode_share, startListeningForAllEchoes } from "@/lib/bifrost";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
@@ -37,7 +37,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     show: boolean, 
     shareData: string | null,
     shareIndex: number | null,
-    status: 'waiting' | 'success' | 'error',
+    status: 'waiting' | 'success',
     message: string
   }>({
     show: false,
@@ -46,7 +46,9 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     status: 'waiting',
     message: 'Waiting for share to be scanned...'
   });
-  const [echoTimeout, setEchoTimeout] = useState<NodeJS.Timeout | null>(null);
+  
+  // Ref to store the cleanup function for echo listeners
+  const echoListenersCleanup = useRef<(() => void) | null>(null);
 
   const handleCopy = async (text: string) => {
     try {
@@ -79,28 +81,32 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     const success = await clientShareManager.saveShare(share);
     
     if (success) {
-      setSavedShares(prev => ({
-        ...prev,
-        [showSaveDialog.shareIndex!]: true
-      }));
-      
-      // Trigger flashing animation
-      setFlashingShares(prev => ({
-        ...prev,
-        [showSaveDialog.shareIndex!]: true
-      }));
-      
-      // Remove flash after animation completes
-      setTimeout(() => {
-        setFlashingShares(prev => ({
-          ...prev,
-          [showSaveDialog.shareIndex!]: false
-        }));
-      }, 1500);
+      markShareAsSaved(showSaveDialog.shareIndex);
     }
 
     // Close the dialog
     setShowSaveDialog({ show: false, shareIndex: null });
+  };
+
+  const markShareAsSaved = (shareIndex: number) => {
+    setSavedShares(prev => ({
+      ...prev,
+      [shareIndex]: true
+    }));
+    
+    // Trigger flashing animation
+    setFlashingShares(prev => ({
+      ...prev,
+      [shareIndex]: true
+    }));
+    
+    // Remove flash after animation completes
+    setTimeout(() => {
+      setFlashingShares(prev => ({
+        ...prev,
+        [shareIndex]: false
+      }));
+    }, 1500);
   };
 
   const handleFinish = () => {
@@ -131,95 +137,12 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         status: 'waiting',
         message: 'Waiting for share to be scanned...'
       });
-      // Start listening for a ping response, passing group and the specific share
-      startEchoListener(groupCredential, selectedShareCredential, shareIndex);
     } else {
       console.error("Selected share credential not found, cannot generate QR code");
     }
   };
 
-  const startEchoListener = (currentGroupCredential: string, currentShareCredential: string, shareIndex: number) => {
-    // Reset the QR code modal to waiting state first
-    setShowQrCode(prev => ({
-      ...prev,
-      status: 'waiting',
-      message: 'Waiting for share to be scanned...'
-    }));
-
-    // Clear any existing ping timeouts
-    if (echoTimeout) {
-      clearTimeout(echoTimeout);
-    }
-
-    // Set a timeout to prevent infinite waiting
-    const timeout = setTimeout(() => {
-      setShowQrCode(prev => ({
-        ...prev,
-        status: 'error',
-        message: 'No echo response received. Please try again.'
-      }));
-    }, 60000); // 1 minute timeout
-
-    setEchoTimeout(timeout);
-
-    // Start listening for echo, now passing group and share credentials
-    awaitShareEcho(currentGroupCredential, currentShareCredential, decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"])
-      .then(() => {
-        console.log("[Keyset.tsx] DEBUG: awaitShareEcho promise resolved (then block entered).");
-        // If echo successful, clear timeout and update state
-        clearTimeout(timeout);
-        setEchoTimeout(null);
-        
-        // Update the QR code modal with success status
-        setShowQrCode(prev => ({
-          ...prev,
-          status: 'success',
-          message: 'Share successfully transferred!'
-        }));
-
-        // Mark the share as saved
-        setSavedShares(prev => ({
-          ...prev,
-          [shareIndex]: true
-        }));
-        
-        // Trigger flashing animation
-        setFlashingShares(prev => ({
-          ...prev,
-          [shareIndex]: true
-        }));
-        
-        // Remove flash after animation completes
-        setTimeout(() => {
-          setFlashingShares(prev => ({
-            ...prev,
-            [shareIndex]: false
-          }));
-        }, 1500);
-
-        // Let the user close the modal manually instead of auto-closing
-      })
-      .catch(error => {
-        console.log("[Keyset.tsx] DEBUG: awaitShareEcho promise rejected (catch block entered). Error:", error);
-        // If echo fails, clear timeout and update state with error
-        clearTimeout(timeout);
-        setEchoTimeout(null);
-        
-        setShowQrCode(prev => ({
-          ...prev,
-          status: 'error',
-          message: `Error: ${error.message}`
-        }));
-      });
-  };
-
   const handleCloseQrCode = () => {
-    // Clear any ongoing ping timeouts
-    if (echoTimeout) {
-      clearTimeout(echoTimeout);
-      setEchoTimeout(null);
-    }
-    
     setShowQrCode({
       show: false,
       shareData: null,
@@ -229,12 +152,49 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     });
   };
 
+  // Handle echo received for any share
+  const handleEchoReceived = useCallback((shareIndex: number, shareCredential: string) => {
+    markShareAsSaved(shareIndex);
+
+    // If the echo is for the share currently in the QR modal, update its status
+    // Accessing showQrCode directly here will use the latest state due to useCallback's dependencies
+    if (showQrCode.show && showQrCode.shareIndex === shareIndex) {
+      setShowQrCode(prev => ({
+        ...prev,
+        status: 'success',
+        message: 'Share successfully transferred!'
+      }));
+    }
+  }, [showQrCode.show, showQrCode.shareIndex]); // Dependencies: showQrCode.show and showQrCode.shareIndex
+
   useEffect(() => {
     const group = decode_group(groupCredential);
     const shares = shareCredentials.map(decode_share);
     setDecodedGroup(group);
     setDecodedShares(shares);
   }, [groupCredential, shareCredentials]);
+
+  // Start listening for echoes on all shares when component mounts
+  useEffect(() => {
+    if (decodedGroup && shareCredentials.length > 0) {
+      const cleanup = startListeningForAllEchoes(
+        groupCredential,
+        shareCredentials,
+        decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"],
+        handleEchoReceived // Pass the memoized callback
+      );
+      
+      echoListenersCleanup.current = cleanup;
+    }
+
+    // Cleanup on unmount or when dependencies change
+    return () => {
+      if (echoListenersCleanup.current) {
+        echoListenersCleanup.current();
+        echoListenersCleanup.current = null;
+      }
+    };
+  }, [groupCredential, shareCredentials, decodedGroup, handleEchoReceived]); // Added handleEchoReceived to dependencies
 
   const formatShare = (share: string) => {
     if (share.length < 36) return share;
@@ -437,7 +397,6 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             
             <div className={`relative flex justify-center p-6 rounded-lg ${
               showQrCode.status === 'success' ? 'bg-green-900/20 border-2 border-green-500/50' : 
-              showQrCode.status === 'error' ? 'bg-red-900/20 border-2 border-red-500/50' : 
               'bg-white'
             }`}>
               {showQrCode.status === 'waiting' && (
@@ -452,17 +411,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 </div>
               )}
               
-              {showQrCode.status === 'error' && (
-                <div className="absolute -top-4 -right-4 bg-red-500 rounded-full p-1">
-                  <AlertCircle className="w-7 h-7 text-white" />
-                </div>
-              )}
-              
               <QRCodeSVG 
                 value={showQrCode.shareData}
                 size={250}
                 level="H"
-                className={showQrCode.status === 'error' ? 'opacity-50' : ''}
               />
               
               {showQrCode.status === 'success' && (
@@ -476,8 +428,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             
             <div className={`mt-5 text-center p-3 rounded-md ${
               showQrCode.status === 'waiting' ? 'bg-blue-900/30 border border-blue-700/50' : 
-              showQrCode.status === 'success' ? 'bg-green-900/30 border border-green-700/50' : 
-              'bg-red-900/30 border border-red-700/50'
+              'bg-green-900/30 border border-green-700/50'
             }`}>
               <div className="flex items-center justify-center gap-2 mb-1">
                 {showQrCode.status === 'waiting' && (
@@ -486,54 +437,32 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 {showQrCode.status === 'success' && (
                   <CheckCircle2 className="w-5 h-5 text-green-400" />
                 )}
-                {showQrCode.status === 'error' && (
-                  <AlertCircle className="w-5 h-5 text-red-400" />
-                )}
                 <p className={`text-sm font-medium ${
                   showQrCode.status === 'waiting' ? 'text-blue-300' : 
-                  showQrCode.status === 'success' ? 'text-green-300' : 
-                  'text-red-300'
+                  'text-green-300'
                 }`}>
                   {showQrCode.message}
                 </p>
               </div>
               
-              {showQrCode.status === 'waiting' && (
-                <p className="text-xs mt-1 text-gray-400">
-                  When another device scans this QR code, the share will be imported
-                </p>
+              {(showQrCode.status === 'waiting') && (
+                 <p className="text-xs mt-1 text-gray-400">
+                   When another device scans this QR code and imports the share, it will be automatically marked as transferred.
+                 </p>
               )}
-              
-              {showQrCode.status === 'error' && (
-                <p className="text-xs mt-1 text-gray-400">
-                  The device may not have successfully received the share
-                </p>
-              )}
-              
-              {showQrCode.status === 'success' && (
-                <p className="text-xs mt-1 text-gray-400">
-                  The share has been successfully transferred to another device
-                </p>
+               {(showQrCode.status === 'success') && (
+                 <p className="text-xs mt-1 text-gray-400">
+                   The share has been successfully transferred to another device.
+                 </p>
               )}
             </div>
             
-            <div className="mt-6 flex justify-end space-x-3">
-              {showQrCode.status === 'error' && (
-                <Button
-                  onClick={() => startEchoListener(groupCredential, showQrCode.shareData!, showQrCode.shareIndex!)}
-                  className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
-                >
-                  Try Again
-                </Button>
-              )}
-              
+            <div className="mt-6 flex justify-end">
               <Button
                 onClick={handleCloseQrCode}
                 className={`transition-colors ${
                   showQrCode.status === 'success' ? 
                   'bg-green-600 hover:bg-green-700 text-green-100' : 
-                  showQrCode.status === 'error' ?
-                  'bg-gray-600 hover:bg-gray-700 text-gray-100' :
                   'bg-blue-600 hover:bg-blue-700 text-blue-100'
                 }`}
               >

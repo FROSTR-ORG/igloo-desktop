@@ -226,3 +226,85 @@ export function awaitShareEcho(groupCredential: string, shareCredential: string,
     }
   });
 }
+
+/**
+ * Starts listening for echo events on all shares in a keyset.
+ * Creates one BifrostNode per share to listen for incoming echo requests.
+ * This is useful for detecting when shares have been imported on other devices.
+ *
+ * @param groupCredential The bfgroup string for the keyset.
+ * @param shareCredentials Array of bfshare strings to listen for echoes on.
+ * @param relays Array of relay URLs to use.
+ * @param onEchoReceived Callback function called when an echo is received for a share.
+ * @returns Cleanup function that stops all listeners and closes connections.
+ */
+export function startListeningForAllEchoes(
+  groupCredential: string,
+  shareCredentials: string[],
+  relays: string[] = ["wss://relay.damus.io", "wss://relay.primal.net"],
+  onEchoReceived: (shareIndex: number, shareCredential: string) => void
+): () => void {
+  const nodes: BifrostNode[] = [];
+  const cleanupFunctions: (() => void)[] = [];
+
+  console.log(`[startListeningForAllEchoes] Starting echo listeners for ${shareCredentials.length} shares`);
+
+  shareCredentials.forEach((shareCredential, index) => {
+    try {
+      const node = get_node({ group: groupCredential, share: shareCredential, relays });
+      nodes.push(node);
+
+      // Create message handler for this specific share
+      const onMessageHandler = (messagePayload: any) => {
+        if (messagePayload && messagePayload.data === 'echo' && messagePayload.tag === '/echo/req') {
+          const shareDetails = decode_share(shareCredential);
+          console.log(`[startListeningForAllEchoes] Echo received for share ${index} (idx: ${shareDetails.idx})`);
+          onEchoReceived(index, shareCredential);
+        }
+      };
+
+      const onErrorHandler = (errorPayload: unknown) => {
+        const shareDetails = decode_share(shareCredential);
+        console.error(`[startListeningForAllEchoes] Error on share ${index} (idx: ${shareDetails.idx}):`, errorPayload);
+      };
+
+      const onClosedHandler = () => {
+        const shareDetails = decode_share(shareCredential);
+        console.log(`[startListeningForAllEchoes] Connection closed for share ${index} (idx: ${shareDetails.idx})`);
+      };
+
+      // Attach listeners
+      node.on('message', onMessageHandler);
+      node.on('error', onErrorHandler);
+      node.on('closed', onClosedHandler);
+
+      // Connect the node
+      node.connect().catch(error => {
+        console.error(`[startListeningForAllEchoes] Failed to connect node for share ${index}:`, error);
+      });
+
+      // Create cleanup function for this node
+      const cleanup = () => {
+        try {
+          node.off('message', onMessageHandler);
+          node.off('error', onErrorHandler);
+          node.off('closed', onClosedHandler);
+          node.close();
+        } catch (error) {
+          console.error(`[startListeningForAllEchoes] Error cleaning up node for share ${index}:`, error);
+        }
+      };
+
+      cleanupFunctions.push(cleanup);
+
+    } catch (error) {
+      console.error(`[startListeningForAllEchoes] Failed to create node for share ${index}:`, error);
+    }
+  });
+
+  // Return master cleanup function
+  return () => {
+    console.log(`[startListeningForAllEchoes] Cleaning up all echo listeners`);
+    cleanupFunctions.forEach(cleanup => cleanup());
+  };
+}
