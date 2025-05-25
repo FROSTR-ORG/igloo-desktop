@@ -447,7 +447,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
               
               {(showQrCode.status === 'waiting') && (
                  <p className="text-xs mt-1 text-gray-400">
-                   When another device scans this QR code and imports the share, it will be automatically marked as transferred.
+                   Scan with any Frostr Connect enabled client - currently only https://frostr-org.github.io/web-demo/
                  </p>
               )}
                {(showQrCode.status === 'success') && (
