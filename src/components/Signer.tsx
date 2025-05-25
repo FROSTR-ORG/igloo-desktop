@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { get_node } from "@/lib/bifrost"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
-import type { SignatureEntry } from '@frostr/bifrost'
+import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import { validateShare, validateGroup } from "@/lib/validation"
@@ -351,27 +351,27 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       node.on('ready', () => addLog('bifrost', 'Bifrost node is ready'));
       node.on('closed', () => addLog('bifrost', 'Bifrost node is closed'));
       node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
-      node.on('bounced', ([reason, msg]: [string, any]) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+      node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
 
       // ECDH events
       node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
-      node.on('/ecdh/sender/res', (msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
-      node.on('/ecdh/sender/rej', ([reason, pkg]: [string, any]) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
-      node.on('/ecdh/sender/ret', ([reason, pkgs]: [string, string]) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
-      node.on('/ecdh/sender/err', ([reason, msgs]: [string, any[]]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
+      node.on('/ecdh/sender/res', (...msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
+      node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
+      node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
+      node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
       node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
       node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
-      node.on('/ecdh/handler/rej', ([reason, msg]: [string, any]) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
+      node.on('/ecdh/handler/rej', (reason: string, msg: any) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
 
       // Signature events
       node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
-      node.on('/sign/sender/res', (msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
-      node.on('/sign/sender/rej', ([reason, pkg]: [string, any]) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
-      node.on('/sign/sender/ret', ([reason, msgs]: [string, SignatureEntry[]]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
-      node.on('/sign/sender/err', ([reason, msgs]: [string, any[]]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
+      node.on('/sign/sender/res', (...msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
+      node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
+      node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
+      node.on('/sign/sender/err', (reason: string, msgs: any[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
       node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
       node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
-      node.on('/sign/handler/rej', ([reason, msg]: [string, any]) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+      node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
 
       await node.connect();
     } catch (error) {

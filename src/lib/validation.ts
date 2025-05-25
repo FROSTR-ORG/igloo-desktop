@@ -26,6 +26,25 @@ const MIN_BFGROUP_LENGTH = Math.floor((GROUP_DATA_SIZE + COMMIT_DATA_SIZE) * 1.6
 const MAX_COMMITS = 15;
 const MAX_BFGROUP_LENGTH = Math.floor((GROUP_DATA_SIZE + (COMMIT_DATA_SIZE * MAX_COMMITS)) * 1.6) + 'bfgroup'.length + 6;
 
+// Constants for bfcred validation
+const GROUP_ID_SIZE = 32; // Assumed size for group ID hash
+
+// Min group serialized size: ID (32) + Threshold (4) + Pubkey (33) + 1 Commit (103) = 172
+const MIN_GROUP_SERIALIZED_SIZE = GROUP_ID_SIZE + GROUP_THOLD_SIZE + GROUP_PUBKEY_SIZE + COMMIT_DATA_SIZE;
+// Max group serialized size: ID (32) + Threshold (4) + Pubkey (33) + MAX_COMMITS (15) * Commit (103) = 69 + 1545 = 1614
+const MAX_GROUP_SERIALIZED_SIZE = GROUP_ID_SIZE + GROUP_THOLD_SIZE + GROUP_PUBKEY_SIZE + (COMMIT_DATA_SIZE * MAX_COMMITS);
+
+// bfcred raw data = share data (100) + group data (min 172, max 1614)
+const MIN_BFCRED_RAW_DATA_SIZE = SHARE_DATA_SIZE + MIN_GROUP_SERIALIZED_SIZE; // 100 + 172 = 272
+const MAX_BFCRED_RAW_DATA_SIZE = SHARE_DATA_SIZE + MAX_GROUP_SERIALIZED_SIZE; // 100 + 1614 = 1714
+
+// Bech32m encoding: prefix('bfcred') + '1' + data + checksum(6). Overhead = prefix.length + 1 + 6
+const BFCRED_HRP = 'bfcred';
+const BFCRED_OVERHEAD = BFCRED_HRP.length + 1 + 6;
+
+const MIN_BFCRED_LENGTH = Math.floor(MIN_BFCRED_RAW_DATA_SIZE * 8 / 5) + BFCRED_OVERHEAD; // Using 8/5 factor for bech32
+const MAX_BFCRED_LENGTH = Math.ceil(MAX_BFCRED_RAW_DATA_SIZE * 8 / 5) + BFCRED_OVERHEAD + 15; // Add a small buffer, similar to other max lengths
+
 /**
  * Validates a nostr secret key (nsec) format
  * @param nsec The string to validate as nsec
@@ -242,4 +261,47 @@ export function useFormInput<T>(
     normalized,
     handleChange
   };
+}
+
+/**
+ * Validates a Bifrost credential string (bfcred)
+ * @param cred The string to validate as a Bifrost credential
+ * @returns Validation result object
+ */
+export function validateBfcred(cred: string): { isValid: boolean; message?: string } {
+  if (!cred || !cred.trim()) {
+    return { isValid: false, message: 'Credential string is required' };
+  }
+
+  // Basic prefix check for the Human-Readable Part (HRP)
+  if (!cred.startsWith(BFCRED_HRP)) {
+    return { isValid: false, message: `Invalid credential format (should start with ${BFCRED_HRP})` };
+  }
+  
+  // Length check
+  if (cred.length < MIN_BFCRED_LENGTH) {
+    return { 
+      isValid: false, 
+      message: `Invalid credential length (expected at least ${MIN_BFCRED_LENGTH} characters, got ${cred.length})` 
+    };
+  }
+  
+  if (cred.length > MAX_BFCRED_LENGTH) {
+    return {
+      isValid: false,
+      message: `Credential string too long (maximum expected length ${MAX_BFCRED_LENGTH} characters, got ${cred.length})`
+    };
+  }
+
+  // Basic format check for bech32m: [hrp]1[data][checksum]
+  const formatCheck = new RegExp(`^${BFCRED_HRP}1[023456789acdefghjklmnpqrstuvwxyz]+$`);
+  if (!formatCheck.test(cred)) {
+    return {
+      isValid: false,
+      message: 'Invalid credential format - must be in bech32m format (e.g., bfcred1...)'
+    };
+  }
+  
+  // Deeper validation should be handled by the Bifrost library's decoder function
+  return { isValid: true };
 } 
