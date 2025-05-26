@@ -153,7 +153,7 @@ const Recover: React.FC<RecoverProps> = ({
                 console.error("Error decoding group for threshold on initialShare:", e);
               }
               // Optionally revert to default if group decode fails here after validation
-              // setCurrentThreshold(defaultThreshold); 
+              setCurrentThreshold(defaultThreshold); 
               setCurrentTotalShares(defaultTotalShares);
             }
           }
@@ -193,7 +193,7 @@ const Recover: React.FC<RecoverProps> = ({
           }
         } catch (e) {
             console.error("Error decoding initial group credential for threshold/totalShares:", e);
-          // setCurrentThreshold(defaultThreshold);
+          setCurrentThreshold(defaultThreshold);
           setCurrentTotalShares(defaultTotalShares);
         }
       }
@@ -268,7 +268,7 @@ const Recover: React.FC<RecoverProps> = ({
                   if (DEBUG_AUTO_POPULATE) {
                     console.error("Error decoding group from storage for threshold/totalShares:", e);
                   }
-                  // setCurrentThreshold(defaultThreshold);
+                  setCurrentThreshold(defaultThreshold);
                   setCurrentTotalShares(defaultTotalShares);
                 }
 
@@ -371,7 +371,7 @@ const Recover: React.FC<RecoverProps> = ({
                   if (DEBUG_AUTO_POPULATE) {
                     console.error("Error decoding auto-populated group for threshold/totalShares:", e);
                   }
-                  // setCurrentThreshold(defaultThreshold);
+                  setCurrentThreshold(defaultThreshold);
                   setCurrentTotalShares(defaultTotalShares);
                 }
 
