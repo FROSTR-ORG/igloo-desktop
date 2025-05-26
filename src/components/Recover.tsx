@@ -76,6 +76,29 @@ const findMatchingGroup = async (shareValue: string) => {
   return null;
 };
 
+// Add this helper function after the findMatchingGroup function
+const decodeGroupThresholdAndShares = (
+  groupCredential: string,
+  defaultThreshold: number,
+  defaultTotalShares: number,
+  debugEnabled = DEBUG_AUTO_POPULATE
+): { threshold: number; totalShares: number } => {
+  try {
+    const decodedGroup = decode_group(groupCredential);
+    const threshold = decodedGroup?.threshold ?? defaultThreshold;
+    const totalShares = (decodedGroup?.commits && Array.isArray(decodedGroup.commits)) 
+                        ? decodedGroup.commits.length 
+                        : defaultTotalShares;
+    
+    return { threshold, totalShares };
+  } catch (e) {
+    if (debugEnabled) {
+      console.error("Error decoding group for threshold/totalShares:", e);
+    }
+    return { threshold: defaultThreshold, totalShares: defaultTotalShares };
+  }
+};
+
 const Recover: React.FC<RecoverProps> = ({ 
   initialShare,
   initialGroupCredential,
@@ -138,24 +161,13 @@ const Recover: React.FC<RecoverProps> = ({
           
           // Decode group to set currentThreshold and currentTotalShares
           if (validation.isValid) {
-            try {
-              const decodedGroup = decode_group(matchingGroup);
-              if (decodedGroup && typeof decodedGroup.threshold === 'number') {
-                setCurrentThreshold(decodedGroup.threshold);
-              }
-              if (decodedGroup && decodedGroup.commits && Array.isArray(decodedGroup.commits)) {
-                setCurrentTotalShares(decodedGroup.commits.length);
-              } else {
-                setCurrentTotalShares(defaultTotalShares);
-              }
-            } catch (e) {
-              if (DEBUG_AUTO_POPULATE) {
-                console.error("Error decoding group for threshold on initialShare:", e);
-              }
-              // Optionally revert to default if group decode fails here after validation
-              setCurrentThreshold(defaultThreshold); 
-              setCurrentTotalShares(defaultTotalShares);
-            }
+            const { threshold, totalShares } = decodeGroupThresholdAndShares(
+              matchingGroup,
+              defaultThreshold,
+              defaultTotalShares
+            );
+            setCurrentThreshold(threshold);
+            setCurrentTotalShares(totalShares);
           }
 
           // Show auto-detection indicator
@@ -181,21 +193,13 @@ const Recover: React.FC<RecoverProps> = ({
 
       // Decode group to set currentThreshold and currentTotalShares
       if (validation.isValid) {
-        try {
-          const decodedGroup = decode_group(initialGroupCredential);
-          if (decodedGroup && typeof decodedGroup.threshold === 'number') {
-            setCurrentThreshold(decodedGroup.threshold);
-          }
-          if (decodedGroup && decodedGroup.commits && Array.isArray(decodedGroup.commits)) {
-            setCurrentTotalShares(decodedGroup.commits.length);
-          } else {
-            setCurrentTotalShares(defaultTotalShares);
-          }
-        } catch (e) {
-            console.error("Error decoding initial group credential for threshold/totalShares:", e);
-          setCurrentThreshold(defaultThreshold);
-          setCurrentTotalShares(defaultTotalShares);
-        }
+        const { threshold, totalShares } = decodeGroupThresholdAndShares(
+          initialGroupCredential,
+          defaultThreshold,
+          defaultTotalShares
+        );
+        setCurrentThreshold(threshold);
+        setCurrentTotalShares(totalShares);
       }
     }
   }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares]);
@@ -254,23 +258,13 @@ const Recover: React.FC<RecoverProps> = ({
                 setGroupError(groupValidation.message);
                 
                 // Decode group to set currentThreshold and currentTotalShares
-                try {
-                  const decodedGroup = decode_group(firstValidShare.groupCredential);
-                  if (decodedGroup && typeof decodedGroup.threshold === 'number') {
-                    setCurrentThreshold(decodedGroup.threshold);
-                  }
-                  if (decodedGroup && decodedGroup.commits && Array.isArray(decodedGroup.commits)) {
-                    setCurrentTotalShares(decodedGroup.commits.length);
-                  } else {
-                    setCurrentTotalShares(defaultTotalShares);
-                  }
-                } catch (e) {
-                  if (DEBUG_AUTO_POPULATE) {
-                    console.error("Error decoding group from storage for threshold/totalShares:", e);
-                  }
-                  setCurrentThreshold(defaultThreshold);
-                  setCurrentTotalShares(defaultTotalShares);
-                }
+                const { threshold, totalShares } = decodeGroupThresholdAndShares(
+                  firstValidShare.groupCredential,
+                  defaultThreshold,
+                  defaultTotalShares
+                );
+                setCurrentThreshold(threshold);
+                setCurrentTotalShares(totalShares);
 
                 // Show auto-detection indicator
                 setIsGroupAutofilled(true);
@@ -357,23 +351,13 @@ const Recover: React.FC<RecoverProps> = ({
                 setGroupError(undefined);
                 
                 // Decode group to set currentThreshold and currentTotalShares
-                try {
-                  const decodedGroupData = decode_group(matchingGroup);
-                  if (decodedGroupData && typeof decodedGroupData.threshold === 'number') {
-                    setCurrentThreshold(decodedGroupData.threshold);
-                  }
-                  if (decodedGroupData && decodedGroupData.commits && Array.isArray(decodedGroupData.commits)) {
-                    setCurrentTotalShares(decodedGroupData.commits.length);
-                  } else {
-                    setCurrentTotalShares(defaultTotalShares);
-                  }
-                } catch (e) {
-                  if (DEBUG_AUTO_POPULATE) {
-                    console.error("Error decoding auto-populated group for threshold/totalShares:", e);
-                  }
-                  setCurrentThreshold(defaultThreshold);
-                  setCurrentTotalShares(defaultTotalShares);
-                }
+                const { threshold, totalShares } = decodeGroupThresholdAndShares(
+                  matchingGroup,
+                  defaultThreshold,
+                  defaultTotalShares
+                );
+                setCurrentThreshold(threshold);
+                setCurrentTotalShares(totalShares);
 
                 // Show auto-detection indicator
                 setIsGroupAutofilled(true);
