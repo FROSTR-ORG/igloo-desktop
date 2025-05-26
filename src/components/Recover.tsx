@@ -10,8 +10,8 @@ import { HelpCircle } from "lucide-react"
 interface RecoverProps {
   initialShare?: string;
   initialGroupCredential?: string;
-  threshold?: number;
-  totalShares?: number;
+  defaultThreshold?: number;
+  defaultTotalShares?: number;
 }
 
 // Enable debugging for troubleshooting group auto-population issues
@@ -76,11 +76,34 @@ const findMatchingGroup = async (shareValue: string) => {
   return null;
 };
 
+// Add this helper function after the findMatchingGroup function
+const decodeGroupThresholdAndShares = (
+  groupCredential: string,
+  defaultThreshold: number,
+  defaultTotalShares: number,
+  debugEnabled = DEBUG_AUTO_POPULATE
+): { threshold: number; totalShares: number } => {
+  try {
+    const decodedGroup = decode_group(groupCredential);
+    const threshold = decodedGroup?.threshold ?? defaultThreshold;
+    const totalShares = (decodedGroup?.commits && Array.isArray(decodedGroup.commits)) 
+                        ? decodedGroup.commits.length 
+                        : defaultTotalShares;
+    
+    return { threshold, totalShares };
+  } catch (e) {
+    if (debugEnabled) {
+      console.error("Error decoding group for threshold/totalShares:", e);
+    }
+    return { threshold: defaultThreshold, totalShares: defaultTotalShares };
+  }
+};
+
 const Recover: React.FC<RecoverProps> = ({ 
   initialShare,
   initialGroupCredential,
-  threshold = 2,
-  totalShares = 3
+  defaultThreshold = 2,
+  defaultTotalShares = 3
 }) => {
   // State for t of n shares
   const [sharesInputs, setSharesInputs] = useState<string[]>([initialShare || ""]);
@@ -107,11 +130,16 @@ const Recover: React.FC<RecoverProps> = ({
 
   const [showRecoverTooltip, setShowRecoverTooltip] = useState(false);
 
+  // Add state for the dynamic threshold
+  const [currentThreshold, setCurrentThreshold] = useState<number>(defaultThreshold);
+  // Add state for dynamic total shares
+  const [currentTotalShares, setCurrentTotalShares] = useState<number>(defaultTotalShares);
+
   // Validate the shares form
   useEffect(() => {
     const validSharesCount = sharesValidity.filter(validity => validity.isValid).length;
-    setSharesFormValid(validSharesCount >= threshold && isGroupValid);
-  }, [sharesValidity, threshold, isGroupValid]);
+    setSharesFormValid(validSharesCount >= currentThreshold && isGroupValid);
+  }, [sharesValidity, currentThreshold, isGroupValid]);
 
   // Add useEffect to check for initialShare changes and extract from it
   useEffect(() => {
@@ -131,6 +159,17 @@ const Recover: React.FC<RecoverProps> = ({
           setIsGroupValid(validation.isValid);
           setGroupError(validation.message);
           
+          // Decode group to set currentThreshold and currentTotalShares
+          if (validation.isValid) {
+            const { threshold, totalShares } = decodeGroupThresholdAndShares(
+              matchingGroup,
+              defaultThreshold,
+              defaultTotalShares
+            );
+            setCurrentThreshold(threshold);
+            setCurrentTotalShares(totalShares);
+          }
+
           // Show auto-detection indicator
           setIsGroupAutofilled(true);
           if (autofilledTimeoutRef.current) {
@@ -151,8 +190,19 @@ const Recover: React.FC<RecoverProps> = ({
       const validation = validateGroup(initialGroupCredential);
       setIsGroupValid(validation.isValid);
       setGroupError(validation.message);
+
+      // Decode group to set currentThreshold and currentTotalShares
+      if (validation.isValid) {
+        const { threshold, totalShares } = decodeGroupThresholdAndShares(
+          initialGroupCredential,
+          defaultThreshold,
+          defaultTotalShares
+        );
+        setCurrentThreshold(threshold);
+        setCurrentTotalShares(totalShares);
+      }
     }
-  }, [initialShare, initialGroupCredential]);
+  }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares]);
 
   // Add useEffect to check for stored shares on component mount
   useEffect(() => {
@@ -207,6 +257,15 @@ const Recover: React.FC<RecoverProps> = ({
                 setIsGroupValid(groupValidation.isValid);
                 setGroupError(groupValidation.message);
                 
+                // Decode group to set currentThreshold and currentTotalShares
+                const { threshold, totalShares } = decodeGroupThresholdAndShares(
+                  firstValidShare.groupCredential,
+                  defaultThreshold,
+                  defaultTotalShares
+                );
+                setCurrentThreshold(threshold);
+                setCurrentTotalShares(totalShares);
+
                 // Show auto-detection indicator
                 setIsGroupAutofilled(true);
                 if (autofilledTimeoutRef.current) {
@@ -227,11 +286,11 @@ const Recover: React.FC<RecoverProps> = ({
     };
     
     autoDetectGroupFromStorage();
-  }, []); // Run once on mount
+  }, [defaultThreshold, defaultTotalShares]);
 
   // Handle adding more share inputs
   const addShareInput = () => {
-    if (sharesInputs.length < totalShares) {
+    if (sharesInputs.length < currentThreshold) {
       setSharesInputs([...sharesInputs, ""]);
       setSharesValidity([...sharesValidity, { isValid: false }]);
     }
@@ -291,6 +350,15 @@ const Recover: React.FC<RecoverProps> = ({
                 setIsGroupValid(true);
                 setGroupError(undefined);
                 
+                // Decode group to set currentThreshold and currentTotalShares
+                const { threshold, totalShares } = decodeGroupThresholdAndShares(
+                  matchingGroup,
+                  defaultThreshold,
+                  defaultTotalShares
+                );
+                setCurrentThreshold(threshold);
+                setCurrentTotalShares(totalShares);
+
                 // Show auto-detection indicator
                 setIsGroupAutofilled(true);
                 if (autofilledTimeoutRef.current) {
@@ -322,6 +390,10 @@ const Recover: React.FC<RecoverProps> = ({
       const newSharesValidity = [...sharesValidity];
       newSharesValidity[index] = validation;
       setSharesValidity(newSharesValidity);
+      if (!validation.isValid) {
+        setCurrentThreshold(defaultThreshold); // Revert to default if basic validation fails
+        setCurrentTotalShares(defaultTotalShares); // Revert to default
+      }
     }
   };
 
@@ -345,9 +417,15 @@ const Recover: React.FC<RecoverProps> = ({
             decodedGroup.commits.length === 0) {
           setIsGroupValid(false);
           setGroupError('Group credential has invalid internal structure');
+          setCurrentThreshold(defaultThreshold); // Revert to default if structure is bad
+          setCurrentTotalShares(defaultTotalShares); // Revert to default
           return;
         }
         
+        // Set the dynamic threshold
+        setCurrentThreshold(decodedGroup.threshold);
+        // Set dynamic total shares
+        setCurrentTotalShares(decodedGroup.commits.length);
         setIsGroupValid(true);
         setGroupError(undefined);
       } catch (error) {
@@ -362,10 +440,16 @@ const Recover: React.FC<RecoverProps> = ({
         } else {
           setGroupError(`Invalid group: ${errorMessage}`);
         }
+        setCurrentThreshold(defaultThreshold); // Revert to default on decode error
+        setCurrentTotalShares(defaultTotalShares); // Revert to default
       }
     } else {
       setIsGroupValid(validation.isValid);
       setGroupError(validation.message);
+      if (!validation.isValid) {
+        setCurrentThreshold(defaultThreshold); // Revert to default if basic validation fails
+        setCurrentTotalShares(defaultTotalShares); // Revert to default
+      }
     }
   };
 
@@ -443,7 +527,7 @@ const Recover: React.FC<RecoverProps> = ({
             <div className="bg-gray-800/50 p-4 rounded-lg">
               <div className="text-sm text-blue-300 mb-2">Recovery Requirements:</div>
               <div className="text-sm text-blue-200">
-                You need {threshold} out of {totalShares} shares to recover your NSEC
+                You need {currentThreshold} out of {currentTotalShares} shares to recover your NSEC
               </div>
             </div>
 
@@ -491,14 +575,14 @@ const Recover: React.FC<RecoverProps> = ({
                   </Button>
                 </div>
               ))}
-              {sharesInputs.length < threshold && (
+              {sharesInputs.length < currentThreshold && (
                 <Button
                   type="button"
                   onClick={addShareInput}
                   className="w-full mt-2 bg-blue-600/30 hover:bg-blue-700/30"
                   disabled={isProcessing}
                 >
-                  Add Share Input ({sharesInputs.length}/{threshold})
+                  Add Share Input ({sharesInputs.length}/{currentThreshold})
                 </Button>
               )}
             </div>
