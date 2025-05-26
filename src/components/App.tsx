@@ -163,8 +163,8 @@ const App: React.FC = () => {
               <Recover 
                 initialShare={signerData?.share} 
                 initialGroupCredential={signerData?.groupCredential}
-                threshold={signerData?.threshold}
-                totalShares={signerData?.totalShares}
+                defaultThreshold={signerData?.threshold}
+                defaultTotalShares={signerData?.totalShares}
               />
             </TabsContent>
           </Tabs>
