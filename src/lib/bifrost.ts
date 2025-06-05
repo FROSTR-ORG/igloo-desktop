@@ -10,7 +10,7 @@ import {
   type BifrostNode,
   type KeysetCredentials,
   type EchoListener
-} from '@igloo/core'
+} from '@frostr/igloo-core'
 
 // Re-export the main functions for backwards compatibility
 export {

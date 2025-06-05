@@ -7,7 +7,7 @@ import {
   validateNostrKey,
   hexToNpub,
   npubToHex
-} from '@igloo/core'
+} from '@frostr/igloo-core'
 
 // Re-export all nostr utilities from igloo/core
 export {
