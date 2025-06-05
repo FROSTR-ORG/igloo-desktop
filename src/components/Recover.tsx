@@ -461,24 +461,20 @@ const Recover: React.FC<RecoverProps> = ({
     
     setIsProcessing(true);
     try {
-      // Decode all shares
-      const decodedShares = sharesInputs
-        .filter((_, index) => sharesValidity[index].isValid)
-        .map(share => decode_share(share));
+      // Get valid share credentials
+      const validShareCredentials = sharesInputs
+        .filter((_, index) => sharesValidity[index].isValid);
 
-      // Decode the group credential
-      const group = decode_group(groupCredential);
+      // Recover the secret key using credentials directly
+      const nsec = recover_nsec(groupCredential, validShareCredentials);
 
-      // Recover the secret key
-      const nsec = recover_nsec(group, decodedShares);
-
-      setResult({
-        success: true,
-        message: (
-          <div>
-            <div className="mb-3 text-green-200 font-medium">
-              Successfully recovered NSEC using {decodedShares.length} shares
-            </div>
+              setResult({
+          success: true,
+          message: (
+            <div>
+              <div className="mb-3 text-green-200 font-medium">
+                Successfully recovered NSEC using {validShareCredentials.length} shares
+              </div>
             <div className="space-y-3">
               <div>
                 <div className="text-sm font-medium mb-1">Recovered NSEC:</div>
