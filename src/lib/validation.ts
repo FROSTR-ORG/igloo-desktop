@@ -7,7 +7,7 @@ import {
   validateRelay,
   validateBfcred,
   type ValidationResult
-} from '@igloo/core';
+} from '@frostr/igloo-core';
 
 // Re-export all validation functions from igloo/core
 export {

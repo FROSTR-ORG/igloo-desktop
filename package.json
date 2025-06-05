@@ -133,7 +133,7 @@
   "dependencies": {
     "@cmdcode/buff": "^2.2.5",
     "@frostr/bifrost": "^1.0.6",
-    "@igloo/core": "file:../igloo-core",
+    "@frostr/igloo-core": "^0.1.0",
     "@noble/ciphers": "^1.2.1",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.7.1",
