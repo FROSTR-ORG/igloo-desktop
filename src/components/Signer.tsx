@@ -305,53 +305,24 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       // Ensure cleanup before starting
       cleanupNode();
 
-      const node = get_node({ 
+      const node = await get_node({ 
         group: groupCredential, 
         share: signerSecret, 
         relays: relayUrls 
       });
 
       nodeRef.current = node;
-
-      // Store event listener references for cleanup
-      const readyListener = () => {
-        addLog('ready', 'Node connected');
-        setIsSignerRunning(true);
-      };
-      
-      const messageListener = (msg: any) => {
-        addLog('message', 'Received message', msg);
-      };
-
-      const errorListener = (error: unknown) => {
-        addLog('error', 'Node error', error);
-        setIsSignerRunning(false);
-      };
-
-      const disconnectListener = () => {
-        addLog('disconnect', 'Node disconnected');
-        setIsSignerRunning(false);
-      };
-
-      // Store listeners in nodeRef for cleanup
-      nodeRef.current.listeners = {
-        ready: readyListener,
-        message: messageListener,
-        error: errorListener,
-        disconnect: disconnectListener
-      };
-
-      // Attach listeners
-      node.client.on('ready', readyListener);
-      node.client.on('message', messageListener);
-      node.client.on('error', errorListener);
-      node.client.on('disconnect', disconnectListener);
+      setIsSignerRunning(true);
 
       // Add Bifrost specific event listeners
       node.on('ready', () => addLog('bifrost', 'Bifrost node is ready'));
       node.on('closed', () => addLog('bifrost', 'Bifrost node is closed'));
       node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
       node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+      node.on('error', (error: unknown) => {
+        addLog('error', 'Node error', error);
+        setIsSignerRunning(false);
+      });
 
       // ECDH events
       node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
@@ -373,7 +344,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
       node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
 
-      await node.connect();
+      addLog('info', 'Signer started successfully');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
