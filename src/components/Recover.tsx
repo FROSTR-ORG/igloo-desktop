@@ -99,6 +99,61 @@ const decodeGroupThresholdAndShares = (
   }
 };
 
+// Helper function to handle group credential processing and state updates
+const processAndSetGroupCredential = (
+  groupCredential: string,
+  defaultThreshold: number,
+  defaultTotalShares: number,
+  options: {
+    setGroupCredential: (value: string) => void;
+    setIsGroupValid: (valid: boolean) => void;
+    setGroupError: (error: string | undefined) => void;
+    setCurrentThreshold: (threshold: number) => void;
+    setCurrentTotalShares: (totalShares: number) => void;
+    setIsGroupAutofilled?: (autofilled: boolean) => void;
+    autofilledTimeoutRef?: React.MutableRefObject<NodeJS.Timeout | null>;
+    showAutofilled?: boolean;
+  }
+) => {
+  const { 
+    setGroupCredential, 
+    setIsGroupValid, 
+    setGroupError, 
+    setCurrentThreshold, 
+    setCurrentTotalShares,
+    setIsGroupAutofilled,
+    autofilledTimeoutRef,
+    showAutofilled = false
+  } = options;
+
+  setGroupCredential(groupCredential);
+  const validation = validateGroup(groupCredential);
+  setIsGroupValid(validation.isValid);
+  setGroupError(validation.message);
+  
+  // Decode group to set currentThreshold and currentTotalShares
+  if (validation.isValid) {
+    const { threshold, totalShares } = decodeGroupThresholdAndShares(
+      groupCredential,
+      defaultThreshold,
+      defaultTotalShares
+    );
+    setCurrentThreshold(threshold);
+    setCurrentTotalShares(totalShares);
+  }
+
+  // Show auto-detection indicator if requested
+  if (showAutofilled && setIsGroupAutofilled && autofilledTimeoutRef) {
+    setIsGroupAutofilled(true);
+    if (autofilledTimeoutRef.current) {
+      clearTimeout(autofilledTimeoutRef.current);
+    }
+    autofilledTimeoutRef.current = setTimeout(() => {
+      setIsGroupAutofilled(false);
+    }, 5000);
+  }
+};
+
 const Recover: React.FC<RecoverProps> = ({ 
   initialShare,
   initialGroupCredential,
@@ -135,6 +190,20 @@ const Recover: React.FC<RecoverProps> = ({
   // Add state for dynamic total shares
   const [currentTotalShares, setCurrentTotalShares] = useState<number>(defaultTotalShares);
 
+  // Helper function to process group credential and update state (within component scope)
+  const processGroupCredential = (groupCred: string, showAutofilled = false) => {
+    processAndSetGroupCredential(groupCred, defaultThreshold, defaultTotalShares, {
+      setGroupCredential,
+      setIsGroupValid,
+      setGroupError,
+      setCurrentThreshold,
+      setCurrentTotalShares,
+      setIsGroupAutofilled,
+      autofilledTimeoutRef,
+      showAutofilled
+    });
+  };
+
   // Validate the shares form
   useEffect(() => {
     const validSharesCount = sharesValidity.filter(validity => validity.isValid).length;
@@ -154,30 +223,7 @@ const Recover: React.FC<RecoverProps> = ({
         const matchingGroup = await findMatchingGroup(initialShare);
         
         if (matchingGroup) {
-          setGroupCredential(matchingGroup);
-          const validation = validateGroup(matchingGroup);
-          setIsGroupValid(validation.isValid);
-          setGroupError(validation.message);
-          
-          // Decode group to set currentThreshold and currentTotalShares
-          if (validation.isValid) {
-            const { threshold, totalShares } = decodeGroupThresholdAndShares(
-              matchingGroup,
-              defaultThreshold,
-              defaultTotalShares
-            );
-            setCurrentThreshold(threshold);
-            setCurrentTotalShares(totalShares);
-          }
-
-          // Show auto-detection indicator
-          setIsGroupAutofilled(true);
-          if (autofilledTimeoutRef.current) {
-            clearTimeout(autofilledTimeoutRef.current);
-          }
-          autofilledTimeoutRef.current = setTimeout(() => {
-            setIsGroupAutofilled(false);
-          }, 5000);
+          processGroupCredential(matchingGroup, true);
         }
       };
       
@@ -186,21 +232,7 @@ const Recover: React.FC<RecoverProps> = ({
     
     // Handle initialGroupCredential if provided
     if (initialGroupCredential) {
-      setGroupCredential(initialGroupCredential);
-      const validation = validateGroup(initialGroupCredential);
-      setIsGroupValid(validation.isValid);
-      setGroupError(validation.message);
-
-      // Decode group to set currentThreshold and currentTotalShares
-      if (validation.isValid) {
-        const { threshold, totalShares } = decodeGroupThresholdAndShares(
-          initialGroupCredential,
-          defaultThreshold,
-          defaultTotalShares
-        );
-        setCurrentThreshold(threshold);
-        setCurrentTotalShares(totalShares);
-      }
+      processGroupCredential(initialGroupCredential, false);
     }
   }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares]);
 
@@ -253,27 +285,7 @@ const Recover: React.FC<RecoverProps> = ({
             if (firstValidShare.groupCredential) {
               const groupValidation = validateGroup(firstValidShare.groupCredential);
               if (groupValidation.isValid) {
-                setGroupCredential(firstValidShare.groupCredential);
-                setIsGroupValid(groupValidation.isValid);
-                setGroupError(groupValidation.message);
-                
-                // Decode group to set currentThreshold and currentTotalShares
-                const { threshold, totalShares } = decodeGroupThresholdAndShares(
-                  firstValidShare.groupCredential,
-                  defaultThreshold,
-                  defaultTotalShares
-                );
-                setCurrentThreshold(threshold);
-                setCurrentTotalShares(totalShares);
-
-                // Show auto-detection indicator
-                setIsGroupAutofilled(true);
-                if (autofilledTimeoutRef.current) {
-                  clearTimeout(autofilledTimeoutRef.current);
-                }
-                autofilledTimeoutRef.current = setTimeout(() => {
-                  setIsGroupAutofilled(false);
-                }, 5000);
+                processGroupCredential(firstValidShare.groupCredential, true);
               }
             }
           }
@@ -346,27 +358,7 @@ const Recover: React.FC<RecoverProps> = ({
               // Validate group before using
               const groupValid = validateGroup(matchingGroup);
               if (groupValid.isValid) {
-                setGroupCredential(matchingGroup);
-                setIsGroupValid(true);
-                setGroupError(undefined);
-                
-                // Decode group to set currentThreshold and currentTotalShares
-                const { threshold, totalShares } = decodeGroupThresholdAndShares(
-                  matchingGroup,
-                  defaultThreshold,
-                  defaultTotalShares
-                );
-                setCurrentThreshold(threshold);
-                setCurrentTotalShares(totalShares);
-
-                // Show auto-detection indicator
-                setIsGroupAutofilled(true);
-                if (autofilledTimeoutRef.current) {
-                  clearTimeout(autofilledTimeoutRef.current);
-                }
-                autofilledTimeoutRef.current = setTimeout(() => {
-                  setIsGroupAutofilled(false);
-                }, 5000);
+                processGroupCredential(matchingGroup, true);
               }
             }
           });
