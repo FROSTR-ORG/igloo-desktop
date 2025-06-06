@@ -36,6 +36,9 @@ class ClientShareManager {
     const shares = await this.getShares();
     if (!shares || !Array.isArray(shares)) return [];
     
+    // Compute prefix once for efficiency
+    const prefix = binderSN.substring(0, 8);
+    
     // Filter shares that might have the matching binder_sn
     const matches = shares.filter(share => {
       // Match by metadata if available
@@ -43,9 +46,10 @@ class ClientShareManager {
         return true;
       }
       
-      // Match by partial share ID (some implementations store this)
-      if (share.id && share.id.includes(binderSN.substring(0, 8))) {
-        return true;
+      // Match by discrete ID segments to prevent false positives
+      if (share.id) {
+        const idSegments = share.id.split('-');
+        return idSegments.some(segment => segment === prefix);
       }
       
       // Match by share value if unencrypted

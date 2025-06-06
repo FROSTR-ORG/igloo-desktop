@@ -1,10 +1,11 @@
 import { clientShareManager } from '@/lib/clientShareManager';
+import { mockDeriveSecret } from '../setup';
+import { validatePassword } from '@/lib/validation';
 
 // Mock the required modules  
 jest.mock('@/lib/clientShareManager');
 
 const mockClientShareManager = clientShareManager as jest.Mocked<typeof clientShareManager>;
-const mockDeriveSecret = jest.fn();
 
 describe('Keyset Creation Workflow', () => {
   beforeEach(() => {
@@ -56,10 +57,7 @@ describe('Keyset Creation Workflow', () => {
         await mockClientShareManager.saveShare(shareData);
       }
 
-      // Verify all shares were saved
-      expect(mockClientShareManager.saveShare).toHaveBeenCalledTimes(3);
-      
-      // Verify the workflow completed successfully
+      // Verify all shares were saved and workflow completed successfully
       expect(mockClientShareManager.saveShare).toHaveBeenCalledTimes(3);
     });
 
@@ -95,23 +93,6 @@ describe('Keyset Creation Workflow', () => {
     });
 
     it('should enforce password requirements', () => {
-      const validatePassword = (password: string) => {
-        const hasMinLength = password.length >= 8;
-        const hasUppercase = /[A-Z]/.test(password);
-        const hasLowercase = /[a-z]/.test(password);
-        const hasNumbers = /\d/.test(password);
-        const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
-        
-        return {
-          isValid: hasMinLength && hasUppercase && hasLowercase && hasNumbers && hasSpecialChars,
-          hasMinLength,
-          hasUppercase,
-          hasLowercase,
-          hasNumbers,
-          hasSpecialChars
-        };
-      };
-
       const validPasswords = [
         'MySecure123!',
         'StrongPass#456',
