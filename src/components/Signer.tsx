@@ -360,53 +360,52 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           
           <div className="space-y-6">
             <div className="space-y-3">
-<div className="flex">
-  <Tooltip 
-    trigger={
-      <Input
-        type="text"
-        value={groupCredential}
-        onChange={(e) => handleGroupChange(e.target.value)}
-        className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-        disabled={isSignerRunning || isConnecting}
-        placeholder="Enter your group credential (bfgroup...)"
-        aria-label="Group credential input"
-      />
-    }
-    position="top"
-    triggerClassName="w-full block"
-    content={
-      <>
-        <p className="mb-2 font-semibold">Group Credential:</p>
-        <p>
-          This is your group data that contains the public information about
-          your keyset, including the threshold and group public key. It starts
-          with 'bfgroup' and is shared among all signers. It is used to
-          identify the group and the threshold for signing.
-        </p>
-      </>
-    }
-  />
-  <Tooltip 
-    trigger={
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => handleCopy(groupCredential, 'group')}
-        className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-        disabled={!groupCredential || !isGroupValid}
-      >
-        {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-      </Button>
-    }
-    position="top"
-    width="w-fit"
-    content="Copy"
-  />
-</div>
+              <div className="flex">
+                <Tooltip 
+                  trigger={
+                    <Input
+                      type="text"
+                      value={groupCredential}
+                      onChange={(e) => handleGroupChange(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                      disabled={isSignerRunning || isConnecting}
+                      placeholder="Enter your group credential (bfgroup...)"
+                      aria-label="Group credential input"
+                    />
+                  }
+                  position="top"
+                  triggerClassName="w-full block"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Group Credential:</p>
+                      <p>
+                        This is your group data that contains the public information about
+                        your keyset, including the threshold and group public key. It starts
+                        with 'bfgroup' and is shared among all signers. It is used to
+                        identify the group and the threshold for signing.
+                      </p>
+                    </>
+                  }
+                />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(groupCredential, 'group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                    >
+                      {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
               
-                            <div className="flex">
+              <div className="flex">
                 <Tooltip 
                   trigger={
                     <Input
