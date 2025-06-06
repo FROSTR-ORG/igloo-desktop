@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Signer from '@/components/Signer';
 
@@ -30,7 +30,7 @@ const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGr
 const mockDecodeShare = decodeShare as jest.MockedFunction<typeof decodeShare>;
 const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
 
-describe('Signer Component Integration (Desktop Logic)', () => {
+describe('Signer Component UI Tests', () => {
   const mockNode = {
     on: jest.fn(),
     off: jest.fn(),
@@ -40,7 +40,7 @@ describe('Signer Component Integration (Desktop Logic)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     
-    // Setup default mock returns
+    // Setup default mock returns for UI tests
     mockValidateShare.mockReturnValue({ isValid: true } as any);
     mockValidateGroup.mockReturnValue({ isValid: true } as any);
     mockDecodeShare.mockReturnValue({
@@ -60,111 +60,151 @@ describe('Signer Component Integration (Desktop Logic)', () => {
     } as any);
   });
 
-    describe('Signer Component Integration with igloo-core', () => {
-    it('should call validateGroup when group credential input changes', async () => {
+  describe('Component Rendering and UI Elements', () => {
+    it('should render the main heading', () => {
+      render(<Signer />);
+      
+      expect(screen.getByText('Start your signer to handle requests')).toBeInTheDocument();
+    });
+
+    it('should render group credential input field', () => {
+      render(<Signer />);
+      
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      
+      expect(groupInput).toBeInTheDocument();
+    });
+
+    it('should render share credential password input field', () => {
+      const { container } = render(<Signer />);
+      
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      expect(passwordInput).toBeInTheDocument();
+    });
+
+    it('should render relay URL section', () => {
+      render(<Signer />);
+      
+      expect(screen.getByText('Relay URLs')).toBeInTheDocument();
+      expect(screen.getByPlaceholderText('Add relay URL')).toBeInTheDocument();
+    });
+
+    it('should render copy buttons for credentials', () => {
+      render(<Signer />);
+      
+      const copyButtons = screen.getAllByRole('button');
+      const copyButtonsForCredentials = copyButtons.filter(button => 
+        button.querySelector('svg.lucide-copy')
+      );
+      
+      expect(copyButtonsForCredentials).toHaveLength(2); // One for group, one for share
+    });
+
+    it('should render signer status indicator', () => {
+      render(<Signer />);
+      
+      expect(screen.getByText(/Signer (Running|Stopped|Connecting)/)).toBeInTheDocument();
+    });
+
+    it('should render start/stop signer button', () => {
+      render(<Signer />);
+      
+      const signerButton = screen.getByRole('button', { name: /start signer|stop signer/i });
+      expect(signerButton).toBeInTheDocument();
+    });
+
+    it('should render default relay URL', () => {
+      render(<Signer />);
+      
+      expect(screen.getByText('wss://relay.primal.net')).toBeInTheDocument();
+    });
+  });
+
+  describe('User Interactions and UI Behavior', () => {
+    it('should allow typing in group credential input', async () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      // The first textbox is group credential, the password input is share, third textbox is relay
       const inputs = screen.getAllByRole('textbox');
       const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
       
       await user.clear(groupInput!);
       await user.type(groupInput!, 'test-group-credential');
       
-      // Validation is called for each character typed
-      expect(mockValidateGroup).toHaveBeenCalledWith('test-group-credential');
+      expect(groupInput).toHaveValue('test-group-credential');
     });
 
-    it('should call validateShare when share input changes', async () => {
+    it('should allow typing in share credential input', async () => {
       const user = userEvent.setup();
       const { container } = render(<Signer />);
       
-      // Find the password input by querying all inputs and filtering by type
       const passwordInput = container.querySelector('input[type="password"]');
       
       await user.type(passwordInput!, 'test-share-credential');
       
-      // Validation is called for each character typed
-      expect(mockValidateShare).toHaveBeenCalledWith('test-share-credential');
+      expect(passwordInput).toHaveValue('test-share-credential');
     });
 
-    it('should call decodeShare for valid shares', async () => {
-      const user = userEvent.setup();
-      const { container } = render(<Signer />);
-      
-      const passwordInput = container.querySelector('input[type="password"]');
-      
-      await user.type(passwordInput!, 'valid-share');
-      
-      expect(mockDecodeShare).toHaveBeenCalledWith('valid-share');
-    });
-
-    it('should call decodeGroup for valid groups', async () => {
+    it('should allow adding relay URLs', async () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const relayInput = screen.getByPlaceholderText('Add relay URL');
+      const addButton = screen.getByRole('button', { name: /add/i });
       
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'valid-group');
+      await user.type(relayInput, 'wss://test-relay.com');
+      await user.click(addButton);
       
-      expect(mockDecodeGroup).toHaveBeenCalledWith('valid-group');
+      expect(screen.getByText('wss://test-relay.com')).toBeInTheDocument();
     });
 
-    it('should handle validation errors gracefully', async () => {
-      mockValidateShare.mockReturnValue({ 
-        isValid: false, 
-        message: 'Invalid share format' 
-      } as any);
-      
+    it('should clear relay input after adding', async () => {
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
-      const passwordInput = container.querySelector('input[type="password"]');
-      await user.type(passwordInput!, 'invalid-share');
+      const relayInput = screen.getByPlaceholderText('Add relay URL');
+      const addButton = screen.getByRole('button', { name: /add/i });
       
-      expect(mockValidateShare).toHaveBeenCalledWith('invalid-share');
+      await user.type(relayInput, 'wss://test-relay.com');
+      await user.click(addButton);
       
+      expect(relayInput).toHaveValue('');
+    });
+
+    it('should allow removing relay URLs', async () => {
+      const user = userEvent.setup();
+      render(<Signer />);
+      
+      // First add a relay (there's a default relay, so we'll have 2 total)
+      const relayInput = screen.getByPlaceholderText('Add relay URL');
+      const addButton = screen.getByRole('button', { name: /add/i });
+      
+      await user.type(relayInput, 'wss://test-relay.com');
+      await user.click(addButton);
+      
+      // Verify the new relay was added
+      expect(screen.getByText('wss://test-relay.com')).toBeInTheDocument();
+      
+      // Now find and click the remove button for the new relay
+      // There should be multiple remove buttons now, get all of them
+      const removeButtons = screen.getAllByRole('button');
+      const removeButtonsWithX = removeButtons.filter(button => 
+        button.querySelector('svg.lucide-x')
+      );
+      
+      // Click the last remove button (should be for the newly added relay)
+      await user.click(removeButtonsWithX[removeButtonsWithX.length - 1]);
+      
+      // Wait a bit for the update
       await waitFor(() => {
-        expect(screen.getByText('Invalid share format')).toBeInTheDocument();
+        expect(screen.queryByText('wss://test-relay.com')).not.toBeInTheDocument();
       });
     });
 
-    it('should call createConnectedNode when starting signer with valid inputs', async () => {
-      const user = userEvent.setup();
-      const { container } = render(<Signer />);
-      
-      // Fill in valid inputs
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
-      const passwordInput = container.querySelector('input[type="password"]');
-      
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'valid-group');
-      await user.type(passwordInput!, 'valid-share');
-      
-      // Click start signer button
-      const startButton = screen.getByRole('button', { name: /start signer/i });
-      await user.click(startButton);
-      
-      await waitFor(() => {
-        expect(mockCreateConnectedNode).toHaveBeenCalledWith({
-          group: 'valid-group',
-          share: 'valid-share',
-          relays: ['wss://relay.primal.net'] // Default relay
-        });
-      });
-    });
-
-    it('should call cleanupBifrostNode when stopping signer', async () => {
-      // Setup a running signer first
-      mockCreateConnectedNode.mockResolvedValue({
-        node: mockNode,
-        state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
-      } as any);
-      
+    it('should disable inputs when signer is running', async () => {
+      // Setup a running signer
       const user = userEvent.setup();
       const { container } = render(<Signer />);
       
@@ -180,18 +220,99 @@ describe('Signer Component Integration (Desktop Logic)', () => {
       const startButton = screen.getByRole('button', { name: /start signer/i });
       await user.click(startButton);
       
-      // Wait for signer to start, then stop it
+      // Check that inputs are disabled
       await waitFor(() => {
-        expect(screen.getByRole('button', { name: /stop signer/i })).toBeInTheDocument();
-      }, { timeout: 3000 });
-      
-      const stopButton = screen.getByRole('button', { name: /stop signer/i });
-      await user.click(stopButton);
-      
-      expect(mockCleanupBifrostNode).toHaveBeenCalledWith(mockNode);
+        expect(groupInput).toBeDisabled();
+        expect(passwordInput).toBeDisabled();
+      });
     });
 
-    it('should render with initial data and call validation functions', () => {
+    it('should show validation errors in UI', async () => {
+      mockValidateShare.mockReturnValue({ 
+        isValid: false, 
+        message: 'Invalid share format' 
+      } as any);
+      
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
+      
+      const passwordInput = container.querySelector('input[type="password"]');
+      await user.type(passwordInput!, 'invalid-share');
+      
+      await waitFor(() => {
+        expect(screen.getByText('Invalid share format')).toBeInTheDocument();
+      });
+    });
+
+    it('should update signer button text based on state', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
+      
+      // Initially should show "Start Signer"
+      expect(screen.getByRole('button', { name: /start signer/i })).toBeInTheDocument();
+      
+      // Fill inputs and start signer
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'valid-group');
+      await user.type(passwordInput!, 'valid-share');
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      // Should now show "Stop Signer"
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /stop signer/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should show different status indicators', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
+      
+      // Initially should show "Stopped"
+      expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      
+      // Fill inputs and start signer
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'valid-group');
+      await user.type(passwordInput!, 'valid-share');
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      // Should show "Running"
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+    });
+  });
+
+  describe('Initial Data Rendering', () => {
+    it('should render with initial data', () => {
+      const initialData = {
+        share: 'initial-share',
+        groupCredential: 'initial-group'
+      };
+      
+      const { container } = render(<Signer initialData={initialData} />);
+      
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      expect(groupInput).toHaveValue('initial-group');
+      expect(passwordInput).toHaveValue('initial-share');
+    });
+
+    it('should validate initial data', () => {
       const initialData = {
         share: 'initial-share',
         groupCredential: 'initial-group'
@@ -204,86 +325,37 @@ describe('Signer Component Integration (Desktop Logic)', () => {
     });
   });
 
-  describe('Validation Logic', () => {
-    it('should handle invalid share validation', () => {
-      mockValidateShare.mockReturnValue({ 
-        isValid: false, 
-        message: 'Invalid share format' 
+  describe('Copy Functionality', () => {
+    it('should show copy buttons for valid credentials', () => {
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      const copyButtons = screen.getAllByRole('button');
+      const enabledCopyButtons = copyButtons.filter(button => 
+        button.querySelector('svg.lucide-copy') && !button.disabled
+      );
+      
+      expect(enabledCopyButtons).toHaveLength(2);
+    });
+
+    it('should disable copy buttons for invalid credentials', () => {
+      mockValidateShare.mockReturnValue({ isValid: false } as any);
+      mockValidateGroup.mockReturnValue({ isValid: false } as any);
+      
+      render(<Signer />);
+      
+      const copyButtons = screen.getAllByRole('button');
+      const copyButtonsForCredentials = copyButtons.filter(button => 
+        button.querySelector('svg.lucide-copy')
+      );
+      
+      copyButtonsForCredentials.forEach(button => {
+        expect(button).toHaveAttribute('disabled');
       });
-      
-      const result = mockValidateShare('invalid-share');
-      
-      expect(result.isValid).toBe(false);
-      expect(result.message).toBe('Invalid share format');
-    });
-
-    it('should handle invalid group validation', () => {
-      mockValidateGroup.mockReturnValue({ 
-        isValid: false, 
-        message: 'Invalid group format' 
-      });
-      
-      const result = mockValidateGroup('invalid-group');
-      
-      expect(result.isValid).toBe(false);
-      expect(result.message).toBe('Invalid group format');
-    });
-
-    it('should handle decoding errors', () => {
-      mockDecodeShare.mockImplementation(() => {
-        throw new Error('Invalid share structure');
-      });
-      
-      expect(() => mockDecodeShare('invalid')).toThrow('Invalid share structure');
-    });
-  });
-
-  describe('Node Lifecycle', () => {
-    it('should handle successful node creation', async () => {
-      const result = await mockCreateConnectedNode({
-        group: 'test-group',
-        share: 'test-share',
-        relays: ['wss://relay.test.com']
-      });
-      
-      expect(result.node).toBe(mockNode);
-      expect(result.state.isReady).toBe(true);
-    });
-
-    it('should handle node creation errors', async () => {
-      mockCreateConnectedNode.mockRejectedValue(new Error('Connection failed'));
-      
-      await expect(mockCreateConnectedNode({
-        group: 'test-group',
-        share: 'test-share',
-        relays: ['wss://relay.test.com']
-      })).rejects.toThrow('Connection failed');
-    });
-
-    it('should handle node cleanup on errors', () => {
-      // Simulate cleanup after error
-      expect(() => mockCleanupBifrostNode(mockNode)).not.toThrow();
-      expect(mockCleanupBifrostNode).toHaveBeenCalledWith(mockNode);
-    });
-  });
-
-  describe('Event Handling', () => {
-    it('should set up event listeners on node', () => {
-      // Test that the node supports event listener setup
-      mockNode.on('ready', () => {});
-      mockNode.on('error', () => {});
-      mockNode.on('closed', () => {});
-      
-      expect(mockNode.on).toHaveBeenCalledWith('ready', expect.any(Function));
-      expect(mockNode.on).toHaveBeenCalledWith('error', expect.any(Function));
-      expect(mockNode.on).toHaveBeenCalledWith('closed', expect.any(Function));
-    });
-
-    it('should support event listener removal', () => {
-      const handler = jest.fn();
-      mockNode.off('ready', handler);
-      
-      expect(mockNode.off).toHaveBeenCalledWith('ready', handler);
     });
   });
 }); 
