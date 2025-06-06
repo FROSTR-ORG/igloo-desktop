@@ -10,7 +10,6 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
   - [Security & Reliability](#security--reliability)
   - [Developer Experience](#developer-experience)
 - [Recent Improvements](#recent-improvements)
-- [Roadmap](#roadmap)
 - [Installation](#installation)
   - [Download Release (Recommended)](#download-release-recommended)
   - [Build from Source](#build-from-source)
@@ -59,19 +58,6 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
 - **🧪 Improved Testing**: New desktop-specific test suite covering Electron integration and workflows
 - **⚡ Better Performance**: Cleaner APIs and more efficient node lifecycle management
 - **📉 Reduced Complexity**: Eliminated ~400+ lines of duplicated logic
-
-## Roadmap
-
-### Immediate Priorities
-- [ ] Enhanced error messages and user-friendly fallbacks
-- [ ] Keep-alive functionality and automatic reconnection
-- [ ] Improved share import/export workflows
-
-### Future Enhancements
-- [ ] Mobile companion app integration
-- [ ] Hardware security module (HSM) support
-- [ ] Advanced share backup strategies
-- [ ] Multi-language support
 
 ## Installation
 
