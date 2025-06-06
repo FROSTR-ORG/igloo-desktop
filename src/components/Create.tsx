@@ -5,12 +5,10 @@ import { Input } from "@/components/ui/input"
 import { Tooltip } from "@/components/ui/tooltip"
 import { Alert } from "@/components/ui/alert"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { generateKeysetWithSecret } from "@/lib/bifrost"
-import { generateNsec, nsecToHex } from "@/lib/nostr"
+import { generateKeysetWithSecret, generateNostrKeyPair, nsecToHex, validateNsec } from "@frostr/igloo-core"
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { InputWithValidation } from "@/components/ui/input-with-validation"
-import { validateNsec } from "@/lib/validation"
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
@@ -57,7 +55,7 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const handleGenerateNsec = async () => {
     setIsGenerating(true);
     try {
-      const { nsec: newNsec } = generateNsec();
+      const { nsec: newNsec } = generateNostrKeyPair();
       setNsec(newNsec);
       setIsValidNsec(true);
       setKeysetGenerated({

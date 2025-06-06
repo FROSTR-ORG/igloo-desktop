@@ -1,7 +1,7 @@
 import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share, startListeningForAllEchoes } from "@/lib/bifrost";
+import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
@@ -168,8 +168,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   }, [showQrCode.show, showQrCode.shareIndex]); // Dependencies: showQrCode.show and showQrCode.shareIndex
 
   useEffect(() => {
-    const group = decode_group(groupCredential);
-    const shares = shareCredentials.map(decode_share);
+    const group = decodeGroup(groupCredential);
+    const shares = shareCredentials.map(decodeShare);
     setDecodedGroup(group);
     setDecodedShares(shares);
   }, [groupCredential, shareCredentials]);
@@ -177,14 +177,16 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   // Start listening for echoes on all shares when component mounts
   useEffect(() => {
     if (decodedGroup && shareCredentials.length > 0) {
-      const cleanup = startListeningForAllEchoes(
+      const echoListener = startListeningForAllEchoes(
         groupCredential,
         shareCredentials,
-        decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"],
-        handleEchoReceived // Pass the memoized callback
+        handleEchoReceived, // Pass the memoized callback
+        {
+          relays: decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"]
+        }
       );
       
-      echoListenersCleanup.current = cleanup;
+      echoListenersCleanup.current = echoListener.cleanup;
     }
 
     // Cleanup on unmount or when dependencies change

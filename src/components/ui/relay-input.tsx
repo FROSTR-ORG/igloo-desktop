@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { InputWithValidation } from "@/components/ui/input-with-validation";
 import { Plus, Trash2 } from "lucide-react";
-import { validateRelay } from '@/lib/validation';
+import { validateRelay } from '@frostr/igloo-core';
 
 interface RelayInputProps {
   relays: string[];
