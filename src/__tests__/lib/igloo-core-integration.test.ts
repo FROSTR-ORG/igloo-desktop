@@ -189,20 +189,130 @@ describe('Igloo Core Integration Tests', () => {
   });
 
   describe('Event Handling', () => {
-    let eventHandlers: Map<string, Function[]>;
+    // Define specific event data interfaces
+    interface ReadyEventData {
+      nodeId: string;
+      timestamp: number;
+    }
+
+    interface ErrorEventData {
+      code: string;
+      message: string;
+      relay: string;
+    }
+
+    interface ClosedEventData {
+      reason: string;
+      timestamp: number;
+    }
+
+    interface ECDHRequestData {
+      sessionId: string;
+      publicKey: string;
+      timestamp: number;
+    }
+
+    interface ECDHResponseData {
+      sessionId: string;
+      sharedSecret: string;
+      success: boolean;
+    }
+
+    interface ECDHRejectionData {
+      sessionId: string;
+      reason: string;
+      error: string;
+    }
+
+    interface SignRequestData {
+      sessionId: string;
+      message: string;
+      messageHash: string;
+      participants: string[];
+    }
+
+    interface SignResponseData {
+      sessionId: string;
+      signature: string;
+      success: boolean;
+      participantCount: number;
+    }
+
+    interface SignHandlerRequestData {
+      sessionId: string;
+      message: string;
+      sender: string;
+      requiresApproval: boolean;
+    }
+
+    interface SignHandlerResponseData {
+      sessionId: string;
+      partialSignature: string;
+      participantId: string;
+    }
+
+    interface SignHandlerRejectionData {
+      sessionId: string;
+      reason: string;
+      message: string;
+    }
+
+    // Define specific event handler types
+    type ReadyHandler = (data: ReadyEventData) => void;
+    type ErrorHandler = (data: ErrorEventData) => void;
+    type ClosedHandler = (data: ClosedEventData) => void;
+    type ECDHRequestHandler = (data: ECDHRequestData) => void;
+    type ECDHResponseHandler = (data: ECDHResponseData) => void;
+    type ECDHRejectionHandler = (data: ECDHRejectionData) => void;
+    type SignRequestHandler = (data: SignRequestData) => void;
+    type SignResponseHandler = (data: SignResponseData) => void;
+    type SignHandlerRequestHandler = (data: SignHandlerRequestData) => void;
+    type SignHandlerResponseHandler = (data: SignHandlerResponseData) => void;
+    type SignHandlerRejectionHandler = (data: SignHandlerRejectionData) => void;
+
+    // Union type for all possible event handlers
+    type EventHandler = 
+      | ReadyHandler
+      | ErrorHandler
+      | ClosedHandler
+      | ECDHRequestHandler
+      | ECDHResponseHandler
+      | ECDHRejectionHandler
+      | SignRequestHandler
+      | SignResponseHandler
+      | SignHandlerRequestHandler
+      | SignHandlerResponseHandler
+      | SignHandlerRejectionHandler;
+
+    // Event mapping type for type-safe event handling
+    interface EventMap {
+      'ready': ReadyHandler;
+      'error': ErrorHandler;
+      'closed': ClosedHandler;
+      '/ecdh/sender/req': ECDHRequestHandler;
+      '/ecdh/sender/res': ECDHResponseHandler;
+      '/ecdh/sender/rej': ECDHRejectionHandler;
+      '/sign/sender/req': SignRequestHandler;
+      '/sign/sender/res': SignResponseHandler;
+      '/sign/handler/req': SignHandlerRequestHandler;
+      '/sign/handler/res': SignHandlerResponseHandler;
+      '/sign/handler/rej': SignHandlerRejectionHandler;
+    }
+
+    let eventHandlers: Map<string, EventHandler[]>;
 
     beforeEach(() => {
       // Enhanced mock node to track event handlers and simulate event emission
       eventHandlers = new Map();
       
-      mockNode.on = jest.fn((event: string, handler: Function) => {
+      mockNode.on = jest.fn((event: string, handler: EventHandler) => {
         if (!eventHandlers.has(event)) {
           eventHandlers.set(event, []);
         }
         eventHandlers.get(event)!.push(handler);
       });
 
-      mockNode.off = jest.fn((event: string, handler: Function) => {
+      mockNode.off = jest.fn((event: string, handler: EventHandler) => {
         if (eventHandlers.has(event)) {
           const handlers = eventHandlers.get(event)!;
           const index = handlers.indexOf(handler);
@@ -212,10 +322,12 @@ describe('Igloo Core Integration Tests', () => {
         }
       });
 
-      // Add emit method to simulate event triggering
-      mockNode.emit = jest.fn((event: string, ...args: any[]) => {
+      // Add emit method to simulate event triggering with proper typing
+      mockNode.emit = jest.fn((event: string, data: any) => {
         if (eventHandlers.has(event)) {
-          eventHandlers.get(event)!.forEach(handler => handler(...args));
+          eventHandlers.get(event)!.forEach(handler => {
+            handler(data);
+          });
         }
       });
     });

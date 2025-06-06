@@ -110,7 +110,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'abc123' }
+          metadata: { binder_sn: 'xyz789' }
         },
         {
           id: 'share-2',
@@ -118,14 +118,22 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'def456' }
+          metadata: { binder_sn: 'mno456' }
+        },
+        {
+          id: 'share-3',
+          name: 'Share 3',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group'
+          // No metadata at all
         }
       ];
 
-      // Mock get-shares to return shares that don't match the query
+      // Mock get-shares to return shares that don't match the searched binder_sn
       mockIpcRenderer.invoke.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('nonexistent');
+      const result = await clientShareManager.findSharesByBinderSN('abc123');
 
       expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
       expect(result).toEqual([]);

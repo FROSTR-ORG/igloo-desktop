@@ -67,11 +67,11 @@ describe('Share Lifecycle Workflow (Desktop Integration)', () => {
       
       // Simulate the decryption process that would happen in LoadShare component
       const derivedSecret = mockDeriveSecret(password, newShare.salt || '');
-      const decryptedShareData = mockDecryptPayload(newShare.share, derivedSecret);
+      const decryptedShareData = mockDecryptPayload(derivedSecret, newShare.share);
       
       // Verify the decryption functions were called as expected in LoadShare component
       expect(mockDeriveSecret).toHaveBeenCalledWith(password, newShare.salt);
-      expect(mockDecryptPayload).toHaveBeenCalledWith(newShare.share, derivedSecret);
+      expect(mockDecryptPayload).toHaveBeenCalledWith(derivedSecret, newShare.share);
       expect(decryptedShareData).toBe('decrypted-share-data');
       
       // Step 5: Use share in Signer (already tested in component tests)
