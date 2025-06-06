@@ -70,18 +70,18 @@ describe('Signer Component UI Tests', () => {
     it('should render group credential input field', () => {
       render(<Signer />);
       
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const groupInput = screen.getByLabelText('Group Credential');
       
       expect(groupInput).toBeInTheDocument();
     });
 
     it('should render share credential password input field', () => {
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
-      const passwordInput = container.querySelector('input[type="password"]');
+      const shareInput = screen.getByLabelText('Share Credential');
       
-      expect(passwordInput).toBeInTheDocument();
+      expect(shareInput).toBeInTheDocument();
+      expect(shareInput).toHaveAttribute('type', 'password');
     });
 
     it('should render relay URL section', () => {
@@ -127,24 +127,23 @@ describe('Signer Component UI Tests', () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const groupInput = screen.getByLabelText('Group Credential');
       
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'test-group-credential');
+      await user.clear(groupInput);
+      await user.type(groupInput, 'test-group-credential');
       
       expect(groupInput).toHaveValue('test-group-credential');
     });
 
     it('should allow typing in share credential input', async () => {
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
-      const passwordInput = container.querySelector('input[type="password"]');
+      const shareInput = screen.getByLabelText('Share Credential');
       
-      await user.type(passwordInput!, 'test-share-credential');
+      await user.type(shareInput, 'test-share-credential');
       
-      expect(passwordInput).toHaveValue('test-share-credential');
+      expect(shareInput).toHaveValue('test-share-credential');
     });
 
     it('should allow adding relay URLs', async () => {
@@ -206,16 +205,15 @@ describe('Signer Component UI Tests', () => {
     it('should disable inputs when signer is running', async () => {
       // Setup a running signer
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
       // Fill inputs and start signer
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
-      const passwordInput = container.querySelector('input[type="password"]');
+      const groupInput = screen.getByLabelText('Group Credential');
+      const shareInput = screen.getByLabelText('Share Credential');
       
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'valid-group');
-      await user.type(passwordInput!, 'valid-share');
+      await user.clear(groupInput);
+      await user.type(groupInput, 'valid-group');
+      await user.type(shareInput, 'valid-share');
       
       const startButton = screen.getByRole('button', { name: /start signer/i });
       await user.click(startButton);
@@ -223,7 +221,7 @@ describe('Signer Component UI Tests', () => {
       // Check that inputs are disabled
       await waitFor(() => {
         expect(groupInput).toBeDisabled();
-        expect(passwordInput).toBeDisabled();
+        expect(shareInput).toBeDisabled();
       });
     });
 
@@ -234,10 +232,10 @@ describe('Signer Component UI Tests', () => {
       } as any);
       
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
-      const passwordInput = container.querySelector('input[type="password"]');
-      await user.type(passwordInput!, 'invalid-share');
+      const shareInput = screen.getByLabelText('Share Credential');
+      await user.type(shareInput, 'invalid-share');
       
       await waitFor(() => {
         expect(screen.getByText('Invalid share format')).toBeInTheDocument();
@@ -246,19 +244,18 @@ describe('Signer Component UI Tests', () => {
 
     it('should update signer button text based on state', async () => {
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
       // Initially should show "Start Signer"
       expect(screen.getByRole('button', { name: /start signer/i })).toBeInTheDocument();
       
       // Fill inputs and start signer
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
-      const passwordInput = container.querySelector('input[type="password"]');
+      const groupInput = screen.getByLabelText('Group Credential');
+      const shareInput = screen.getByLabelText('Share Credential');
       
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'valid-group');
-      await user.type(passwordInput!, 'valid-share');
+      await user.clear(groupInput);
+      await user.type(groupInput, 'valid-group');
+      await user.type(shareInput, 'valid-share');
       
       const startButton = screen.getByRole('button', { name: /start signer/i });
       await user.click(startButton);
@@ -271,19 +268,18 @@ describe('Signer Component UI Tests', () => {
 
     it('should show different status indicators', async () => {
       const user = userEvent.setup();
-      const { container } = render(<Signer />);
+      render(<Signer />);
       
       // Initially should show "Stopped"
       expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
       
       // Fill inputs and start signer
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
-      const passwordInput = container.querySelector('input[type="password"]');
+      const groupInput = screen.getByLabelText('Group Credential');
+      const shareInput = screen.getByLabelText('Share Credential');
       
-      await user.clear(groupInput!);
-      await user.type(groupInput!, 'valid-group');
-      await user.type(passwordInput!, 'valid-share');
+      await user.clear(groupInput);
+      await user.type(groupInput, 'valid-group');
+      await user.type(shareInput, 'valid-share');
       
       const startButton = screen.getByRole('button', { name: /start signer/i });
       await user.click(startButton);
@@ -302,14 +298,13 @@ describe('Signer Component UI Tests', () => {
         groupCredential: 'initial-group'
       };
       
-      const { container } = render(<Signer initialData={initialData} />);
+      render(<Signer initialData={initialData} />);
       
-      const inputs = screen.getAllByRole('textbox');
-      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
-      const passwordInput = container.querySelector('input[type="password"]');
+      const groupInput = screen.getByLabelText('Group Credential');
+      const shareInput = screen.getByLabelText('Share Credential');
       
       expect(groupInput).toHaveValue('initial-group');
-      expect(passwordInput).toHaveValue('initial-share');
+      expect(shareInput).toHaveValue('initial-share');
     });
 
     it('should validate initial data', () => {
@@ -336,7 +331,7 @@ describe('Signer Component UI Tests', () => {
       
       const copyButtons = screen.getAllByRole('button');
       const enabledCopyButtons = copyButtons.filter(button => 
-        button.querySelector('svg.lucide-copy') && !button.disabled
+        button.querySelector('svg.lucide-copy') && !(button as HTMLButtonElement).disabled
       );
       
       expect(enabledCopyButtons).toHaveLength(2);
