@@ -348,6 +348,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
             <Tooltip 
               trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+              position="right"
               content={
                 <>
                   <p className="mb-2 font-semibold">Important:</p>
@@ -359,64 +360,89 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           
           <div className="space-y-6">
             <div className="space-y-3">
-              <div className="space-y-2">
-                <label htmlFor="group-credential-input" className="text-blue-300 text-sm font-medium">
-                  Group Credential
-                </label>
-                <div className="flex">
-                  <Input
-                    id="group-credential-input"
-                    type="text"
-                    value={groupCredential}
-                    onChange={(e) => handleGroupChange(e.target.value)}
-                    className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                    disabled={isSignerRunning || isConnecting}
-                    aria-describedby={groupError ? "group-error" : undefined}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleCopy(groupCredential, 'group')}
-                    className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                    disabled={!groupCredential || !isGroupValid}
-                    aria-label="Copy group credential"
-                  >
-                    {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                  </Button>
-                </div>
-                {groupError && (
-                  <p id="group-error" className="text-red-400 text-sm">{groupError}</p>
-                )}
+              <div className="flex">
+                <Tooltip 
+                  trigger={
+                    <Input
+                      type="text"
+                      value={groupCredential}
+                      onChange={(e) => handleGroupChange(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                      disabled={isSignerRunning || isConnecting}
+                      placeholder="Enter your group credential (bfgroup...)"
+                      aria-label="Group credential input"
+                    />
+                  }
+                  position="top"
+                  triggerClassName="w-full block"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Group Credential:</p>
+                      <p>
+                        This is your group data that contains the public information about
+                        your keyset, including the threshold and group public key. It starts
+                        with 'bfgroup' and is shared among all signers. It is used to
+                        identify the group and the threshold for signing.
+                      </p>
+                    </>
+                  }
+                />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(groupCredential, 'group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                    >
+                      {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
               
-              <div className="space-y-2">
-                <label htmlFor="share-credential-input" className="text-blue-300 text-sm font-medium">
-                  Share Credential
-                </label>
-                <div className="flex">
-                  <Input
-                    id="share-credential-input"
-                    type="password"
-                    value={signerSecret}
-                    onChange={(e) => handleShareChange(e.target.value)}
-                    className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                    disabled={isSignerRunning || isConnecting}
-                    aria-describedby={shareError ? "share-error" : undefined}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => handleCopy(signerSecret, 'share')}
-                    className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                    disabled={!signerSecret || !isShareValid}
-                    aria-label="Copy share credential"
-                  >
-                    {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                  </Button>
-                </div>
-                {shareError && (
-                  <p id="share-error" className="text-red-400 text-sm">{shareError}</p>
-                )}
+              <div className="flex">
+                <Tooltip 
+                  trigger={
+                    <Input
+                      type="password"
+                      value={signerSecret}
+                      onChange={(e) => handleShareChange(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                      disabled={isSignerRunning || isConnecting}
+                      placeholder="Enter your secret share (bfshare...)"
+                      aria-label="Secret share input"
+                    />
+                  }
+                  position="top"
+                  triggerClassName="w-full block"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Secret Share:</p>
+                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with 'bfshare' and should be kept private and secure. Each signer needs a share to participate in signing.</p>
+                    </>
+                  }
+                />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(signerSecret, 'share')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!signerSecret || !isShareValid}
+                    >
+                      {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
               
               <div className="flex items-center justify-between mt-6">
@@ -455,6 +481,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
                 <Tooltip 
                   trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  position="right"
                   content={
                     <>
                       <p className="mb-2 font-semibold">Important:</p>

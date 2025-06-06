@@ -193,7 +193,9 @@ const App: React.FC = () => {
                       <>
                         <p className="mb-2 font-semibold">How to use Igloo:</p>
                         <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
-                        <p>Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
+                        <p className="mb-2">Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
+                        <p className="mb-2">Igloo does not allow you to publish notes at this time only participate in signing.</p>
+                        <p className="mb-2">Checkout <a href="https://frostr.org/apps" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">frostr.org/apps</a> for our other frostr clients including Frost2x which allows you to publish notes through the browser.</p>
                       </>
                     }
                   />

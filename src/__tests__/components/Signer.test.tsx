@@ -70,7 +70,7 @@ describe('Signer Component UI Tests', () => {
     it('should render group credential input field', () => {
       render(<Signer />);
       
-      const groupInput = screen.getByLabelText('Group Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
       
       expect(groupInput).toBeInTheDocument();
     });
@@ -78,7 +78,7 @@ describe('Signer Component UI Tests', () => {
     it('should render share credential password input field', () => {
       render(<Signer />);
       
-      const shareInput = screen.getByLabelText('Share Credential');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       expect(shareInput).toBeInTheDocument();
       expect(shareInput).toHaveAttribute('type', 'password');
@@ -127,7 +127,7 @@ describe('Signer Component UI Tests', () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      const groupInput = screen.getByLabelText('Group Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
       
       await user.clear(groupInput);
       await user.type(groupInput, 'test-group-credential');
@@ -139,7 +139,7 @@ describe('Signer Component UI Tests', () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      const shareInput = screen.getByLabelText('Share Credential');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       await user.type(shareInput, 'test-share-credential');
       
@@ -208,8 +208,8 @@ describe('Signer Component UI Tests', () => {
       render(<Signer />);
       
       // Fill inputs and start signer
-      const groupInput = screen.getByLabelText('Group Credential');
-      const shareInput = screen.getByLabelText('Share Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       await user.clear(groupInput);
       await user.type(groupInput, 'valid-group');
@@ -225,7 +225,7 @@ describe('Signer Component UI Tests', () => {
       });
     });
 
-    it('should show validation errors in UI', async () => {
+    it('should validate share input and disable copy button for invalid share', async () => {
       mockValidateShare.mockReturnValue({ 
         isValid: false, 
         message: 'Invalid share format' 
@@ -234,12 +234,16 @@ describe('Signer Component UI Tests', () => {
       const user = userEvent.setup();
       render(<Signer />);
       
-      const shareInput = screen.getByLabelText('Share Credential');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       await user.type(shareInput, 'invalid-share');
       
-      await waitFor(() => {
-        expect(screen.getByText('Invalid share format')).toBeInTheDocument();
-      });
+      // Find the copy button next to the share input (should be disabled for invalid input)
+      const copyButtons = screen.getAllByRole('button');
+      const shareCopyButton = copyButtons.filter(button => 
+        button.querySelector('svg.lucide-copy')
+      )[1]; // Second copy button is for share
+      
+      expect(shareCopyButton).toHaveAttribute('disabled');
     });
 
     it('should update signer button text based on state', async () => {
@@ -250,8 +254,8 @@ describe('Signer Component UI Tests', () => {
       expect(screen.getByRole('button', { name: /start signer/i })).toBeInTheDocument();
       
       // Fill inputs and start signer
-      const groupInput = screen.getByLabelText('Group Credential');
-      const shareInput = screen.getByLabelText('Share Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       await user.clear(groupInput);
       await user.type(groupInput, 'valid-group');
@@ -274,8 +278,8 @@ describe('Signer Component UI Tests', () => {
       expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
       
       // Fill inputs and start signer
-      const groupInput = screen.getByLabelText('Group Credential');
-      const shareInput = screen.getByLabelText('Share Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       await user.clear(groupInput);
       await user.type(groupInput, 'valid-group');
@@ -300,8 +304,8 @@ describe('Signer Component UI Tests', () => {
       
       render(<Signer initialData={initialData} />);
       
-      const groupInput = screen.getByLabelText('Group Credential');
-      const shareInput = screen.getByLabelText('Share Credential');
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       
       expect(groupInput).toHaveValue('initial-group');
       expect(shareInput).toHaveValue('initial-share');
