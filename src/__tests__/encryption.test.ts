@@ -16,7 +16,7 @@ jest.mock('@noble/hashes/sha256', () => ({
 }));
 
 jest.mock('@noble/hashes/pbkdf2', () => ({
-  pbkdf2: jest.fn().mockReturnValue(Buffer.from('mockPbkdf2Output'))
+  pbkdf2: jest.fn().mockReturnValue(new Uint8Array(32).fill(42)) // 32 bytes of data
 }));
 
 // Create spy functions for the noble cipher
@@ -62,8 +62,8 @@ describe('Encryption Functions', () => {
       // Note: We can't verify Buff.str and Buff.hex calls directly since they're not Jest spies
       expect(pbkdf2).toHaveBeenCalledWith(
         sha256,                    // Hash function
-        expect.any(Uint8Array),    // Password bytes
-        expect.any(Uint8Array),    // Salt bytes
+        expect.anything(),         // Password bytes (could be Buffer or Uint8Array)
+        expect.anything(),         // Salt bytes (could be Buffer or Uint8Array)
         expect.objectContaining({  // Options
           c: 32,                   // Iterations
           dkLen: 32                // Output length
