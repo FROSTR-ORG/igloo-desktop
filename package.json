@@ -1,6 +1,6 @@
 {
   "name": "igloo",
-  "version": "0.0.8",
+  "version": "0.0.9",
   "description": "Frostr desktop signer and key management app",
   "author": {
     "name": "austinkelsay",
@@ -133,6 +133,7 @@
   "dependencies": {
     "@cmdcode/buff": "^2.2.5",
     "@frostr/bifrost": "^1.0.6",
+    "@frostr/igloo-core": "^0.1.0",
     "@noble/ciphers": "^1.2.1",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.7.1",
@@ -145,7 +146,6 @@
     "clsx": "^2.1.1",
     "express": "^4.21.1",
     "lucide-react": "^0.453.0",
-    "nostr-tools": "^2.10.0",
     "qrcode.react": "^3.1.0",
     "react": "^17.0.2",
     "react-dom": "^17.0.2",
