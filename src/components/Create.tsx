@@ -130,7 +130,19 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
       <CardHeader>
         <div className="flex items-center justify-between">
           <div className="flex items-center w-full justify-between">
-            <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
+            <div className="flex items-center gap-2">
+              <CardTitle className="text-xl text-blue-200">Create Keyset</CardTitle>
+              <Tooltip 
+                trigger={<HelpCircle size={18} className="text-blue-400 cursor-pointer" />}
+                content={
+                  <>
+                    <p className="mb-2 font-semibold">Create a new keyset:</p>
+                    <p className="mb-2">Split your nostr private key into multiple shares using FROST (Flexible Round-Optimized Schnorr Threshold signatures).</p>
+                    <p>You can either import your existing nsec or generate a new one. The keyset will be split into shares that can be distributed across different devices for secure signing.</p>
+                  </>
+                }
+              />
+            </div>
             <IconButton
               variant="ghost"
               icon={<ArrowLeft className="w-4 h-4" />}
@@ -145,7 +157,18 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         <div className="space-y-4">
           <div className="space-y-2">
             <InputWithValidation
-              label="Keyset Name"
+              label={
+                <div className="flex items-center gap-1">
+                  <span>Keyset Name</span>
+                  <Tooltip 
+                    trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
+                    content={
+                      <p>A unique name to identify this keyset. This helps you distinguish between different keysets when managing multiple sets of shares.</p>
+                    }
+                    width="w-60"
+                  />
+                </div>
+              }
               placeholder="Enter a name for this keyset"
               value={keysetName}
               onChange={handleNameChange}
@@ -160,7 +183,21 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
           <div className="space-y-2 w-full">
             <div className="flex gap-2 w-full">
               <InputWithValidation
-                label="Nostr Private Key (nsec)"
+                label={
+                  <div className="flex items-center gap-1">
+                    <span>Nostr Private Key (nsec)</span>
+                    <Tooltip 
+                      trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
+                      content={
+                        <>
+                          <p className="mb-2 font-semibold">Your nostr private key:</p>
+                          <p className="mb-2">This is your nostr private key (nsec) that will be split into shares. You can either paste your existing nsec or generate a new one.</p>
+                          <p>The private key will be used to create the threshold shares but will not be stored after the keyset is created.</p>
+                        </>
+                      }
+                    />
+                  </div>
+                }
                 type="password"
                 placeholder="Enter your nsec or generate a new one"
                 value={nsec}

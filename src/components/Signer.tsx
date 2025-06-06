@@ -360,7 +360,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           
           <div className="space-y-6">
             <div className="space-y-3">
-              <div className="flex">
+                            <div className="flex">
                 <Tooltip 
                   trigger={
                     <Input
@@ -373,25 +373,33 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                     />
                   }
                   position="top"
+                  triggerClassName="w-full block"
                   content={
                     <>
                       <p className="mb-2 font-semibold">Group Credential:</p>
-                      <p>This is your group data that contains the public information about your keyset, including the threshold and group public key. It starts with 'bfgroup' and is shared among all participants.</p>
+                      <p>This is your group data that contains the public information about your keyset, including the threshold and group public key. It starts with 'bfgroup' and is shared among all signers. It is used to identify the group and the threshold for signing.</p>
                     </>
                   }
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(groupCredential, 'group')}
-                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!groupCredential || !isGroupValid}
-                >
-                  {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(groupCredential, 'group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                    >
+                      {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
               
-              <div className="flex">
+                            <div className="flex">
                 <Tooltip 
                   trigger={
                     <Input
@@ -404,22 +412,30 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                     />
                   }
                   position="top"
+                  triggerClassName="w-full block"
                   content={
                     <>
                       <p className="mb-2 font-semibold">Secret Share:</p>
-                      <p>This is your individual secret share of the private key. It starts with 'bfshare' and should be kept private and secure. Each participant has a unique share that's required for signing.</p>
+                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with 'bfshare' and should be kept private and secure. Each signer needs a share to participate in signing.</p>
                     </>
                   }
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(signerSecret, 'share')}
-                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!signerSecret || !isShareValid}
-                >
-                  {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(signerSecret, 'share')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!signerSecret || !isShareValid}
+                    >
+                      {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
               
               <div className="flex items-center justify-between mt-6">
