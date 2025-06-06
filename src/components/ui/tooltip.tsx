@@ -7,6 +7,7 @@ interface TooltipProps {
   className?: string;
   position?: 'top' | 'right' | 'bottom' | 'left';
   width?: string;
+  triggerClassName?: string;
 }
 
 const Tooltip: React.FC<TooltipProps> = ({
@@ -15,6 +16,7 @@ const Tooltip: React.FC<TooltipProps> = ({
   className,
   position = 'left',
   width = 'w-72',
+  triggerClassName,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
 
@@ -27,7 +29,7 @@ const Tooltip: React.FC<TooltipProps> = ({
 
   return (
     <div 
-      className="relative inline-block"
+      className={cn("relative inline-block", triggerClassName)}
       onMouseEnter={() => setIsVisible(true)}
       onMouseLeave={() => setIsVisible(false)}
     >
