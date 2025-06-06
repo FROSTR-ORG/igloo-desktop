@@ -152,7 +152,8 @@ describe('App Component', () => {
 
     // Should show signer view with tabs
     expect(screen.getByTestId('signer-component')).toBeInTheDocument();
-    expect(screen.getAllByText('Signer')[0]).toBeInTheDocument(); // Multiple "Signer" texts exist
+    // Verify signer tab is present and accessible - more reliable than getAllByText with index
+    expect(screen.getByRole('tab', { name: /signer/i })).toBeInTheDocument();
     expect(screen.getByText('Back to Shares')).toBeInTheDocument();
   });
 
