@@ -189,44 +189,282 @@ describe('Igloo Core Integration Tests', () => {
   });
 
   describe('Event Handling', () => {
-    it('should set up event listeners on node', () => {
-      // Test that the node supports event listener setup
-      mockNode.on('ready', () => {});
-      mockNode.on('error', () => {});
-      mockNode.on('closed', () => {});
+    let eventHandlers: Map<string, Function[]>;
+
+    beforeEach(() => {
+      // Enhanced mock node to track event handlers and simulate event emission
+      eventHandlers = new Map();
       
-      expect(mockNode.on).toHaveBeenCalledWith('ready', expect.any(Function));
-      expect(mockNode.on).toHaveBeenCalledWith('error', expect.any(Function));
-      expect(mockNode.on).toHaveBeenCalledWith('closed', expect.any(Function));
+      mockNode.on = jest.fn((event: string, handler: Function) => {
+        if (!eventHandlers.has(event)) {
+          eventHandlers.set(event, []);
+        }
+        eventHandlers.get(event)!.push(handler);
+      });
+
+      mockNode.off = jest.fn((event: string, handler: Function) => {
+        if (eventHandlers.has(event)) {
+          const handlers = eventHandlers.get(event)!;
+          const index = handlers.indexOf(handler);
+          if (index > -1) {
+            handlers.splice(index, 1);
+          }
+        }
+      });
+
+      // Add emit method to simulate event triggering
+      mockNode.emit = jest.fn((event: string, ...args: any[]) => {
+        if (eventHandlers.has(event)) {
+          eventHandlers.get(event)!.forEach(handler => handler(...args));
+        }
+      });
     });
 
-    it('should support event listener removal', () => {
+    it('should set up event listeners and handle ready event', () => {
+      const readyHandler = jest.fn();
+      const errorHandler = jest.fn();
+      const closedHandler = jest.fn();
+      
+      // Set up event listeners
+      mockNode.on('ready', readyHandler);
+      mockNode.on('error', errorHandler);
+      mockNode.on('closed', closedHandler);
+      
+      // Verify listeners were registered
+      expect(mockNode.on).toHaveBeenCalledWith('ready', readyHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('error', errorHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('closed', closedHandler);
+      
+      // Simulate ready event
+      const readyData = { nodeId: 'test-node-123', timestamp: Date.now() };
+      mockNode.emit('ready', readyData);
+      
+      // Verify handler was called with correct arguments
+      expect(readyHandler).toHaveBeenCalledTimes(1);
+      expect(readyHandler).toHaveBeenCalledWith(readyData);
+      expect(errorHandler).not.toHaveBeenCalled();
+      expect(closedHandler).not.toHaveBeenCalled();
+    });
+
+    it('should handle error events with proper error data', () => {
+      const errorHandler = jest.fn();
+      mockNode.on('error', errorHandler);
+      
+      // Simulate error event
+      const errorData = { 
+        code: 'CONNECTION_FAILED', 
+        message: 'Failed to connect to relay',
+        relay: 'wss://relay.test.com'
+      };
+      mockNode.emit('error', errorData);
+      
+      // Verify error handler was called with correct arguments
+      expect(errorHandler).toHaveBeenCalledTimes(1);
+      expect(errorHandler).toHaveBeenCalledWith(errorData);
+    });
+
+    it('should handle closed events with cleanup data', () => {
+      const closedHandler = jest.fn();
+      mockNode.on('closed', closedHandler);
+      
+      // Simulate closed event
+      const closedData = { reason: 'user_requested', timestamp: Date.now() };
+      mockNode.emit('closed', closedData);
+      
+      // Verify closed handler was called
+      expect(closedHandler).toHaveBeenCalledTimes(1);
+      expect(closedHandler).toHaveBeenCalledWith(closedData);
+    });
+
+    it('should support event listener removal and prevent removed handlers from being called', () => {
       const handler = jest.fn();
+      const persistentHandler = jest.fn();
+      
+      // Add handlers
+      mockNode.on('ready', handler);
+      mockNode.on('ready', persistentHandler);
+      
+      // Verify handlers were registered
+      expect(mockNode.on).toHaveBeenCalledWith('ready', handler);
+      expect(mockNode.on).toHaveBeenCalledWith('ready', persistentHandler);
+      
+      // Remove one handler
       mockNode.off('ready', handler);
-      
       expect(mockNode.off).toHaveBeenCalledWith('ready', handler);
+      
+      // Emit event
+      mockNode.emit('ready', { test: 'data' });
+      
+      // Verify only persistent handler was called
+      expect(handler).not.toHaveBeenCalled();
+      expect(persistentHandler).toHaveBeenCalledTimes(1);
+      expect(persistentHandler).toHaveBeenCalledWith({ test: 'data' });
     });
 
-    it('should handle ECDH events', () => {
-      const ecdhHandler = jest.fn();
-      mockNode.on('/ecdh/sender/req', ecdhHandler);
-      mockNode.on('/ecdh/sender/res', ecdhHandler);
-      mockNode.on('/ecdh/sender/rej', ecdhHandler);
+    it('should handle ECDH events with proper message processing', () => {
+      const ecdhReqHandler = jest.fn();
+      const ecdhResHandler = jest.fn();
+      const ecdhRejHandler = jest.fn();
       
-      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/req', ecdhHandler);
-      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/res', ecdhHandler);
-      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/rej', ecdhHandler);
+      // Set up ECDH event listeners
+      mockNode.on('/ecdh/sender/req', ecdhReqHandler);
+      mockNode.on('/ecdh/sender/res', ecdhResHandler);
+      mockNode.on('/ecdh/sender/rej', ecdhRejHandler);
+      
+      // Verify listeners were registered
+      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/req', ecdhReqHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/res', ecdhResHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/rej', ecdhRejHandler);
+      
+      // Simulate ECDH request
+      const ecdhReqData = {
+        sessionId: 'ecdh-session-123',
+        publicKey: 'test-public-key',
+        timestamp: Date.now()
+      };
+      mockNode.emit('/ecdh/sender/req', ecdhReqData);
+      
+      // Simulate ECDH response
+      const ecdhResData = {
+        sessionId: 'ecdh-session-123',
+        sharedSecret: 'test-shared-secret',
+        success: true
+      };
+      mockNode.emit('/ecdh/sender/res', ecdhResData);
+      
+      // Simulate ECDH rejection
+      const ecdhRejData = {
+        sessionId: 'ecdh-session-456',
+        reason: 'invalid_public_key',
+        error: 'Public key validation failed'
+      };
+      mockNode.emit('/ecdh/sender/rej', ecdhRejData);
+      
+      // Verify handlers were called with correct arguments
+      expect(ecdhReqHandler).toHaveBeenCalledTimes(1);
+      expect(ecdhReqHandler).toHaveBeenCalledWith(ecdhReqData);
+      
+      expect(ecdhResHandler).toHaveBeenCalledTimes(1);
+      expect(ecdhResHandler).toHaveBeenCalledWith(ecdhResData);
+      
+      expect(ecdhRejHandler).toHaveBeenCalledTimes(1);
+      expect(ecdhRejHandler).toHaveBeenCalledWith(ecdhRejData);
     });
 
-    it('should handle signature events', () => {
-      const signHandler = jest.fn();
-      mockNode.on('/sign/sender/req', signHandler);
-      mockNode.on('/sign/sender/res', signHandler);
-      mockNode.on('/sign/handler/req', signHandler);
+    it('should handle signature events with comprehensive message processing', () => {
+      const signReqHandler = jest.fn();
+      const signResHandler = jest.fn();
+      const signHandlerReqHandler = jest.fn();
+      const signHandlerResHandler = jest.fn();
+      const signHandlerRejHandler = jest.fn();
       
-      expect(mockNode.on).toHaveBeenCalledWith('/sign/sender/req', signHandler);
-      expect(mockNode.on).toHaveBeenCalledWith('/sign/sender/res', signHandler);
-      expect(mockNode.on).toHaveBeenCalledWith('/sign/handler/req', signHandler);
+      // Set up signature event listeners
+      mockNode.on('/sign/sender/req', signReqHandler);
+      mockNode.on('/sign/sender/res', signResHandler);
+      mockNode.on('/sign/handler/req', signHandlerReqHandler);
+      mockNode.on('/sign/handler/res', signHandlerResHandler);
+      mockNode.on('/sign/handler/rej', signHandlerRejHandler);
+      
+      // Verify listeners were registered
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/sender/req', signReqHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/sender/res', signResHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/handler/req', signHandlerReqHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/handler/res', signHandlerResHandler);
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/handler/rej', signHandlerRejHandler);
+      
+      // Simulate signature request from sender
+      const signReqData = {
+        sessionId: 'sign-session-789',
+        message: 'message-to-sign',
+        messageHash: 'hash-of-message',
+        participants: ['participant1', 'participant2']
+      };
+      mockNode.emit('/sign/sender/req', signReqData);
+      
+      // Simulate signature response to sender
+      const signResData = {
+        sessionId: 'sign-session-789',
+        signature: 'final-signature',
+        success: true,
+        participantCount: 2
+      };
+      mockNode.emit('/sign/sender/res', signResData);
+      
+      // Simulate signature request to handler
+      const signHandlerReqData = {
+        sessionId: 'sign-session-789',
+        message: 'message-to-sign',
+        sender: 'sender-pubkey',
+        requiresApproval: true
+      };
+      mockNode.emit('/sign/handler/req', signHandlerReqData);
+      
+      // Simulate signature response from handler
+      const signHandlerResData = {
+        sessionId: 'sign-session-789',
+        partialSignature: 'partial-sig-123',
+        participantId: 'participant1'
+      };
+      mockNode.emit('/sign/handler/res', signHandlerResData);
+      
+      // Simulate signature rejection from handler
+      const signHandlerRejData = {
+        sessionId: 'sign-session-999',
+        reason: 'user_rejected',
+        message: 'User declined to sign the message'
+      };
+      mockNode.emit('/sign/handler/rej', signHandlerRejData);
+      
+      // Verify all handlers were called with correct arguments
+      expect(signReqHandler).toHaveBeenCalledTimes(1);
+      expect(signReqHandler).toHaveBeenCalledWith(signReqData);
+      
+      expect(signResHandler).toHaveBeenCalledTimes(1);
+      expect(signResHandler).toHaveBeenCalledWith(signResData);
+      
+      expect(signHandlerReqHandler).toHaveBeenCalledTimes(1);
+      expect(signHandlerReqHandler).toHaveBeenCalledWith(signHandlerReqData);
+      
+      expect(signHandlerResHandler).toHaveBeenCalledTimes(1);
+      expect(signHandlerResHandler).toHaveBeenCalledWith(signHandlerResData);
+      
+      expect(signHandlerRejHandler).toHaveBeenCalledTimes(1);
+      expect(signHandlerRejHandler).toHaveBeenCalledWith(signHandlerRejData);
+    });
+
+    it('should handle multiple handlers for the same event', () => {
+      const handler1 = jest.fn();
+      const handler2 = jest.fn();
+      const handler3 = jest.fn();
+      
+      // Register multiple handlers for the same event
+      mockNode.on('ready', handler1);
+      mockNode.on('ready', handler2);
+      mockNode.on('ready', handler3);
+      
+      // Emit event
+      const eventData = { nodeState: 'ready', connectedRelays: 3 };
+      mockNode.emit('ready', eventData);
+      
+      // Verify all handlers were called
+      expect(handler1).toHaveBeenCalledTimes(1);
+      expect(handler1).toHaveBeenCalledWith(eventData);
+      
+      expect(handler2).toHaveBeenCalledTimes(1);
+      expect(handler2).toHaveBeenCalledWith(eventData);
+      
+      expect(handler3).toHaveBeenCalledTimes(1);
+      expect(handler3).toHaveBeenCalledWith(eventData);
+    });
+
+    it('should handle events with no registered handlers gracefully', () => {
+      // Emit event with no registered handlers
+      expect(() => {
+        mockNode.emit('unregistered-event', { data: 'test' });
+      }).not.toThrow();
+      
+      // Verify emit was called
+      expect(mockNode.emit).toHaveBeenCalledWith('unregistered-event', { data: 'test' });
     });
   });
 
