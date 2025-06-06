@@ -95,24 +95,55 @@ describe('Keyset Creation Workflow', () => {
     });
 
     it('should enforce password requirements', () => {
+      const validatePassword = (password: string) => {
+        const hasMinLength = password.length >= 8;
+        const hasUppercase = /[A-Z]/.test(password);
+        const hasLowercase = /[a-z]/.test(password);
+        const hasNumbers = /\d/.test(password);
+        const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+        
+        return {
+          isValid: hasMinLength && hasUppercase && hasLowercase && hasNumbers && hasSpecialChars,
+          hasMinLength,
+          hasUppercase,
+          hasLowercase,
+          hasNumbers,
+          hasSpecialChars
+        };
+      };
+
       const validPasswords = [
-        'password123',
-        'mySecurePass!',
-        'L0ngPasswordWithNumbers123'
+        'MySecure123!',
+        'StrongPass#456',
+        'Complex$Password789',
+        'ValidKey@2024'
       ];
 
       const invalidPasswords = [
-        '',           // empty
-        '123',        // too short  
-        'pas',        // too short
+        '',                    // empty
+        'short1!',            // too short (7 chars)
+        'nouppercase123!',    // no uppercase
+        'NOLOWERCASE123!',    // no lowercase
+        'NoNumbers!@#',       // no numbers
+        'NoSpecialChars123',  // no special characters
+        'password',           // missing multiple requirements
+        'PASSWORD123',        // missing lowercase and special chars
+        'mypass123'           // missing uppercase and special chars
       ];
 
       validPasswords.forEach(password => {
-        expect(password.length).toBeGreaterThanOrEqual(4);
+        const validation = validatePassword(password);
+        expect(validation.isValid).toBe(true);
+        expect(validation.hasMinLength).toBe(true);
+        expect(validation.hasUppercase).toBe(true);
+        expect(validation.hasLowercase).toBe(true);
+        expect(validation.hasNumbers).toBe(true);
+        expect(validation.hasSpecialChars).toBe(true);
       });
 
       invalidPasswords.forEach(password => {
-        expect(password.length).toBeLessThan(4);
+        const validation = validatePassword(password);
+        expect(validation.isValid).toBe(false);
       });
     });
   });
