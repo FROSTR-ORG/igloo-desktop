@@ -190,7 +190,8 @@ describe('Keyset Creation Workflow', () => {
       const shareId = 'test-share';
       
       // Mock the file explorer opening
-      mockClientShareManager.openShareLocation = jest.fn().mockResolvedValue(undefined);
+      // Mock the file explorer opening
+      mockClientShareManager.openShareLocation.mockResolvedValue(undefined);
 
       await mockClientShareManager.openShareLocation(shareId);
 
