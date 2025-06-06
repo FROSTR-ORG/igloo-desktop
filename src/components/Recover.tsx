@@ -1,9 +1,8 @@
 import React, { useState, useEffect, FormEvent, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { recover_nsec, decode_share, decode_group } from "@/lib/bifrost"
+import { recoverSecretKeyFromCredentials, decodeShare, decodeGroup, validateShare, validateGroup } from "@frostr/igloo-core"
 import { InputWithValidation } from "@/components/ui/input-with-validation"
-import { validateShare, validateGroup } from "@/lib/validation"
 import { clientShareManager, type IglooShare } from "@/lib/clientShareManager"
 import { HelpCircle } from "lucide-react"
 
@@ -23,7 +22,7 @@ const findMatchingGroup = async (shareValue: string) => {
   
   try {
     // Try to decode the share
-    const decodedShare = decode_share(shareValue);
+    const decodedShare = decodeShare(shareValue);
     
     if (DEBUG_AUTO_POPULATE) {
       console.log("Share decoded for group lookup:", decodedShare);
@@ -43,7 +42,7 @@ const findMatchingGroup = async (shareValue: string) => {
           // Match by share content if it's already decoded
           if (saved.shareCredential) {
             try {
-              const savedDecodedShare = decode_share(saved.shareCredential);
+              const savedDecodedShare = decodeShare(saved.shareCredential);
               return savedDecodedShare.binder_sn === decodedShare.binder_sn && saved.groupCredential;
             } catch (e) {
               // Skip this check if we can't decode
@@ -84,7 +83,7 @@ const decodeGroupThresholdAndShares = (
   debugEnabled = DEBUG_AUTO_POPULATE
 ): { threshold: number; totalShares: number } => {
   try {
-    const decodedGroup = decode_group(groupCredential);
+    const decodedGroup = decodeGroup(groupCredential);
     const threshold = decodedGroup?.threshold ?? defaultThreshold;
     const totalShares = (decodedGroup?.commits && Array.isArray(decodedGroup.commits)) 
                         ? decodedGroup.commits.length 
@@ -330,7 +329,7 @@ const Recover: React.FC<RecoverProps> = ({
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid share
-        const decodedShare = decode_share(value);
+        const decodedShare = decodeShare(value);
         
         if (DEBUG_AUTO_POPULATE) {
           console.log(`Decoded share ${index}:`, decodedShare);
@@ -400,7 +399,7 @@ const Recover: React.FC<RecoverProps> = ({
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid group
-        const decodedGroup = decode_group(value);
+        const decodedGroup = decodeGroup(value);
         
         // Additional structure validation
         if (typeof decodedGroup.threshold !== 'number' || 
@@ -458,7 +457,7 @@ const Recover: React.FC<RecoverProps> = ({
         .filter((_, index) => sharesValidity[index].isValid);
 
       // Recover the secret key using credentials directly
-      const nsec = recover_nsec(groupCredential, validShareCredentials);
+      const nsec = recoverSecretKeyFromCredentials(groupCredential, validShareCredentials);
 
               setResult({
           success: true,
