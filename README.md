@@ -4,8 +4,12 @@ Frostr keyset manager and remote signer for secure distributed key management.
 Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key management protocol for nostr, using the powers of FROST (Flexible Round-Optimized Schnorr Threshold signatures).
 
 ## Table of Contents
-- [Implemented Features](#implemented-features)
-- [TODO](#todo)
+- [Features](#features)
+  - [Core Functionality](#core-functionality)
+  - [Desktop Integration](#desktop-integration)
+  - [Security & Reliability](#security--reliability)
+  - [Developer Experience](#developer-experience)
+- [Recent Improvements](#recent-improvements)
 - [Installation](#installation)
   - [Download Release (Recommended)](#download-release-recommended)
   - [Build from Source](#build-from-source)
@@ -17,23 +21,43 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
   - [Keyset Operations](#keyset-operations)
   - [Key Rotation](#key-rotation)
 
-### Implemented Features
-- [x] Keyset generation
-- [x] Nsec import (for keyset generation)
-- [x] Remote signing (using single share)
-- [x] Save individual Encrypted Shares to file system
-- [X] Recover nsec from threshold of shares
-- [x] Signed binary for Windows, Linux, MacOS
-- [x] Build pipeline
-- [x] Event Log for Signer
-- [x] FAQ
-- [x] Better Form Validation for Share, Group, Relay, Nsec, Hex Privkey
-- [x] QR code generation for easy share transfer between devices
-- [x] Ping confirmation for QR code transfers
+## Features
 
-### TODO
-- [ ] Better Error Messages and Fallbacks
-- [ ] Keep Alive / Auto Reconnect
+### Core Functionality
+- **🔑 Keyset Management**: Generate new keysets or import existing nsec keys
+- **📊 Threshold Signing**: Create k-of-n multi-signature setups (2/3, 3/5, etc.)
+- **🔐 Encrypted Share Storage**: Save individual shares to filesystem with password encryption
+- **🖥️ Remote Signing**: Start signing nodes that communicate over nostr relays
+- **🔄 Key Recovery**: Reconstruct nsec from threshold number of shares
+- **📱 QR Code Sharing**: Transfer shares between devices with visual confirmation
+- **📋 Event Logging**: Complete audit trail of signing requests and responses
+
+### Desktop Integration
+- **💾 File System Management**: Automatic share detection and secure storage
+- **🖱️ Electron UI**: Native desktop experience with system integration
+- **📋 Clipboard Support**: Easy copying of keys, shares, and QR codes
+- **🔒 Cross-Platform**: Signed binaries for Windows, macOS, and Linux
+
+### Security & Reliability
+- **🏗️ Architecture**: Built on `@frostr/igloo-core` for centralized, tested cryptographic operations
+- **🛡️ Input Validation**: Comprehensive validation for shares, keys, relays, and hex inputs
+- **🔄 Node Lifecycle**: Robust connection management and cleanup procedures
+- **🔐 End-to-End Encryption**: Secure communication between signing nodes over nostr
+
+### Developer Experience
+- **🧪 Comprehensive Testing**: Desktop-specific test suite covering workflows and integration
+- **📦 Modern Build Pipeline**: Automated releases with GPG signing and checksums
+- **📚 Clear Documentation**: Detailed FAQ and user guides
+- **🔧 Development Tools**: Hot reload and debugging support
+
+## Recent Improvements
+
+- **🎯 Architecture Migration**: Moved all core cryptographic logic to `@frostr/igloo-core` library
+- **🔧 Enhanced Reliability**: Fixed race conditions in node connection and cleanup
+- **📦 Simplified Codebase**: Desktop app now focuses on UI/UX while core logic is centralized
+- **🧪 Improved Testing**: New desktop-specific test suite covering Electron integration and workflows
+- **⚡ Better Performance**: Cleaner APIs and more efficient node lifecycle management
+- **📉 Reduced Complexity**: Eliminated ~400+ lines of duplicated logic
 
 ## Installation
 
@@ -106,6 +130,16 @@ Recover: Use threshold of shares in keyset to recover nsec.
 
 Igloo implements the FROSTR protocol, which uses Shamir Secret Sharing to break up your nsec into "shares" and a hyper-optimized version of FROST to coordinate signing of messages.
 
+### Architecture
+
+Igloo uses a **hybrid architecture** for maximum reliability and maintainability:
+
+- **🖥️ Desktop App (Igloo)**: Focuses on user interface, file management, and Electron-specific features
+- **📚 Core Library (@frostr/igloo-core)**: Handles all cryptographic operations, validation, and node management
+- **🔗 Shared Logic**: Ensures consistency across all FROSTR applications (desktop, web, mobile)
+
+### Workflow
+
 The workflow is simple:
 1. Use Igloo to generate a new nsec or import your existing one
 2. Create your multi-signature setup (like 2/3, 3/5, etc.) generating multiple shares
@@ -114,6 +148,14 @@ The workflow is simple:
 5. Your signatures remain unchanged - nobody knows you're using multi-sig
 
 The beauty of this system is that it's a drop-in replacement for existing signing solutions, working with NIP-07 and NIP-46 compatible applications.
+
+### Benefits of the New Architecture
+
+- **🔒 Improved Security**: Centralized, well-tested cryptographic operations
+- **🚀 Better Reliability**: Robust node lifecycle management and error handling  
+- **🧪 Enhanced Testing**: Comprehensive test coverage for both UI and core logic
+- **📦 Easier Maintenance**: Clear separation between desktop features and core functionality
+- **⚡ Future-Proof**: Core logic can be shared across web, mobile, and desktop applications
 
 ## FAQ
 

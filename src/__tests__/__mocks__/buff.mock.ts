@@ -16,9 +16,9 @@ export class MockBuff extends Uint8Array {
       const encoder = new TextEncoder();
       const bytes = encoder.encode(data);
       super(bytes);
-    } else if (data instanceof Uint8Array) {
-      // Handle Uint8Array or Buffer input
-      super(data);
+    } else if (data instanceof Uint8Array || Buffer.isBuffer(data)) {
+      // Handle Uint8Array or Buffer input - ensure we copy the data
+      super(new Uint8Array(data));
     } else if (typeof data === 'number') {
       // Handle number input (create array of specified size)
       super(size || data);
@@ -50,6 +50,10 @@ export class MockBuff extends Uint8Array {
     return content;
   }
 
+  get length() {
+    return super.length;
+  }
+
   get b64url() {
     return Buffer.from(this).toString('base64url');
   }
@@ -63,7 +67,7 @@ export class MockBuff extends Uint8Array {
   // Static methods
   static str(data: string) {
     return {
-      digest: Buffer.from(data)
+      digest: new Uint8Array(Buffer.from(data))
     };
   }
 
@@ -75,16 +79,16 @@ export class MockBuff extends Uint8Array {
         const padded = Buffer.alloc(size, 0);
         // Copy original data to the end of the buffer (right-aligned, zero-padded on the left)
         buffer.copy(padded, size - buffer.length);
-        return padded;
+        return new Uint8Array(padded);
       }
-      return buffer;
+      return new Uint8Array(buffer);
     } catch (e) {
-      return Buffer.alloc(size || 0);
+      return new Uint8Array(Buffer.alloc(size || 0));
     }
   }
 
   static random(length: number) {
-    return Buffer.alloc(length, '0123456789abcdef');
+    return new Uint8Array(Buffer.alloc(length, '0123456789abcdef'));
   }
 
   static join(buffers: Uint8Array[]) {
