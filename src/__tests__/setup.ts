@@ -30,13 +30,20 @@ jest.mock('electron', () => ({
 
 // Mock igloo-core module
 jest.mock('@frostr/igloo-core', () => ({
-  generateKeyset: jest.fn(),
+  generateKeysetWithSecret: jest.fn(),
   validateShare: jest.fn(),
-  validateGroupCredential: jest.fn(),
+  validateGroup: jest.fn(),
   decodeShare: jest.fn(),
-  validateRelayUrl: jest.fn(),
-  createSigningNode: jest.fn(),
-  recoverNsec: jest.fn(),
+  decodeGroup: jest.fn(),
+  validateRelay: jest.fn(),
+  createConnectedNode: jest.fn(),
+  recoverSecretKeyFromCredentials: jest.fn(),
+  startListeningForAllEchoes: jest.fn(),
+  cleanupBifrostNode: jest.fn(),
+  isNodeReady: jest.fn(),
+  generateNostrKeyPair: jest.fn(),
+  nsecToHex: jest.fn(),
+  validateNsec: jest.fn(),
 }));
 
 // Suppress console logs during tests unless needed
