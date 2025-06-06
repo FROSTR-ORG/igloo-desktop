@@ -4,12 +4,14 @@ This directory contains the tests for the Igloo application, which focuses on ke
 
 ## Testing Strategy
 
-Since migrating core logic to `@frostr/igloo-core`, our testing focuses on **desktop-specific functionality**:
+Following our successful migration to `@frostr/igloo-core`, our testing focuses on **desktop-specific functionality**:
 
 1. **Desktop Integration Tests**: Electron IPC, file system operations, share management
 2. **React Component Tests**: UI behavior, user interactions, state management  
 3. **Workflow Tests**: End-to-end user workflows across components
 4. **Desktop-Specific Features**: Clipboard, file explorer integration, QR codes
+
+This migration eliminated **~400+ lines of duplicated logic** and allows us to focus testing efforts on the unique desktop experience while core cryptographic operations are tested in the centralized library.
 
 ## Best Practices
 
