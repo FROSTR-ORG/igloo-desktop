@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
-import { createAndConnectNode, validateShare, validateGroup, decodeShare, decodeGroup } from "@frostr/igloo-core"
+import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode, isNodeReady } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
@@ -48,6 +48,7 @@ const DEFAULT_RELAY = "wss://relay.primal.net";
 
 const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
   const [isShareValid, setIsShareValid] = useState(false);
   const [shareError, setShareError] = useState<string | undefined>(undefined);
@@ -73,13 +74,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   useEffect(() => {
     // Cleanup function that runs when component unmounts
     return () => {
-      if (isSignerRunning) {
+      if (nodeRef.current) {
         addLog('info', 'Signer stopped due to page navigation');
         cleanupNode();
-        setIsSignerRunning(false);
       }
     };
-  }, [isSignerRunning]);
+  }, []); // Empty dependency array means this only runs on mount/unmount
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
@@ -96,80 +96,29 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     setLogs(prev => [...prev, { timestamp, type, message, data, id }]);
   };
 
-  // Add cleanup function
+  // Clean node cleanup using igloo-core
   const cleanupNode = () => {
     if (nodeRef.current) {
-      try {
-        // Remove event listeners
-        if (nodeRef.current.listeners) {
-          const { ready, message, error, disconnect } = nodeRef.current.listeners;
-          nodeRef.current.client?.off('ready', ready);
-          nodeRef.current.client?.off('message', message);
-          nodeRef.current.client?.off('error', error);
-          nodeRef.current.client?.off('disconnect', disconnect);
+      // Temporarily suppress console.warn to hide expected igloo-core warnings
+      const originalWarn = console.warn;
+      console.warn = (message: string, ...args: any[]) => {
+        // Only suppress the specific expected warning about removeAllListeners
+        if (typeof message === 'string' && message.includes('removeAllListeners not available')) {
+          return; // Skip this expected warning
         }
-
-        // Remove Bifrost specific listeners
-        try {
-          nodeRef.current.off('ready');
-          nodeRef.current.off('closed');
-          nodeRef.current.off('message');
-          nodeRef.current.off('bounced');
-
-          // Remove ECDH events
-          nodeRef.current.off('/ecdh/sender/req');
-          nodeRef.current.off('/ecdh/sender/res');
-          nodeRef.current.off('/ecdh/sender/rej');
-          nodeRef.current.off('/ecdh/sender/ret');
-          nodeRef.current.off('/ecdh/sender/err');
-          nodeRef.current.off('/ecdh/handler/req');
-          nodeRef.current.off('/ecdh/handler/res');
-          nodeRef.current.off('/ecdh/handler/rej');
-
-          // Remove Signature events
-          nodeRef.current.off('/sign/sender/req');
-          nodeRef.current.off('/sign/sender/res');
-          nodeRef.current.off('/sign/sender/rej');
-          nodeRef.current.off('/sign/sender/ret');
-          nodeRef.current.off('/sign/sender/err');
-          nodeRef.current.off('/sign/handler/req');
-          nodeRef.current.off('/sign/handler/res');
-          nodeRef.current.off('/sign/handler/rej');
-        } catch (e) {
-          console.warn('Error removing event listeners:', e);
-        }
-
-        // Thoroughly attempt to disconnect the node
-        try {
-          // Try calling disconnect on the node itself (if available)
-          if (typeof nodeRef.current.disconnect === 'function') {
-            nodeRef.current.disconnect();
-          }
-          
-          // Disconnect the client
-          if (nodeRef.current.client) {
-            // Try force close method if it exists
-            if (typeof nodeRef.current.client.close === 'function') {
-              nodeRef.current.client.close();
-            }
-            
-            // Try normal disconnect
-            if (typeof nodeRef.current.client.disconnect === 'function') {
-              nodeRef.current.client.disconnect();
-            }
-            
-            // Null out the client reference
-            nodeRef.current.client = null;
-          }
-        } catch (e) {
-          console.warn('Error disconnecting:', e);
-        }
-      } catch (error) {
-        console.error('Error during cleanup:', error);
-      }
+        originalWarn(message, ...args);
+      };
       
-      // Completely clear the node reference
-      nodeRef.current = null;
+      try {
+        // Use igloo-core's cleanup - it handles the manual cleanup internally
+        cleanupBifrostNode(nodeRef.current);
+      } catch (error) {
+        console.error('Unexpected error during cleanup:', error);
+      } finally {
+        // Restore original console.warn
+        console.warn = originalWarn;
+        nodeRef.current = null;
+      }
     }
   };
 
@@ -302,52 +251,69 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     try {
       // Ensure cleanup before starting
       cleanupNode();
+      setIsConnecting(true);
+      addLog('info', 'Creating and connecting node...');
 
-      const node = await createAndConnectNode({ 
+      // Use the improved createConnectedNode API which returns enhanced state info
+      const result = await createConnectedNode({ 
         group: groupCredential, 
         share: signerSecret, 
         relays: relayUrls 
       });
 
-      nodeRef.current = node;
-      setIsSignerRunning(true);
+      nodeRef.current = result.node;
 
-      // Add Bifrost specific event listeners
-      node.on('ready', () => addLog('bifrost', 'Bifrost node is ready'));
-      node.on('closed', () => addLog('bifrost', 'Bifrost node is closed'));
-      node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
-      node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
-      node.on('error', (error: unknown) => {
+      // Set up event listeners for state changes
+      result.node.on('closed', () => {
+        addLog('bifrost', 'Bifrost node is closed');
+        setIsSignerRunning(false);
+        setIsConnecting(false);
+      });
+      result.node.on('error', (error: unknown) => {
         addLog('error', 'Node error', error);
         setIsSignerRunning(false);
+        setIsConnecting(false);
       });
 
+      // Set up comprehensive event logging
+      result.node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
+      result.node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+
       // ECDH events
-      node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
-      node.on('/ecdh/sender/res', (...msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
-      node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
-      node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
-      node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
-      node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
-      node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
-      node.on('/ecdh/handler/rej', (reason: string, msg: any) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
+      result.node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
+      result.node.on('/ecdh/sender/res', (...msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
+      result.node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
+      result.node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
+      result.node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
+      result.node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
+      result.node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
+      result.node.on('/ecdh/handler/rej', (reason: string, msg: any) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
 
       // Signature events
-      node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
-      node.on('/sign/sender/res', (...msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
-      node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
-      node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
-      node.on('/sign/sender/err', (reason: string, msgs: any[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
-      node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
-      node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
-      node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+      result.node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
+      result.node.on('/sign/sender/res', (...msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
+      result.node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
+      result.node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
+      result.node.on('/sign/sender/err', (reason: string, msgs: any[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
+      result.node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
+      result.node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
+      result.node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
 
-      addLog('info', 'Signer started successfully');
+      // Use the enhanced state info from createConnectedNode
+      if (result.state.isReady) {
+        addLog('info', 'Node connected and ready');
+        setIsConnecting(false);
+        setIsSignerRunning(true);
+      } else {
+        addLog('warning', 'Node created but not yet ready, waiting...');
+        // Keep connecting state until ready
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
       cleanupNode();
       setIsSignerRunning(false);
+      setIsConnecting(false);
     }
   };
 
@@ -356,6 +322,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       cleanupNode();
       addLog('info', 'Signer stopped');
       setIsSignerRunning(false);
+      setIsConnecting(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to stop signer', { error: errorMessage });
@@ -398,7 +365,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   value={groupCredential}
                   onChange={(e) => handleGroupChange(e.target.value)}
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                  disabled={isSignerRunning}
+                  disabled={isSignerRunning || isConnecting}
                 />
                 <Button
                   variant="ghost"
@@ -420,7 +387,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   value={signerSecret}
                   onChange={(e) => handleShareChange(e.target.value)}
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                  disabled={isSignerRunning}
+                  disabled={isSignerRunning || isConnecting}
                 />
                 <Button
                   variant="ghost"
@@ -441,9 +408,17 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   <div className={`w-3 h-3 rounded-full ${
                     isSignerRunning 
                       ? 'bg-green-500 pulse-animation' 
+                      : isConnecting
+                      ? 'bg-yellow-500 pulse-animation'
                       : 'bg-red-500'
                   }`}></div>
-                  <span className="text-gray-300">Signer {isSignerRunning ? 'Running' : 'Stopped'}</span>
+                  <span className="text-gray-300">
+                    Signer {
+                      isSignerRunning ? 'Running' : 
+                      isConnecting ? 'Connecting...' : 
+                      'Stopped'
+                    }
+                  </span>
                 </div>
                 <Button
                   onClick={handleSignerButtonClick}
@@ -452,9 +427,9 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       ? "bg-red-600 hover:bg-red-700"
                       : "bg-green-600 hover:bg-green-700"
                   } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
-                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0}
+                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0 || isConnecting}
                 >
-                  {isSignerRunning ? "Stop Signer" : "Start Signer"}
+                  {isSignerRunning ? "Stop Signer" : isConnecting ? "Connecting..." : "Start Signer"}
                 </Button>
               </div>
             </div>
@@ -479,12 +454,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   value={newRelayUrl}
                   onChange={(e) => setNewRelayUrl(e.target.value)}
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
-                  disabled={isSignerRunning}
+                  disabled={isSignerRunning || isConnecting}
                 />
                 <Button
                   onClick={handleAddRelay}
                   className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!newRelayUrl.trim() || isSignerRunning}
+                  disabled={!newRelayUrl.trim() || isSignerRunning || isConnecting}
                 >
                   Add
                 </Button>
@@ -500,7 +475,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       icon={<X className="h-4 w-4" />}
                       onClick={() => handleRemoveRelay(relay)}
                       tooltip="Remove relay"
-                      disabled={isSignerRunning || relayUrls.length <= 1}
+                      disabled={isSignerRunning || isConnecting || relayUrls.length <= 1}
                     />
                   </div>
                 ))}
