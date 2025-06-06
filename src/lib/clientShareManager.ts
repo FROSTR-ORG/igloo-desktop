@@ -51,10 +51,11 @@ class ClientShareManager {
       // Match by share value if unencrypted
       if (share.shareCredential) {
         try {
-          // You would need to import decode_share here or pass it as a parameter
-          // const decodedShare = decode_share(share.shareCredential);
+          // Note: Could use decodeShare from @frostr/igloo-core if needed
+          // import { decodeShare } from '@frostr/igloo-core';
+          // const decodedShare = decodeShare(share.shareCredential);
           // return decodedShare.binder_sn === binderSN;
-          return false; // Uncomment above after importing decode_share
+          return false; // Implement if needed
         } catch (e) {
           return false;
         }
