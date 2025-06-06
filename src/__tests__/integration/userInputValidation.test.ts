@@ -1,5 +1,4 @@
-// Mock the encryption module functionality
-const mockDeriveSecret = jest.fn();
+import { mockDeriveSecret } from '../setup';
 
 describe('User Input Validation and Error Handling', () => {
   beforeEach(() => {
