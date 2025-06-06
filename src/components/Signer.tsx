@@ -3,13 +3,11 @@ import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
-import { get_node } from "@/lib/bifrost"
+import { createAndConnectNode, validateShare, validateGroup, decodeShare, decodeGroup } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
-import { validateShare, validateGroup } from "@/lib/validation"
-import { decode_share, decode_group } from "@/lib/bifrost"
 
 // Add CSS for the pulse animation
 const pulseStyle = `
@@ -210,7 +208,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid share
-        const decodedShare = decode_share(value);
+        const decodedShare = decodeShare(value);
         
         // Additional structure validation could be done here
         if (typeof decodedShare.idx !== 'number' || 
@@ -251,7 +249,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid group
-        const decodedGroup = decode_group(value);
+        const decodedGroup = decodeGroup(value);
         
         // Additional structure validation
         if (typeof decodedGroup.threshold !== 'number' || 
@@ -305,7 +303,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       // Ensure cleanup before starting
       cleanupNode();
 
-      const node = await get_node({ 
+      const node = await createAndConnectNode({ 
         group: groupCredential, 
         share: signerSecret, 
         relays: relayUrls 
