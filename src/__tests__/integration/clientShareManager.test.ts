@@ -1,12 +1,5 @@
-// Mock Electron's IPC renderer - must be done before any imports
-const mockInvoke = jest.fn();
-jest.mock('electron', () => ({
-  ipcRenderer: {
-    invoke: mockInvoke
-  }
-}));
-
 import { clientShareManager, type IglooShare } from '../../lib/clientShareManager';
+import { mockIpcRenderer } from '../setup';
 
 describe('ClientShareManager (Desktop Integration)', () => {
   beforeEach(() => {
@@ -26,16 +19,16 @@ describe('ClientShareManager (Desktop Integration)', () => {
         }
       ];
 
-      mockInvoke.mockResolvedValue(mockShares);
+      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
 
       const result = await clientShareManager.getShares();
 
-      expect(mockInvoke).toHaveBeenCalledWith('get-shares');
+      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
       expect(result).toEqual(mockShares);
     });
 
     it('should return false when IPC call fails', async () => {
-      mockInvoke.mockRejectedValue(new Error('IPC Error'));
+      mockIpcRenderer.invoke.mockRejectedValue(new Error('IPC Error'));
 
       const result = await clientShareManager.getShares();
 
@@ -53,11 +46,11 @@ describe('ClientShareManager (Desktop Integration)', () => {
         groupCredential: 'group'
       };
 
-      mockInvoke.mockResolvedValue(true);
+      mockIpcRenderer.invoke.mockResolvedValue(true);
 
       const result = await clientShareManager.saveShare(testShare);
 
-      expect(mockInvoke).toHaveBeenCalledWith('save-share', testShare);
+      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('save-share', testShare);
       expect(result).toBe(true);
     });
 
@@ -70,7 +63,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
         groupCredential: 'group'
       };
 
-      mockInvoke.mockRejectedValue(new Error('Save failed'));
+      mockIpcRenderer.invoke.mockRejectedValue(new Error('Save failed'));
 
       const result = await clientShareManager.saveShare(testShare);
 
@@ -99,7 +92,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
         }
       ];
 
-      mockInvoke.mockResolvedValue(mockShares);
+      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
 
       const result = await clientShareManager.findSharesByBinderSN('abc123');
 
@@ -108,7 +101,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
     });
 
     it('should return empty array when no shares match', async () => {
-      mockInvoke.mockResolvedValue([]);
+      mockIpcRenderer.invoke.mockResolvedValue([]);
 
       const result = await clientShareManager.findSharesByBinderSN('nonexistent');
 
@@ -118,26 +111,26 @@ describe('ClientShareManager (Desktop Integration)', () => {
 
   describe('deleteShare', () => {
     it('should delete share via Electron main process', async () => {
-      mockInvoke.mockResolvedValue(true);
+      mockIpcRenderer.invoke.mockResolvedValue(true);
 
       const result = await clientShareManager.deleteShare('share-id');
 
-      expect(mockInvoke).toHaveBeenCalledWith('delete-share', 'share-id');
+      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('delete-share', 'share-id');
       expect(result).toBe(true);
     });
   });
 
   describe('openShareLocation', () => {
     it('should open share location in file explorer', async () => {
-      mockInvoke.mockResolvedValue(undefined);
+      mockIpcRenderer.invoke.mockResolvedValue(undefined);
 
       await clientShareManager.openShareLocation('share-id');
 
-      expect(mockInvoke).toHaveBeenCalledWith('open-share-location', 'share-id');
+      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('open-share-location', 'share-id');
     });
 
     it('should handle errors gracefully', async () => {
-      mockInvoke.mockRejectedValue(new Error('Failed to open'));
+      mockIpcRenderer.invoke.mockRejectedValue(new Error('Failed to open'));
 
       // Should not throw
       await expect(clientShareManager.openShareLocation('share-id')).resolves.toBeUndefined();
