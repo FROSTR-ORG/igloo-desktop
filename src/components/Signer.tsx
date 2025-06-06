@@ -416,6 +416,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
                       disabled={isSignerRunning || isConnecting}
                       placeholder="Enter your secret share (bfshare...)"
+                      aria-label="Secret share input"
                     />
                   }
                   position="top"
