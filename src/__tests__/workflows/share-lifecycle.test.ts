@@ -139,28 +139,63 @@ describe('Share Lifecycle Workflow (Desktop Integration)', () => {
         groupCredential: 'group'
       };
 
-      mockInvoke.mockRejectedValueOnce(new Error('Filesystem error'));
+      // Mock console.error to verify error logging
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const expectedError = new Error('Filesystem error');
+      mockInvoke.mockRejectedValueOnce(expectedError);
       
       const result = await clientShareManager.saveShare(share);
       
+      // Verify return value
       expect(result).toBe(false);
+      
+      // Verify error logging behavior
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to save share:', expectedError);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      
+      // Restore console.error
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle load failures gracefully', async () => {
-      mockInvoke.mockRejectedValueOnce(new Error('Read error'));
+      // Mock console.error to verify error logging
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const expectedError = new Error('Read error');
+      mockInvoke.mockRejectedValueOnce(expectedError);
       
       const result = await clientShareManager.getShares();
       
+      // Verify return value
       expect(result).toBe(false);
+      
+      // Verify error logging behavior
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Error retrieving shares:', expectedError);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      
+      // Restore console.error
+      consoleErrorSpy.mockRestore();
     });
 
     it('should handle file operations errors', async () => {
-      mockInvoke.mockRejectedValueOnce(new Error('File system error'));
+      // Mock console.error to verify error logging
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      
+      const expectedError = new Error('File system error');
+      mockInvoke.mockRejectedValueOnce(expectedError);
       
       const result = await clientShareManager.openShareLocation('test-id');
       
       // Should not throw, just handle gracefully
       expect(result).toBeUndefined();
+      
+      // Verify error logging behavior
+      expect(consoleErrorSpy).toHaveBeenCalledWith('Failed to open share location:', expectedError);
+      expect(consoleErrorSpy).toHaveBeenCalledTimes(1);
+      
+      // Restore console.error
+      consoleErrorSpy.mockRestore();
     });
   });
 
