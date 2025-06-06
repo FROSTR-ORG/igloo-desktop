@@ -1,95 +1,206 @@
-// Mock igloo-core functions first
-const mockCreateConnectedNode = jest.fn();
-const mockCleanupBifrostNode = jest.fn();
-const mockValidateShare = jest.fn();
-const mockValidateGroup = jest.fn();
-const mockDecodeShare = jest.fn();
-const mockDecodeGroup = jest.fn();
+import React from 'react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import Signer from '@/components/Signer';
 
+// Mock igloo-core module
 jest.mock('@frostr/igloo-core', () => ({
-  createConnectedNode: mockCreateConnectedNode,
-  cleanupBifrostNode: mockCleanupBifrostNode,
-  validateShare: mockValidateShare,
-  validateGroup: mockValidateGroup,
-  decodeShare: mockDecodeShare,
-  decodeGroup: mockDecodeGroup,
+  createConnectedNode: jest.fn(),
+  cleanupBifrostNode: jest.fn(),
+  validateShare: jest.fn(),
+  validateGroup: jest.fn(),
+  decodeShare: jest.fn(),
+  decodeGroup: jest.fn(),
 }));
+
+// Get references to the mocked functions with proper typing
+import { 
+  createConnectedNode,
+  cleanupBifrostNode,
+  validateShare,
+  validateGroup,
+  decodeShare,
+  decodeGroup,
+} from '@frostr/igloo-core';
+
+const mockCreateConnectedNode = createConnectedNode as jest.MockedFunction<typeof createConnectedNode>;
+const mockCleanupBifrostNode = cleanupBifrostNode as jest.MockedFunction<typeof cleanupBifrostNode>;
+const mockValidateShare = validateShare as jest.MockedFunction<typeof validateShare>;
+const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGroup>;
+const mockDecodeShare = decodeShare as jest.MockedFunction<typeof decodeShare>;
+const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
 
 describe('Signer Component Integration (Desktop Logic)', () => {
   const mockNode = {
     on: jest.fn(),
     off: jest.fn(),
     disconnect: jest.fn(),
-  };
+  } as any;
 
   beforeEach(() => {
     jest.clearAllMocks();
     
     // Setup default mock returns
-    mockValidateShare.mockReturnValue({ isValid: true });
-    mockValidateGroup.mockReturnValue({ isValid: true });
+    mockValidateShare.mockReturnValue({ isValid: true } as any);
+    mockValidateGroup.mockReturnValue({ isValid: true } as any);
     mockDecodeShare.mockReturnValue({
       idx: 1,
       seckey: 'test-key',
       binder_sn: 'test-binder',
       hidden_sn: 'test-hidden'
-    });
+    } as any);
     mockDecodeGroup.mockReturnValue({
       threshold: 2,
       group_pk: 'test-group-pk',
-      commits: ['commit1', 'commit2']
-    });
+      commits: [{ content: 'commit1' }, { content: 'commit2' }]
+    } as any);
     mockCreateConnectedNode.mockResolvedValue({
       node: mockNode,
-      state: { isReady: true }
-    });
+      state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+    } as any);
   });
 
-  describe('igloo-core Integration', () => {
-    it('should use igloo-core validation functions', () => {
-      // Test that validation functions are called correctly
-      mockValidateShare('test-share');
-      mockValidateGroup('test-group');
+    describe('Signer Component Integration with igloo-core', () => {
+    it('should call validateGroup when group credential input changes', async () => {
+      const user = userEvent.setup();
+      render(<Signer />);
       
-      expect(mockValidateShare).toHaveBeenCalledWith('test-share');
-      expect(mockValidateGroup).toHaveBeenCalledWith('test-group');
+      // The first textbox is group credential, the password input is share, third textbox is relay
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'test-group-credential');
+      
+      // Validation is called for each character typed
+      expect(mockValidateGroup).toHaveBeenCalledWith('test-group-credential');
     });
 
-    it('should use igloo-core decoding functions', () => {
-      // Test that decoding functions work correctly
-      const shareResult = mockDecodeShare('test-share');
-      const groupResult = mockDecodeGroup('test-group');
+    it('should call validateShare when share input changes', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
       
-      expect(shareResult).toEqual({
-        idx: 1,
-        seckey: 'test-key',
-        binder_sn: 'test-binder',
-        hidden_sn: 'test-hidden'
+      // Find the password input by querying all inputs and filtering by type
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.type(passwordInput!, 'test-share-credential');
+      
+      // Validation is called for each character typed
+      expect(mockValidateShare).toHaveBeenCalledWith('test-share-credential');
+    });
+
+    it('should call decodeShare for valid shares', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
+      
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.type(passwordInput!, 'valid-share');
+      
+      expect(mockDecodeShare).toHaveBeenCalledWith('valid-share');
+    });
+
+    it('should call decodeGroup for valid groups', async () => {
+      const user = userEvent.setup();
+      render(<Signer />);
+      
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'valid-group');
+      
+      expect(mockDecodeGroup).toHaveBeenCalledWith('valid-group');
+    });
+
+    it('should handle validation errors gracefully', async () => {
+      mockValidateShare.mockReturnValue({ 
+        isValid: false, 
+        message: 'Invalid share format' 
+      } as any);
+      
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
+      
+      const passwordInput = container.querySelector('input[type="password"]');
+      await user.type(passwordInput!, 'invalid-share');
+      
+      expect(mockValidateShare).toHaveBeenCalledWith('invalid-share');
+      
+      await waitFor(() => {
+        expect(screen.getByText('Invalid share format')).toBeInTheDocument();
       });
+    });
+
+    it('should call createConnectedNode when starting signer with valid inputs', async () => {
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
       
-      expect(groupResult).toEqual({
-        threshold: 2,
-        group_pk: 'test-group-pk',
-        commits: ['commit1', 'commit2']
+      // Fill in valid inputs
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'valid-group');
+      await user.type(passwordInput!, 'valid-share');
+      
+      // Click start signer button
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(mockCreateConnectedNode).toHaveBeenCalledWith({
+          group: 'valid-group',
+          share: 'valid-share',
+          relays: ['wss://relay.primal.net'] // Default relay
+        });
       });
     });
 
-    it('should create connected node with correct parameters', async () => {
-      const config = {
-        group: 'test-group',
-        share: 'test-share',
-        relays: ['wss://relay.test.com']
-      };
+    it('should call cleanupBifrostNode when stopping signer', async () => {
+      // Setup a running signer first
+      mockCreateConnectedNode.mockResolvedValue({
+        node: mockNode,
+        state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+      } as any);
       
-      await mockCreateConnectedNode(config);
+      const user = userEvent.setup();
+      const { container } = render(<Signer />);
       
-      expect(mockCreateConnectedNode).toHaveBeenCalledWith(config);
-    });
-
-    it('should handle node cleanup correctly', () => {
-      mockCleanupBifrostNode(mockNode);
+      // Fill inputs and start signer
+      const inputs = screen.getAllByRole('textbox');
+      const groupInput = inputs.find(input => input.getAttribute('type') === 'text' && !input.getAttribute('placeholder'));
+      const passwordInput = container.querySelector('input[type="password"]');
+      
+      await user.clear(groupInput!);
+      await user.type(groupInput!, 'valid-group');
+      await user.type(passwordInput!, 'valid-share');
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      // Wait for signer to start, then stop it
+      await waitFor(() => {
+        expect(screen.getByRole('button', { name: /stop signer/i })).toBeInTheDocument();
+      }, { timeout: 3000 });
+      
+      const stopButton = screen.getByRole('button', { name: /stop signer/i });
+      await user.click(stopButton);
       
       expect(mockCleanupBifrostNode).toHaveBeenCalledWith(mockNode);
+    });
+
+    it('should render with initial data and call validation functions', () => {
+      const initialData = {
+        share: 'initial-share',
+        groupCredential: 'initial-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      expect(mockValidateShare).toHaveBeenCalledWith('initial-share');
+      expect(mockValidateGroup).toHaveBeenCalledWith('initial-group');
     });
   });
 
