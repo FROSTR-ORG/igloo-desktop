@@ -10,10 +10,7 @@ import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import type { 
   SignerHandle, 
-  SignerProps, 
-  BifrostNode, 
-  BifrostMessage, 
-  ConsoleWarnOverride 
+  SignerProps
 } from '@/types';
 
 // Add CSS for the pulse animation
