@@ -1,6 +1,6 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
-const path = require('path');
-const shareManagerModule = require('./lib/shareManager');
+import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import * as path from 'path';
+import * as shareManagerModule from './lib/shareManager';
 
 function createWindow() {
   const win = new BrowserWindow({
@@ -38,14 +38,17 @@ app.whenReady().then(() => {
     return shareManagerModule.getAllShares();
   });
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('save-share', async (_: any, share: any) => {
     return shareManager.saveShare(share);
   });
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('delete-share', async (_: any, shareId: string) => {
     return shareManager.deleteShare(shareId);
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('open-share-location', async (_: any, shareId: string) => {
     const filePath = shareManager.getSharePath(shareId);
     await shell.showItemInFolder(filePath);

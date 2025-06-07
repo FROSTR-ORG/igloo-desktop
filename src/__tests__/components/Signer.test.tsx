@@ -32,39 +32,36 @@ const mockDecodeShare = decodeShare as jest.MockedFunction<typeof decodeShare>;
 const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
 
 describe('Signer Component UI Tests', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockNode = {
     on: jest.fn(),
     off: jest.fn(),
     disconnect: jest.fn(),
-  } as any;
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     
     // Setup default mock returns for UI tests
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockValidateShare.mockReturnValue({ isValid: true } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockValidateGroup.mockReturnValue({ isValid: true } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockValidateShare.mockReturnValue({ isValid: true });
+    mockValidateGroup.mockReturnValue({ isValid: true });
     mockDecodeShare.mockReturnValue({
       idx: 1,
       seckey: 'test-key',
       binder_sn: 'test-binder',
       hidden_sn: 'test-hidden'
-    } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    });
     mockDecodeGroup.mockReturnValue({
       threshold: 2,
       group_pk: 'test-group-pk',
-      commits: [{ content: 'commit1' }, { content: 'commit2' }]
-    } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      commits: [
+        { idx: 0, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
+        { idx: 1, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' }
+      ]
+    });
     mockCreateConnectedNode.mockResolvedValue({
-      node: mockNode,
+      node: mockNode as any, // Mock node for testing
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
-    } as any);
+    });
   });
 
   describe('Component Rendering and UI Elements', () => {
@@ -251,13 +248,11 @@ describe('Signer Component UI Tests', () => {
 
     it('should validate share input and disable copy button for invalid share', async () => {
       // Make group valid and share invalid to isolate which copy button gets disabled
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockValidateGroup.mockReturnValue({ isValid: true } as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      mockValidateGroup.mockReturnValue({ isValid: true });
       mockValidateShare.mockReturnValue({ 
         isValid: false, 
         message: 'Invalid share format' 
-      } as any);
+      });
       
       const user = userEvent.setup();
       render(<Signer />);
@@ -384,10 +379,8 @@ describe('Signer Component UI Tests', () => {
     });
 
     it('should disable copy buttons for invalid credentials', () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockValidateShare.mockReturnValue({ isValid: false } as any);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockValidateGroup.mockReturnValue({ isValid: false } as any);
+      mockValidateShare.mockReturnValue({ isValid: false });
+      mockValidateGroup.mockReturnValue({ isValid: false });
       
       render(<Signer />);
       

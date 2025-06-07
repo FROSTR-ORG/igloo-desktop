@@ -48,7 +48,7 @@ const RelayInput: React.FC<RelayInputProps> = ({
       const defaultRelay = "wss://relay.primal.net";
       onChange([defaultRelay]);
     }
-  }, []);
+  }, [relays.length, onChange]);
 
   return (
     <div className={className}>

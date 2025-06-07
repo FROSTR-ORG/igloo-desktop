@@ -16,39 +16,37 @@ jest.mock('@frostr/igloo-core', () => ({
 }));
 
 describe('Igloo Core Integration Tests', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockNode = {
     on: jest.fn(),
     off: jest.fn(),
     disconnect: jest.fn(),
-  } as any;
+    emit: jest.fn(),
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     
     // Setup default mock returns
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockValidateShare.mockReturnValue({ isValid: true } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    mockValidateGroup.mockReturnValue({ isValid: true } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    mockValidateShare.mockReturnValue({ isValid: true });
+    mockValidateGroup.mockReturnValue({ isValid: true });
     mockDecodeShare.mockReturnValue({
       idx: 1,
       seckey: 'test-key',
       binder_sn: 'test-binder',
       hidden_sn: 'test-hidden'
-    } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    });
     mockDecodeGroup.mockReturnValue({
       threshold: 2,
       group_pk: 'test-group-pk',
-      commits: [{ content: 'commit1' }, { content: 'commit2' }]
-    } as any);
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      commits: [
+        { idx: 0, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
+        { idx: 1, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' }
+      ]
+    });
     mockCreateConnectedNode.mockResolvedValue({
-      node: mockNode,
+      node: mockNode as any, // Mock node for testing
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
-    } as any);
+    });
   });
 
   describe('Validation Logic', () => {
@@ -121,7 +119,10 @@ describe('Igloo Core Integration Tests', () => {
       expect(result).toEqual({
         threshold: 2,
         group_pk: 'test-group-pk',
-        commits: [{ content: 'commit1' }, { content: 'commit2' }]
+        commits: [
+          { idx: 0, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
+          { idx: 1, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' }
+        ]
       });
     });
   });
@@ -178,11 +179,10 @@ describe('Igloo Core Integration Tests', () => {
 
     it('should handle node state transitions', async () => {
       // Test different node states
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockCreateConnectedNode.mockResolvedValue({
-        node: mockNode,
+        node: mockNode as any, // Mock node for testing
         state: { isReady: false, isConnected: true, isConnecting: false, connectedRelays: ['relay1'] }
-      } as any);
+      });
       
       const result = await mockCreateConnectedNode({
         group: 'test-group',
