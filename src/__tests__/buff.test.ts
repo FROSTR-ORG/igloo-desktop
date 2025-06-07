@@ -1,6 +1,6 @@
 // Test file for the mocked Buff class
 // Import and set up the shared Buff mock
-import { setupBuffMock, MockBuff } from './__mocks__/buff.mock';
+import { setupBuffMock } from './__mocks__/buff.mock';
 setupBuffMock();
 
 // Now we can import our mocked version
@@ -99,7 +99,8 @@ describe('Buff Library Mock', () => {
       // The error is intentionally triggered in the buff.mock.ts implementation
       expect(() => {
         const buff = new Buff('invalid');
-        const _ = buff.str;
+        // Accessing str property should throw for 'invalid' input
+        void buff.str;
       }).toThrow();
       
       // Test base64url decoding with invalid data

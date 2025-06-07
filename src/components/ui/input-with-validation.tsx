@@ -17,7 +17,6 @@ const InputWithValidation: React.FC<InputWithValidationProps> = ({
   onChange,
   isValid,
   errorMessage,
-  isRequired = false,
   className,
   id,
   ...props

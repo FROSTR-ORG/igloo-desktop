@@ -1,30 +1,18 @@
 import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { decode_group, decode_share, startListeningForAllEchoes } from "@/lib/bifrost";
+import { Tooltip } from "@/components/ui/tooltip";
+import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
-import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, QrCode, Loader2, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
-
-interface KeysetProps {
-  groupCredential: string;
-  shareCredentials: string[];
-  name: string;
-  onFinish?: () => void;
-}
-
-interface DecodedShare {
-  binder_sn: string;
-  hidden_sn: string;
-  idx: number;
-  seckey: string;
-}
+import type { DecodedShare, DecodedGroup, KeysetProps, RenderableData } from '@/types';
 
 const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name, onFinish }) => {
   const [decodedShares, setDecodedShares] = useState<DecodedShare[]>([]);
-  const [decodedGroup, setDecodedGroup] = useState<any>(null);
+  const [decodedGroup, setDecodedGroup] = useState<DecodedGroup | null>(null);
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [savedShares, setSavedShares] = useState<{[key: number]: boolean}>({});
   const [flashingShares, setFlashingShares] = useState<{[key: number]: boolean}>({});
@@ -153,7 +141,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   };
 
   // Handle echo received for any share
-  const handleEchoReceived = useCallback((shareIndex: number, shareCredential: string) => {
+  const handleEchoReceived = useCallback((shareIndex: number) => {
     markShareAsSaved(shareIndex);
 
     // If the echo is for the share currently in the QR modal, update its status
@@ -168,8 +156,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   }, [showQrCode.show, showQrCode.shareIndex]); // Dependencies: showQrCode.show and showQrCode.shareIndex
 
   useEffect(() => {
-    const group = decode_group(groupCredential);
-    const shares = shareCredentials.map(decode_share);
+    const group = decodeGroup(groupCredential);
+    const shares = shareCredentials.map(decodeShare);
     setDecodedGroup(group);
     setDecodedShares(shares);
   }, [groupCredential, shareCredentials]);
@@ -177,14 +165,16 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
   // Start listening for echoes on all shares when component mounts
   useEffect(() => {
     if (decodedGroup && shareCredentials.length > 0) {
-      const cleanup = startListeningForAllEchoes(
+      const echoListener = startListeningForAllEchoes(
         groupCredential,
         shareCredentials,
-        decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"],
-        handleEchoReceived // Pass the memoized callback
+        handleEchoReceived, // Pass the memoized callback
+        {
+          relays: decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"]
+        }
       );
       
-      echoListenersCleanup.current = cleanup;
+      echoListenersCleanup.current = echoListener.cleanup;
     }
 
     // Cleanup on unmount or when dependencies change
@@ -201,7 +191,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     return `${share.slice(0, 24)}${'*'.repeat(share.length - 24)}`;
   };
 
-  const renderDecodedInfo = (data: any, rawString?: string) => {
+  const renderDecodedInfo = (data: RenderableData, rawString?: string) => {
     return (
       <div className="space-y-3">
         {rawString && (
@@ -230,7 +220,19 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             <h2 className="text-xl font-semibold text-blue-200 mb-4">{name}</h2>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-blue-200 text-sm font-medium">Group Credential</h3>
+                <div className="flex items-center">
+                  <h3 className="text-blue-200 text-sm font-medium">Group Credential</h3>
+                  <Tooltip 
+                    trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                    position="right"
+                    content={
+                      <>
+                        <p className="mb-2 font-semibold">Group Credential:</p>
+                        <p>This contains the public information about your keyset, including the threshold and group public key. It starts with &apos;bfgroup&apos; and is shared among all signers to identify the group and signing requirements.</p>
+                      </>
+                    }
+                  />
+                </div>
                 <div className="flex space-x-2">
                   <Button
                     variant="ghost"
@@ -246,7 +248,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                     onClick={() => toggleExpanded('group')}
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                   >
-                    {expandedItems['group'] ? '▼' : '▶'}
+                    {expandedItems['group'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
@@ -266,7 +268,19 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-blue-200 text-sm font-medium">Share Credentials</h3>
+              <div className="flex items-center">
+                <h3 className="text-blue-200 text-sm font-medium">Share Credentials</h3>
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  position="right"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Share Credentials:</p>
+                      <p>These are individual secret shares of the private key. Each share starts with &apos;bfshare&apos; and should be kept private and secure. A threshold number of these shares is required to create signatures.</p>
+                    </>
+                  }
+                />
+              </div>
               <div className="space-y-3">
                 {shareCredentials.map((share, index) => {
                   const decodedShare = decodedShares[index];
@@ -351,7 +365,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                               onClick={() => toggleExpanded(`${name}-share-${index}`)}
                               className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                             >
-                              {expandedItems[`${name}-share-${index}`] ? '▼' : '▶'}
+                              {expandedItems[`${name}-share-${index}`] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </Button>
                           </div>
                         </div>

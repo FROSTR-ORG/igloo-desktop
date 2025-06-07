@@ -4,9 +4,14 @@ This directory contains the tests for the Igloo application, which focuses on ke
 
 ## Testing Strategy
 
-1. **Unit Tests**: Testing individual functions and components in isolation
-2. **Component Tests**: Testing UI components (to be added)
-3. **Integration Tests**: Testing workflows across multiple components (to be added)
+Following our successful migration to `@frostr/igloo-core`, our testing focuses on **desktop-specific functionality**:
+
+1. **Desktop Integration Tests**: Electron IPC, file system operations, share management
+2. **React Component Tests**: UI behavior, user interactions, state management  
+3. **Workflow Tests**: End-to-end user workflows across components
+4. **Desktop-Specific Features**: Clipboard, file explorer integration, QR codes
+
+This migration eliminated **~400+ lines of duplicated logic** and allows us to focus testing efforts on the unique desktop experience while core cryptographic operations are tested in the centralized library.
 
 ## Best Practices
 
@@ -24,30 +29,36 @@ We follow these best practices for our tests:
 ## Directory Structure
 
 ```
-__tests__/               # Main testing directory
-├── __mocks__/           # Shared mock implementations 
-│   ├── buff.mock.ts     # Mock implementation of Buff library
-│   └── bifrost.mock.ts  # Single source of truth for Bifrost mocks
-├── mocks/               # Additional mock implementations
-├── bifrost/             # Tests for Bifrost functionality
-│   ├── decode_group.test.ts
-│   ├── decode_share.test.ts
-│   ├── generateKeysetWithSecret.test.ts
-│   ├── index.test.ts
-│   └── recover_nsec.test.ts
-├── buff.test.ts         # Tests for Buff mock implementation
-├── encryption.test.ts   # Tests for encryption utilities
-├── validation.test.ts   # Tests for validation functions
-└── README.md            # This file
+__tests__/                    # Main testing directory
+├── __mocks__/                # Shared mock implementations 
+│   ├── buff.mock.ts          # Mock implementation of Buff library
+│   ├── nostr-tools.mock.ts   # Mock for nostr-tools
+│   └── bifrost.mock.ts       # Legacy bifrost mocks (to be cleaned up)
+├── integration/              # Desktop integration tests
+│   ├── clientShareManager.test.ts  # Electron IPC communication
+│   └── shareManager.test.ts        # File system operations (planned)
+├── components/               # React component tests
+│   ├── Signer.test.tsx       # Signer component UI and igloo-core integration
+│   ├── App.test.tsx          # App routing and state (planned)
+│   └── ...                   # Other component tests (planned)
+├── workflows/                # End-to-end workflow tests
+│   └── share-lifecycle.test.ts    # Complete share workflow
+├── encryption.test.ts        # Desktop encryption utilities
+├── buff.test.ts             # Buff mock implementation tests
+└── README.md                # This file
 ```
 
 ## Current Test Coverage
 
-Our current test suite covers:
+Our current test suite covers **desktop-specific functionality**:
 
-- **Validation**: Input validation for various formats (nsec, hex privkey, share, group, relay)
-- **Encryption**: Secret derivation, encryption, and decryption operations
-- **Bifrost**: Key management, share generation, and secret recovery
+- **Desktop Integration**: Electron IPC communication, file system operations
+- **Component Testing**: React component UI, user interactions, state management
+- **Workflow Testing**: End-to-end user workflows (create → save → load → use)
+- **Desktop Features**: Clipboard integration, file explorer operations
+- **Encryption**: Desktop-specific encryption utilities (password derivation, file encryption)
+
+**Core Logic**: Validation, key management, and cryptographic operations are tested in `@frostr/igloo-core`
 
 ## Running Tests
 

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { InputWithValidation } from "@/components/ui/input-with-validation";
 import { Plus, Trash2 } from "lucide-react";
-import { validateRelay } from '@/lib/validation';
+import { validateRelay } from '@frostr/igloo-core';
 
 interface RelayInputProps {
   relays: string[];
@@ -48,7 +48,7 @@ const RelayInput: React.FC<RelayInputProps> = ({
       const defaultRelay = "wss://relay.primal.net";
       onChange([defaultRelay]);
     }
-  }, []);
+  }, [relays.length, onChange]);
 
   return (
     <div className={className}>

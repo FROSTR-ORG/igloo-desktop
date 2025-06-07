@@ -7,6 +7,7 @@ export interface LogEntryData {
   timestamp: string;
   type: string;
   message: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data?: any;
   id: string;
 }
@@ -42,7 +43,7 @@ export const LogEntry = memo(({ log }: LogEntryProps) => {
     if (!hasData) return null;
     try {
       return JSON.stringify(log.data, null, 2);
-    } catch (error) {
+    } catch {
       return 'Error: Unable to format data';
     }
   }, [log.data, hasData]);
