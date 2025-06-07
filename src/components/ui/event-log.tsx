@@ -1,5 +1,4 @@
 import React, { useRef, useEffect, useCallback, memo, useState } from "react";
-import { Button } from "@/components/ui/button";
 import { IconButton } from "@/components/ui/icon-button";
 import { StatusIndicator } from "@/components/ui/status-indicator";
 import { Trash2, ChevronDown, ChevronUp } from "lucide-react";

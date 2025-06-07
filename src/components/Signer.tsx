@@ -93,7 +93,34 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const addLog = (type: string, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
-    setLogs(prev => [...prev, { timestamp, type, message, data, id }]);
+    
+    setLogs(prev => {
+      // Check for potential duplicates based on data content
+      if (data && typeof data === 'object') {
+        const dataString = JSON.stringify(data);
+        
+        // Look for recent logs (within last 5 entries) with similar data
+        const recentLogs = prev.slice(-5);
+        const isDuplicate = recentLogs.some(log => {
+          if (!log.data) return false;
+          try {
+            const logDataString = typeof log.data === 'string' ? log.data : JSON.stringify(log.data);
+            return logDataString === dataString || 
+                   (typeof log.data === 'object' && 
+                    log.data.id === data.id && 
+                    log.data.tag === data.tag);
+          } catch {
+            return false;
+          }
+        });
+        
+        if (isDuplicate) {
+          return prev; // Skip adding this duplicate
+        }
+      }
+      
+      return [...prev, { timestamp, type, message, data, id }];
+    });
   };
 
   // Clean node cleanup using igloo-core
@@ -276,7 +303,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       });
 
       // Set up comprehensive event logging
-      result.node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
       result.node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
 
       // ECDH events
