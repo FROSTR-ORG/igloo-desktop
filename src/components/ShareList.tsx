@@ -13,7 +13,7 @@ interface ShareListProps {
   onNewKeyset?: () => void;
 }
 
-const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => {
+const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
   const [shares, setShares] = useState<IglooShare[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingShare, setLoadingShare] = useState<IglooShare | null>(null);

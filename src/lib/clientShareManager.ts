@@ -14,9 +14,9 @@ export interface IglooShare {
   shareCredential?: string;
   metadata?: {
     binder_sn?: string;
-    [key: string]: any;
+    [key: string]: string | number | boolean | null | undefined;
   };
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined | object;
 }
 
 class ClientShareManager {
@@ -61,7 +61,7 @@ class ClientShareManager {
         try {
           const decodedShare = decodeShare(share.shareCredential);
           return decodedShare.binder_sn === binderSN;
-        } catch (e) {
+        } catch {
           return false;
         }
       }

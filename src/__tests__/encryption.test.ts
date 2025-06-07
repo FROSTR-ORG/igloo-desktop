@@ -31,7 +31,7 @@ const decryptMock = jest.fn().mockImplementation((data) => {
 
 jest.mock('@noble/ciphers/aes', () => {
   return {
-    gcm: jest.fn().mockImplementation((secret, vector) => ({
+    gcm: jest.fn().mockImplementation(() => ({
       encrypt: encryptMock,
       decrypt: decryptMock
     }))

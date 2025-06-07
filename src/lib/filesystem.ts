@@ -18,7 +18,6 @@ export function sanitizeShareFilename(
   options: { replacement?: string; maxLength?: number } = {}
 ): FilenameSanitizationResult {
   const { replacement = '_', maxLength = 255 } = options;
-  const originalFilename = filename;
   const errors: string[] = [];
   
   // Check if original filename has unsafe characters
@@ -75,6 +74,7 @@ export function sanitizeShareFilename(
  */
 function hasUnsafeCharacters(filename: string): boolean {
   // Characters that are unsafe across most filesystems
+  // eslint-disable-next-line no-control-regex
   const unsafeChars = /[<>:"/\\|?*\x00-\x1f]/;
   return unsafeChars.test(filename);
 }

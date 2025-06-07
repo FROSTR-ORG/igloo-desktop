@@ -1,9 +1,9 @@
-import React, { useState, useEffect, FormEvent, useRef } from "react"
+import React, { useState, useEffect, FormEvent, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { recoverSecretKeyFromCredentials, decodeShare, decodeGroup, validateShare, validateGroup } from "@frostr/igloo-core"
 import { InputWithValidation } from "@/components/ui/input-with-validation"
-import { clientShareManager, type IglooShare } from "@/lib/clientShareManager"
+import { clientShareManager } from "@/lib/clientShareManager"
 import { HelpCircle } from "lucide-react"
 
 interface RecoverProps {
@@ -44,7 +44,7 @@ const findMatchingGroup = async (shareValue: string) => {
             try {
               const savedDecodedShare = decodeShare(saved.shareCredential);
               return savedDecodedShare.binder_sn === decodedShare.binder_sn && saved.groupCredential;
-            } catch (e) {
+            } catch {
               // Skip this check if we can't decode
             }
           }
@@ -90,9 +90,9 @@ const decodeGroupThresholdAndShares = (
                         : defaultTotalShares;
     
     return { threshold, totalShares };
-  } catch (e) {
+  } catch (error) {
     if (debugEnabled) {
-      console.error("Error decoding group for threshold/totalShares:", e);
+      console.error("Error decoding group for threshold/totalShares:", error);
     }
     return { threshold: defaultThreshold, totalShares: defaultTotalShares };
   }
@@ -182,15 +182,13 @@ const Recover: React.FC<RecoverProps> = ({
   });
   const [isProcessing, setIsProcessing] = useState(false);
 
-  const [showRecoverTooltip, setShowRecoverTooltip] = useState(false);
-
   // Add state for the dynamic threshold
   const [currentThreshold, setCurrentThreshold] = useState<number>(defaultThreshold);
   // Add state for dynamic total shares
   const [currentTotalShares, setCurrentTotalShares] = useState<number>(defaultTotalShares);
 
   // Helper function to process group credential and update state (within component scope)
-  const processGroupCredential = (groupCred: string, showAutofilled = false) => {
+  const processGroupCredential = useCallback((groupCred: string, showAutofilled = false) => {
     processAndSetGroupCredential(groupCred, defaultThreshold, defaultTotalShares, {
       setGroupCredential,
       setIsGroupValid,
@@ -201,7 +199,7 @@ const Recover: React.FC<RecoverProps> = ({
       autofilledTimeoutRef,
       showAutofilled
     });
-  };
+  }, [defaultThreshold, defaultTotalShares]);
 
   // Validate the shares form
   useEffect(() => {
@@ -233,7 +231,7 @@ const Recover: React.FC<RecoverProps> = ({
     if (initialGroupCredential) {
       processGroupCredential(initialGroupCredential, false);
     }
-  }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares]);
+  }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares, processGroupCredential]);
 
   // Add useEffect to check for stored shares on component mount
   useEffect(() => {
@@ -297,7 +295,7 @@ const Recover: React.FC<RecoverProps> = ({
     };
     
     autoDetectGroupFromStorage();
-  }, [defaultThreshold, defaultTotalShares]);
+  }, [defaultThreshold, defaultTotalShares, groupCredential, sharesInputs, processGroupCredential]);
 
   // Handle adding more share inputs
   const addShareInput = () => {
@@ -477,10 +475,10 @@ const Recover: React.FC<RecoverProps> = ({
           </div>
         )
       });
-    } catch (error: any) {
+    } catch (error) {
       setResult({
         success: false,
-        message: `Error recovering NSEC: ${error.message}`
+        message: `Error recovering NSEC: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       setIsProcessing(false);
@@ -492,20 +490,7 @@ const Recover: React.FC<RecoverProps> = ({
       <CardHeader>
         <div className="flex items-center">
           <CardTitle className="text-xl text-blue-200">Recover NSEC</CardTitle>
-          <div 
-            className="ml-2 text-blue-400 cursor-pointer relative"
-            onMouseEnter={() => setShowRecoverTooltip(true)}
-            onMouseLeave={() => setShowRecoverTooltip(false)}
-          >
-            <HelpCircle size={18} />
-            {showRecoverTooltip && (
-              <div className="absolute right-0 w-72 p-3 bg-gray-800 border border-blue-900/50 rounded-md shadow-lg text-xs text-blue-200 z-50">
-                <p className="mb-2 font-semibold">How to recover your NSEC:</p>
-                <p className="mb-2">You can always recover your NSEC with the threshold number of shares. The share that has already been loaded is autopopulated along with the group key.</p>
-                <p>Just add the remaining shares needed to meet the threshold to recover your original private key.</p>
-              </div>
-            )}
-          </div>
+          <HelpCircle size={18} className="ml-2 text-blue-400" />
         </div>
       </CardHeader>
       <CardContent className="space-y-8">
