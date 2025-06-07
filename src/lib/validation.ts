@@ -142,7 +142,7 @@ export function formatRelayUrl(url: string): RelayUrlValidationResult {
   // Add protocol if missing (only for URLs that don't already have a protocol)
   if (!formatted.startsWith('ws://') && !formatted.startsWith('wss://')) {
     // Don't add protocol if it looks like it's just an invalid string
-    if (!formatted.includes('.') || formatted.includes(' ')) {
+    if (formatted.includes(' ')) {
       return {
         isValid: false,
         formatted: original,
