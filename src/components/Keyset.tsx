@@ -8,24 +8,11 @@ import { clientShareManager } from '@/lib/clientShareManager';
 import { CheckCircle2, QrCode, Loader2, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
-
-interface KeysetProps {
-  groupCredential: string;
-  shareCredentials: string[];
-  name: string;
-  onFinish?: () => void;
-}
-
-interface DecodedShare {
-  binder_sn: string;
-  hidden_sn: string;
-  idx: number;
-  seckey: string;
-}
+import type { DecodedShare, DecodedGroup, KeysetProps, RenderableData } from '@/types';
 
 const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name, onFinish }) => {
   const [decodedShares, setDecodedShares] = useState<DecodedShare[]>([]);
-  const [decodedGroup, setDecodedGroup] = useState<any>(null);
+  const [decodedGroup, setDecodedGroup] = useState<DecodedGroup | null>(null);
   const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [savedShares, setSavedShares] = useState<{[key: number]: boolean}>({});
   const [flashingShares, setFlashingShares] = useState<{[key: number]: boolean}>({});
@@ -204,7 +191,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     return `${share.slice(0, 24)}${'*'.repeat(share.length - 24)}`;
   };
 
-  const renderDecodedInfo = (data: any, rawString?: string) => {
+  const renderDecodedInfo = (data: RenderableData, rawString?: string) => {
     return (
       <div className="space-y-3">
         {rawString && (
