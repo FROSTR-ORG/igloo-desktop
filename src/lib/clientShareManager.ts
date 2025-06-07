@@ -1,4 +1,5 @@
 import { ipcRenderer } from 'electron';
+import { decodeShare } from '@frostr/igloo-core';
 
 // Debug helper for group auto-population
 const DEBUG_GROUP_AUTO = true;
@@ -39,7 +40,7 @@ class ClientShareManager {
     // Compute prefix once for efficiency
     const prefix = binderSN.substring(0, 8);
     
-    // Filter shares that might have the matching binder_sn
+        // Filter shares that might have the matching binder_sn
     const matches = shares.filter(share => {
       // Match by metadata if available
       if (share.metadata && share.metadata.binder_sn === binderSN) {
@@ -49,17 +50,17 @@ class ClientShareManager {
       // Match by discrete ID segments to prevent false positives
       if (share.id) {
         const idSegments = share.id.split('-');
-        return idSegments.some(segment => segment === prefix);
+        const idMatch = idSegments.some(segment => segment === prefix);
+        if (idMatch) {
+          return true;
+        }
       }
       
       // Match by share value if unencrypted
       if (share.shareCredential) {
         try {
-          // Note: Could use decodeShare from @frostr/igloo-core if needed
-          // import { decodeShare } from '@frostr/igloo-core';
-          // const decodedShare = decodeShare(share.shareCredential);
-          // return decodedShare.binder_sn === binderSN;
-          return false; // Implement if needed
+          const decodedShare = decodeShare(share.shareCredential);
+          return decodedShare.binder_sn === binderSN;
         } catch (e) {
           return false;
         }
