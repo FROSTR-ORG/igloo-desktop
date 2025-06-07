@@ -90,32 +90,54 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   }));
 
+  // Helper function to safely detect duplicate log entries
+  const isDuplicateLog = (newData: any, recentLogs: LogEntryData[]): boolean => {
+    if (!newData || typeof newData !== 'object') {
+      return false;
+    }
+
+    // Fast path: check for duplicate IDs and tags without serialization
+    if (newData.id && newData.tag) {
+      return recentLogs.some(log => 
+        log.data && 
+        typeof log.data === 'object' && 
+        log.data.id === newData.id && 
+        log.data.tag === newData.tag
+      );
+    }
+
+    // Fallback: safe serialization comparison for complex objects
+    try {
+      const newDataString = JSON.stringify(newData);
+      return recentLogs.some(log => {
+        if (!log.data) return false;
+        
+        try {
+          const logDataString = typeof log.data === 'string' 
+            ? log.data 
+            : JSON.stringify(log.data);
+          return logDataString === newDataString;
+        } catch {
+          // If serialization fails, assume not duplicate to avoid false positives
+          return false;
+        }
+      });
+    } catch {
+      // If initial serialization fails (circular refs, etc.), skip duplicate check
+      return false;
+    }
+  };
+
   const addLog = (type: string, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
     
     setLogs(prev => {
-      // Check for potential duplicates based on data content
-      if (data && typeof data === 'object') {
-        const dataString = JSON.stringify(data);
-        
-        // Look for recent logs (within last 5 entries) with similar data
-        const recentLogs = prev.slice(-5);
-        const isDuplicate = recentLogs.some(log => {
-          if (!log.data) return false;
-          try {
-            const logDataString = typeof log.data === 'string' ? log.data : JSON.stringify(log.data);
-            return logDataString === dataString || 
-                   (typeof log.data === 'object' && 
-                    log.data.id === data.id && 
-                    log.data.tag === data.tag);
-          } catch {
-            return false;
-          }
-        });
-        
-        if (isDuplicate) {
-          return prev; // Skip adding this duplicate
+      // Only check for duplicates if we have data to compare
+      if (data) {
+        const recentLogs = prev.slice(-5); // Check last 5 entries for performance
+        if (isDuplicateLog(data, recentLogs)) {
+          return prev; // Skip adding duplicate
         }
       }
       
