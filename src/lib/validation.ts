@@ -17,7 +17,7 @@ export function validatePassword(password: string): PasswordValidationResult {
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
   const hasNumbers = /\d/.test(password);
-  const hasSpecialChars = /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(password);
+  const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
   
   return {
     isValid: hasMinLength && hasUppercase && hasLowercase && hasNumbers && hasSpecialChars,
@@ -240,7 +240,7 @@ export function formatRelayUrl(url: string): RelayUrlValidationResult {
                 formatted !== 'wss://' && 
                 formatted !== 'ws://';
     }
-  } catch (e) {
+  } catch {
     isValid = false;
   }
   

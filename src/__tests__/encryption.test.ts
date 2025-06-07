@@ -31,7 +31,7 @@ const decryptMock = jest.fn().mockImplementation((data) => {
 
 jest.mock('@noble/ciphers/aes', () => {
   return {
-    gcm: jest.fn().mockImplementation((secret, vector) => ({
+    gcm: jest.fn().mockImplementation(() => ({
       encrypt: encryptMock,
       decrypt: decryptMock
     }))
@@ -48,8 +48,8 @@ describe('Encryption Functions', () => {
   describe('derive_secret', () => {
     it('should accept password and salt and return a hex string', () => {
       // Import mocked dependencies
-      const { pbkdf2 } = require('@noble/hashes/pbkdf2');
-      const { sha256 } = require('@noble/hashes/sha256');
+      const { pbkdf2 } = jest.requireMock('@noble/hashes/pbkdf2');
+      const { sha256 } = jest.requireMock('@noble/hashes/sha256');
       
       // Call the function
       const result = derive_secret('password', 'salt');
@@ -73,7 +73,7 @@ describe('Encryption Functions', () => {
 
     it('should handle edge cases without throwing', () => {
       // Import mocked dependencies
-      const { pbkdf2 } = require('@noble/hashes/pbkdf2');
+      const { pbkdf2 } = jest.requireMock('@noble/hashes/pbkdf2');
       
       // Reset mock call count for this test
       pbkdf2.mockClear();
@@ -100,7 +100,7 @@ describe('Encryption Functions', () => {
     // Instead, let's test that the function calls pbkdf2 with different parameters
     it('should call pbkdf2 with different parameters for different inputs', () => {
       // Import mocked dependencies
-      const { pbkdf2 } = require('@noble/hashes/pbkdf2');
+      const { pbkdf2 } = jest.requireMock('@noble/hashes/pbkdf2');
       
       // Reset mock
       pbkdf2.mockClear();
