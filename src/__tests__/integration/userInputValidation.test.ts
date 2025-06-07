@@ -1,4 +1,6 @@
 import { mockDeriveSecret } from '../setup';
+import { validatePassword, formatRelayUrl, isValidRelayUrl, validateSalt, isValidSalt } from '@/lib/validation';
+import { sanitizeShareFilename, isFilenameSafe, FILESYSTEM_LIMITS } from '@/lib/filesystem';
 
 describe('User Input Validation and Error Handling', () => {
   beforeEach(() => {
@@ -9,24 +11,39 @@ describe('User Input Validation and Error Handling', () => {
     it('should validate password strength requirements', () => {
       const strongPasswords = [
         'MySecurePassword123!',
-        'AnotherGoodOne456',
-        'Complex_Pass_2023',
-        'minimum8chars'
+        'StrongPass#456',
+        'Complex$Password789',
+        'ValidKey@2024',
+        'Secure_Pass123!'
       ];
 
       const weakPasswords = [
-        '',            // empty
-        '123',         // too short
-        'pass',        // too short
-        'weak',        // too short
+        '',                    // empty
+        'short1!',            // too short (7 chars)
+        'nouppercase123!',    // no uppercase
+        'NOLOWERCASE123!',    // no lowercase
+        'NoNumbers!@#',       // no numbers
+        'NoSpecialChars123',  // no special characters
+        'password',           // missing multiple requirements
+        'PASSWORD123',        // missing lowercase and special chars
+        'mypass123',          // missing uppercase and special chars
+        'weakpass',           // common weak password
+        '12345678'            // all numbers, no letters or special chars
       ];
 
       strongPasswords.forEach(password => {
-        expect(password.length).toBeGreaterThanOrEqual(8);
+        const validation = validatePassword(password);
+        expect(validation.isValid).toBe(true);
+        expect(validation.hasMinLength).toBe(true);
+        expect(validation.hasUppercase).toBe(true);
+        expect(validation.hasLowercase).toBe(true);
+        expect(validation.hasNumbers).toBe(true);
+        expect(validation.hasSpecialChars).toBe(true);
       });
 
       weakPasswords.forEach(password => {
-        expect(password.length).toBeLessThan(8);
+        const validation = validatePassword(password);
+        expect(validation.isValid).toBe(false);
       });
     });
 
@@ -85,21 +102,51 @@ describe('User Input Validation and Error Handling', () => {
         'Share\\with\\backslashes',
         'Share:with:colons',
         'Share*with*asterisks',
-        'Share?with?questions'
+        'Share?with?questions',
+        'CON.txt',                    // Windows reserved name
+        'share name.  ',              // Trailing dots and spaces
+        '.hidden',                    // Leading dot
+        'a'.repeat(300),              // Too long
+        '<invalid>',                  // Angle brackets
+        'file|name'                   // Pipe character
       ];
 
+      const validNames = [
+        'Valid Share Name',
+        'Share_123',
+        'backup-keyset',
+        'work.share'
+      ];
+
+      // Test unsafe names get sanitized
       unsafeNames.forEach(name => {
-        // Should contain filesystem-unsafe characters
-        expect(name).toMatch(/[\/\\:*?"<>|]/);
+        const result = sanitizeShareFilename(name);
+        
+        // Should detect that original was unsafe
+        expect(result.originalUnsafe || result.errors.length > 0).toBe(true);
+        
+        // Sanitized version should be safe for filesystem
+        expect(result.sanitized).toBeTruthy();
+        expect(result.sanitized.length).toBeLessThanOrEqual(FILESYSTEM_LIMITS.MAX_FILENAME_LENGTH);
+        
+        // Should not contain unsafe characters
+        expect(result.sanitized).not.toMatch(/[<>:"/\\|?*\x00-\x1f]/);
+        
+        // Should not end with dots or spaces
+        expect(result.sanitized).not.toMatch(/[. ]$/);
+        
+        // Should not be a Windows reserved name
+        expect(result.sanitized).not.toMatch(/^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\.|$)/i);
       });
 
-      // Sanitized versions should be safe
-      const sanitizedNames = unsafeNames.map(name => 
-        name.replace(/[\/\\:*?"<>|]/g, '_')
-      );
-
-      sanitizedNames.forEach(name => {
-        expect(name).not.toMatch(/[\/\\:*?"<>|]/);
+      // Test valid names remain unchanged
+      validNames.forEach(name => {
+        const result = sanitizeShareFilename(name);
+        
+        expect(result.isValid).toBe(true);
+        expect(result.sanitized).toBe(name);
+        expect(result.errors).toHaveLength(0);
+        expect(isFilenameSafe(name)).toBe(true);
       });
     });
   });
@@ -168,11 +215,15 @@ describe('User Input Validation and Error Handling', () => {
       ];
 
       validRelayUrls.forEach(url => {
-        expect(url).toMatch(/^wss?:\/\/.+/);
+        expect(isValidRelayUrl(url)).toBe(true);
+        const result = formatRelayUrl(url);
+        expect(result.isValid).toBe(true);
       });
 
       invalidRelayUrls.forEach(url => {
-        expect(url).not.toMatch(/^wss?:\/\/.+/);
+        expect(isValidRelayUrl(url)).toBe(false);
+        const result = formatRelayUrl(url);
+        expect(result.isValid).toBe(false);
       });
     });
 
@@ -190,19 +241,11 @@ describe('User Input Validation and Error Handling', () => {
       ];
 
       urlsNeedingFormatting.forEach((url, index) => {
-        let formatted = url.trim();
+        const result = formatRelayUrl(url);
         
-        // Add protocol if missing
-        if (!formatted.startsWith('ws://') && !formatted.startsWith('wss://')) {
-          formatted = `wss://${formatted}`;
-        }
-        
-        // Remove trailing slash
-        if (formatted.endsWith('/') && formatted !== 'wss://' && formatted !== 'ws://') {
-          formatted = formatted.slice(0, -1);
-        }
-
-        expect(formatted).toBe(expectedFormatted[index]);
+        expect(result.isValid).toBe(true);
+        expect(result.formatted).toBe(expectedFormatted[index]);
+        expect(result.message).toBeUndefined();
       });
     });
   });
@@ -259,13 +302,44 @@ describe('User Input Validation and Error Handling', () => {
       const invalidSalts = [
         '',                    // empty
         'invalid-hex',         // not hex
-        'too-short',          // too short
+        'abc123',             // too short but valid hex
       ];
 
       invalidSalts.forEach(salt => {
         // Test that salt validation would catch these
-        const isValidSalt = salt.length >= 16 && /^[0-9a-fA-F]+$/.test(salt);
-        expect(isValidSalt).toBe(false);
+        const validation = validateSalt(salt);
+        expect(validation.isValid).toBe(false);
+        expect(isValidSalt(salt)).toBe(false);
+        
+        // Verify specific validation details
+        if (salt === '') {
+          expect(validation.message).toBe('Salt is required');
+        } else if (salt === 'invalid-hex') {
+          expect(validation.isHexadecimal).toBe(false);
+          expect(validation.message).toBe('Salt must contain only hexadecimal characters (0-9, a-f, A-F)');
+        } else if (salt === 'abc123') {
+          expect(validation.hasMinLength).toBe(false);
+          expect(validation.isHexadecimal).toBe(true);
+          expect(validation.message).toBe('Salt must be at least 16 characters long');
+        }
+      });
+    });
+
+    it('should handle valid salt values', () => {
+      const validSalts = [
+        'abcdef0123456789',        // minimum valid length (16 chars)
+        'ABCDEF0123456789',        // uppercase hex
+        'a1b2c3d4e5f67890abc123',  // longer valid salt
+        '0123456789abcdefABCDEF'  // mixed case
+      ];
+
+      validSalts.forEach(salt => {
+        const validation = validateSalt(salt);
+        expect(validation.isValid).toBe(true);
+        expect(isValidSalt(salt)).toBe(true);
+        expect(validation.hasMinLength).toBe(true);
+        expect(validation.isHexadecimal).toBe(true);
+        expect(validation.message).toBeUndefined();
       });
     });
   });
