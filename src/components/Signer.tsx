@@ -567,4 +567,5 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
 Signer.displayName = 'Signer';
 
-export default Signer; 
+export default Signer;
+export type { SignerHandle }; 

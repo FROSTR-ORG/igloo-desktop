@@ -13,6 +13,7 @@ jest.mock('@/lib/clientShareManager', () => ({
 
 // Mock child components to focus on App logic
 jest.mock('@/components/ShareList', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function MockShareList({ onShareLoaded }: any) {
     return (
       <div data-testid="share-list">
@@ -28,6 +29,7 @@ jest.mock('@/components/ShareList', () => {
 });
 
 jest.mock('@/components/Create', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function MockCreate({ onKeysetCreated, onBack }: any) {
     return (
       <div data-testid="create-component">
@@ -48,6 +50,7 @@ jest.mock('@/components/Create', () => {
 });
 
 jest.mock('@/components/Keyset', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return function MockKeyset({ onFinish }: any) {
     return (
       <div data-testid="keyset-component">
@@ -58,6 +61,7 @@ jest.mock('@/components/Keyset', () => {
 });
 
 jest.mock('@/components/Signer', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const MockSigner = React.forwardRef((props: any, ref: any) => {
     React.useImperativeHandle(ref, () => ({
       stopSigner: jest.fn().mockResolvedValue(undefined),

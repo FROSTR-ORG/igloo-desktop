@@ -65,6 +65,7 @@ describe('User Input Validation and Error Handling', () => {
       ];
 
       passwordsWithSpecialChars.forEach(password => {
+        // eslint-disable-next-line no-useless-escape
         expect(password).toMatch(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/);
       });
     });
@@ -130,6 +131,7 @@ describe('User Input Validation and Error Handling', () => {
         expect(result.sanitized.length).toBeLessThanOrEqual(FILESYSTEM_LIMITS.MAX_FILENAME_LENGTH);
         
         // Should not contain unsafe characters
+        // eslint-disable-next-line no-control-regex
         expect(result.sanitized).not.toMatch(/[<>:"/\\|?*\x00-\x1f]/);
         
         // Should not end with dots or spaces
@@ -278,7 +280,7 @@ describe('User Input Validation and Error Handling', () => {
         try {
           JSON.parse(content);
           isValidJson = true;
-        } catch (e) {
+        } catch {
           isValidJson = false;
         }
         
