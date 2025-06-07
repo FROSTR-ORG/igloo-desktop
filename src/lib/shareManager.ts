@@ -1,7 +1,10 @@
 // Import electron and node modules
-import * as electron from 'electron';
-import * as fsModule from 'fs';
-import * as pathModule from 'path';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const electron = require('electron');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fsModule = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const pathModule = require('path');
 
 /**
  * Interface for the share structure
@@ -153,4 +156,4 @@ function getAllShares(): IglooShare[] | false {
 }
 
 // Export the ShareManager class and helper functions
-export { ShareManager, getAllShares }; 
+module.exports = { ShareManager, getAllShares }; 

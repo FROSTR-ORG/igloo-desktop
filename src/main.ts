@@ -1,6 +1,9 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
-import * as path from 'path';
-import * as shareManagerModule from './lib/shareManager';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const { app, BrowserWindow, ipcMain, shell } = require('electron');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const path = require('path');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const shareManagerModule = require('./lib/shareManager');
 
 function createWindow() {
   const win = new BrowserWindow({
