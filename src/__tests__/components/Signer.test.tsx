@@ -262,23 +262,13 @@ describe('Signer Component UI Tests', () => {
       const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
       await user.type(shareInput, 'invalid-share');
       
-      // Find all copy buttons
-      const copyButtons = screen.getAllByRole('button').filter(button => 
-        button.querySelector('svg.lucide-copy')
-      );
+      // Specifically target the copy buttons using their aria-labels
+      const groupCopyButton = screen.getByLabelText('Copy group credential');
+      const shareCopyButton = screen.getByLabelText('Copy secret share');
       
-      // Verify copy buttons exist (don't hardcode the exact count)
-      expect(copyButtons.length).toBeGreaterThan(0);
-      
-      // With invalid share and valid group, we should have at least one disabled and one enabled
-      const disabledCopyButtons = copyButtons.filter(button => button.hasAttribute('disabled'));
-      const enabledCopyButtons = copyButtons.filter(button => !button.hasAttribute('disabled'));
-      
-      // At least one should be disabled (the share copy button)
-      expect(disabledCopyButtons.length).toBeGreaterThan(0);
-      
-      // At least one should be enabled (the group copy button)  
-      expect(enabledCopyButtons.length).toBeGreaterThan(0);
+      // Assert specific button states: share button disabled, group button enabled
+      expect(shareCopyButton).toBeDisabled();
+      expect(groupCopyButton).not.toBeDisabled();
     });
 
     it('should update signer button text based on state', async () => {
