@@ -395,6 +395,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       onClick={() => handleCopy(groupCredential, 'group')}
                       className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
                       disabled={!groupCredential || !isGroupValid}
+                      aria-label="Copy group credential"
                     >
                       {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
                     </Button>
@@ -435,6 +436,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       onClick={() => handleCopy(signerSecret, 'share')}
                       className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
                       disabled={!signerSecret || !isShareValid}
+                      aria-label="Copy secret share"
                     >
                       {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
                     </Button>
