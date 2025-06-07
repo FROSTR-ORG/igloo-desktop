@@ -24,9 +24,6 @@ const Modal: React.FC<ModalProps> = ({
   preventClickOutside = false,
   maxWidth = "max-w-md"
 }) => {
-  // Don't render anything if the modal is not open
-  if (!isOpen) return null;
-  
   // Handle escape key press
   useEffect(() => {
     const handleEscKey = (event: KeyboardEvent) => {
@@ -35,11 +32,16 @@ const Modal: React.FC<ModalProps> = ({
       }
     };
 
-    window.addEventListener('keydown', handleEscKey);
-    return () => {
-      window.removeEventListener('keydown', handleEscKey);
-    };
+    if (isOpen) {
+      window.addEventListener('keydown', handleEscKey);
+      return () => {
+        window.removeEventListener('keydown', handleEscKey);
+      };
+    }
   }, [isOpen, onClose]);
+
+  // Don't render anything if the modal is not open
+  if (!isOpen) return null;
 
   const handleOutsideClick = (event: React.MouseEvent<HTMLDivElement>) => {
     if (event.target === event.currentTarget && !preventClickOutside) {

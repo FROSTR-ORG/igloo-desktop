@@ -83,7 +83,6 @@ describe('Keyset Creation Workflow', () => {
     });
 
     it('should validate share passwords and encryption', async () => {
-      const shareCredential = 'test-share-credential';
       const password = 'user-password';
       const salt = 'random-salt-value';
 
