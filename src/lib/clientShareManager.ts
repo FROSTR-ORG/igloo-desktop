@@ -1,23 +1,12 @@
 import { ipcRenderer } from 'electron';
 import { decodeShare } from '@frostr/igloo-core';
+import type { IglooShare } from '@/types';
 
 // Debug helper for group auto-population
 const DEBUG_GROUP_AUTO = true;
 
-export interface IglooShare {
-  id: string;
-  name: string;
-  share: string;
-  salt: string;
-  groupCredential: string;
-  savedAt?: string;
-  shareCredential?: string;
-  metadata?: {
-    binder_sn?: string;
-    [key: string]: string | number | boolean | null | undefined;
-  };
-  [key: string]: string | number | boolean | null | undefined | object;
-}
+// Re-export for backward compatibility
+export type { IglooShare };
 
 class ClientShareManager {
   async getShares(): Promise<IglooShare[] | false> {
