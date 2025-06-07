@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
-import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode, isNodeReady } from "@frostr/igloo-core"
+import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
@@ -51,35 +51,19 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isConnecting, setIsConnecting] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
   const [isShareValid, setIsShareValid] = useState(false);
-  const [shareError, setShareError] = useState<string | undefined>(undefined);
-  
   const [relayUrls, setRelayUrls] = useState<string[]>([DEFAULT_RELAY]);
   const [newRelayUrl, setNewRelayUrl] = useState("");
   
   const [groupCredential, setGroupCredential] = useState(initialData?.groupCredential || "");
   const [isGroupValid, setIsGroupValid] = useState(false);
-  const [groupError, setGroupError] = useState<string | undefined>(undefined);
   
   const [copiedStates, setCopiedStates] = useState({
     group: false,
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showSignerTooltip, setShowSignerTooltip] = useState(false);
-  const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
   const nodeRef = useRef<any>(null);
-
-  // Add effect to cleanup on unmount
-  useEffect(() => {
-    // Cleanup function that runs when component unmounts
-    return () => {
-      if (nodeRef.current) {
-        addLog('info', 'Signer stopped due to page navigation');
-        cleanupNode();
-      }
-    };
-  }, []); // Empty dependency array means this only runs on mount/unmount
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
@@ -128,7 +112,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   };
 
-  const addLog = (type: string, message: string, data?: any) => {
+  const addLog = useCallback((type: string, message: string, data?: any) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
     
@@ -143,10 +127,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       
       return [...prev, { timestamp, type, message, data, id }];
     });
-  };
+  }, []);
 
   // Clean node cleanup using igloo-core
-  const cleanupNode = () => {
+  const cleanupNode = useCallback(() => {
     if (nodeRef.current) {
       // Temporarily suppress console.warn to hide expected igloo-core warnings
       const originalWarn = console.warn;
@@ -169,20 +153,29 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         nodeRef.current = null;
       }
     }
-  };
+  }, []);
+
+  // Add effect to cleanup on unmount
+  useEffect(() => {
+    // Cleanup function that runs when component unmounts
+    return () => {
+      if (nodeRef.current) {
+        addLog('info', 'Signer stopped due to page navigation');
+        cleanupNode();
+      }
+    };
+  }, [addLog, cleanupNode]); // Include dependencies
 
   // Validate initial data
   useEffect(() => {
     if (initialData?.share) {
       const validation = validateShare(initialData.share);
       setIsShareValid(validation.isValid);
-      setShareError(validation.message);
     }
     
     if (initialData?.groupCredential) {
       const validation = validateGroup(initialData.groupCredential);
       setIsGroupValid(validation.isValid);
-      setGroupError(validation.message);
     }
   }, [initialData]);
 
@@ -214,28 +207,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             typeof decodedShare.binder_sn !== 'string' || 
             typeof decodedShare.hidden_sn !== 'string') {
           setIsShareValid(false);
-          setShareError('Share has invalid internal structure');
           return;
         }
         
         setIsShareValid(true);
-        setShareError(undefined);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Invalid share structure';
+      } catch {
         setIsShareValid(false);
-        
-        // If the error appears to be related to bech32m decode
-        if (errorMessage.includes('malformed') || 
-            errorMessage.includes('decode') || 
-            errorMessage.includes('bech32')) {
-          setShareError('Invalid bfshare format - must be a valid bech32m encoded credential');
-        } else {
-          setShareError(`Invalid share: ${errorMessage}`);
-        }
       }
     } else {
       setIsShareValid(validation.isValid);
-      setShareError(validation.message);
     }
   };
 
@@ -255,28 +235,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             !Array.isArray(decodedGroup.commits) ||
             decodedGroup.commits.length === 0) {
           setIsGroupValid(false);
-          setGroupError('Group credential has invalid internal structure');
           return;
         }
         
         setIsGroupValid(true);
-        setGroupError(undefined);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Invalid group structure';
+      } catch {
         setIsGroupValid(false);
-        
-        // If the error appears to be related to bech32m decode
-        if (errorMessage.includes('malformed') || 
-            errorMessage.includes('decode') || 
-            errorMessage.includes('bech32')) {
-          setGroupError('Invalid bfgroup format - must be a valid bech32m encoded credential');
-        } else {
-          setGroupError(`Invalid group: ${errorMessage}`);
-        }
       }
     } else {
       setIsGroupValid(validation.isValid);
-      setGroupError(validation.message);
     }
   };
 
@@ -429,7 +396,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       <p>
                         This is your group data that contains the public information about
                         your keyset, including the threshold and group public key. It starts
-                        with 'bfgroup' and is shared among all signers. It is used to
+                        with &apos;bfgroup&apos; and is shared among all signers. It is used to
                         identify the group and the threshold for signing.
                       </p>
                     </>
@@ -472,7 +439,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   content={
                     <>
                       <p className="mb-2 font-semibold">Secret Share:</p>
-                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with 'bfshare' and should be kept private and secure. Each signer needs a share to participate in signing.</p>
+                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with &apos;bfshare&apos; and should be kept private and secure. Each signer needs a share to participate in signing.</p>
                     </>
                   }
                 />
@@ -586,5 +553,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     </div>
   );
 });
+
+Signer.displayName = 'Signer';
 
 export default Signer; 

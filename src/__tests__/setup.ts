@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 // Polyfill for TextEncoder/TextDecoder in test environment
 import { TextEncoder, TextDecoder } from 'util';
 global.TextEncoder = TextEncoder;
-global.TextDecoder = TextDecoder as any;
+global.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 
 // Mock Electron globally for all tests
 global.window = Object.create(window);
