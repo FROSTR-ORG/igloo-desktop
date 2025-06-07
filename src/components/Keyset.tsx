@@ -1,10 +1,11 @@
 import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Tooltip } from "@/components/ui/tooltip";
 import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
-import { CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle2, QrCode, AlertCircle, Loader2, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
 
@@ -232,7 +233,19 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             <h2 className="text-xl font-semibold text-blue-200 mb-4">{name}</h2>
             <div className="space-y-2">
               <div className="flex justify-between items-center">
-                <h3 className="text-blue-200 text-sm font-medium">Group Credential</h3>
+                <div className="flex items-center">
+                  <h3 className="text-blue-200 text-sm font-medium">Group Credential</h3>
+                  <Tooltip 
+                    trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                    position="right"
+                    content={
+                      <>
+                        <p className="mb-2 font-semibold">Group Credential:</p>
+                        <p>This contains the public information about your keyset, including the threshold and group public key. It starts with 'bfgroup' and is shared among all signers to identify the group and signing requirements.</p>
+                      </>
+                    }
+                  />
+                </div>
                 <div className="flex space-x-2">
                   <Button
                     variant="ghost"
@@ -248,7 +261,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                     onClick={() => toggleExpanded('group')}
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                   >
-                    {expandedItems['group'] ? '▼' : '▶'}
+                    {expandedItems['group'] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </Button>
                 </div>
               </div>
@@ -268,7 +281,19 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
             </div>
 
             <div className="space-y-4">
-              <h3 className="text-blue-200 text-sm font-medium">Share Credentials</h3>
+              <div className="flex items-center">
+                <h3 className="text-blue-200 text-sm font-medium">Share Credentials</h3>
+                <Tooltip 
+                  trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  position="right"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Share Credentials:</p>
+                      <p>These are individual secret shares of the private key. Each share starts with 'bfshare' and should be kept private and secure. A threshold number of these shares is required to create signatures.</p>
+                    </>
+                  }
+                />
+              </div>
               <div className="space-y-3">
                 {shareCredentials.map((share, index) => {
                   const decodedShare = decodedShares[index];
@@ -353,7 +378,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                               onClick={() => toggleExpanded(`${name}-share-${index}`)}
                               className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                             >
-                              {expandedItems[`${name}-share-${index}`] ? '▼' : '▶'}
+                              {expandedItems[`${name}-share-${index}`] ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                             </Button>
                           </div>
                         </div>
