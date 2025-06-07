@@ -1,9 +1,12 @@
 import { clientShareManager, type IglooShare } from '../../lib/clientShareManager';
 import { mockIpcRenderer } from '../setup';
+import { decodeShare } from '@frostr/igloo-core';
 
 describe('ClientShareManager (Desktop Integration)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset decodeShare mock to default behavior
+    (decodeShare as jest.Mock).mockReset();
   });
 
   describe('getShares', () => {
@@ -217,6 +220,108 @@ describe('ClientShareManager (Desktop Integration)', () => {
 
       expect(result).toEqual([]);
     });
+
+    it('should find shares by decoding shareCredential', async () => {
+      // Create shares with IDs that won't match any segments of 'target123'
+      const mockShares: IglooShare[] = [
+        {
+          id: 'foo',  // Simple ID with no dashes that won't match
+          name: 'Share 1',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group',
+          shareCredential: 'encoded-share-credential-1'
+          // No metadata to prevent metadata matching
+        },
+        {
+          id: 'bar',  // Simple ID with no dashes that won't match  
+          name: 'Share 2',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group',
+          shareCredential: 'encoded-share-credential-2'
+          // No metadata to prevent metadata matching
+        }
+      ];
+
+      // Mock decodeShare to return different binder_sn values
+      (decodeShare as jest.Mock)
+        .mockReturnValueOnce({ binder_sn: 'target123' })
+        .mockReturnValueOnce({ binder_sn: 'other456' });
+
+      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+
+      const result = await clientShareManager.findSharesByBinderSN('target123');
+
+      expect(decodeShare).toHaveBeenCalledTimes(2);
+      expect(decodeShare).toHaveBeenCalledWith('encoded-share-credential-1');
+      expect(decodeShare).toHaveBeenCalledWith('encoded-share-credential-2');
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('foo');
+    });
+
+    it('should handle decodeShare errors gracefully', async () => {
+      const mockShares: IglooShare[] = [
+        {
+          id: 'baz',  // Simple ID that won't match  
+          name: 'Share 1',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group',
+          shareCredential: 'invalid-credential'
+          // No metadata to prevent metadata matching
+        },
+        {
+          id: 'qux',  // Simple ID that won't match
+          name: 'Share 2',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group',
+          shareCredential: 'valid-credential'
+          // No metadata to prevent metadata matching
+        }
+      ];
+
+      // Mock decodeShare to throw error for first call, succeed for second
+      (decodeShare as jest.Mock)
+        .mockImplementationOnce(() => {
+          throw new Error('Invalid share credential');
+        })
+        .mockReturnValueOnce({ binder_sn: 'target123' });
+
+      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+
+      const result = await clientShareManager.findSharesByBinderSN('target123');
+
+      expect(decodeShare).toHaveBeenCalledTimes(2);
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('qux');
+    });
+
+    it('should prioritize metadata match over shareCredential decoding', async () => {
+      const mockShares: IglooShare[] = [
+        {
+          id: 'share-1',
+          name: 'Share 1',
+          share: 'data',
+          salt: 'salt',
+          groupCredential: 'group',
+          metadata: { binder_sn: 'target123' },
+          shareCredential: 'encoded-credential'
+        }
+      ];
+
+      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+
+      const result = await clientShareManager.findSharesByBinderSN('target123');
+
+      // decodeShare should not be called since metadata match takes precedence
+      expect(decodeShare).not.toHaveBeenCalled();
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('share-1');
+    });
+
+
   });
 
   describe('deleteShare', () => {

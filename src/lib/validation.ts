@@ -105,6 +105,72 @@ export function isValidSalt(salt: string): boolean {
 }
 
 /**
+ * Validates if a string is a valid hostname
+ * @param hostname - The hostname to validate
+ * @returns boolean indicating if the hostname is valid
+ */
+function isValidHostname(hostname: string): boolean {
+  // Check for basic invalid cases
+  if (!hostname || hostname.length === 0) return false;
+  if (hostname.startsWith('.') || hostname.endsWith('.')) return false;
+  if (hostname.includes('..')) return false;
+  
+  // Valid hostname patterns:
+  // - Domain names: example.com, relay.nostr.com, sub.domain.example.com
+  // - IP addresses: 192.168.1.1, 127.0.0.1
+  // - Localhost: localhost
+  // - With port: example.com:8080, 192.168.1.1:7777
+  
+  // Split hostname and port if present
+  const parts = hostname.split(':');
+  if (parts.length > 2) return false; // Too many colons
+  
+  const host = parts[0];
+  const port = parts[1];
+  
+  // Validate port if present
+  if (port) {
+    const portNum = parseInt(port, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) return false;
+  }
+  
+  // Validate the host part
+  // Check if it's an IP address
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipPattern.test(host)) {
+    // Validate IP address ranges
+    const ipParts = host.split('.').map(Number);
+    return ipParts.every(part => part >= 0 && part <= 255);
+  }
+  
+  // Special case for localhost
+  if (host === 'localhost') return true;
+  
+  // Check if it's a valid domain name with at least one dot (for relay URLs we expect proper domains)
+  if (!host.includes('.')) {
+    // Single-label hostnames are generally not valid for WebSocket relays
+    // except for special cases like localhost (handled above)
+    return false;
+  }
+  
+  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
+  if (!domainPattern.test(host)) return false;
+  
+  // Additional checks for domain names
+  const labels = host.split('.');
+  if (labels.length < 2) return false; // Must have at least domain.tld
+  
+  return labels.every(label => {
+    // Each label should be 1-63 characters
+    if (label.length === 0 || label.length > 63) return false;
+    // Each label should not start or end with hyphen
+    if (label.startsWith('-') || label.endsWith('-')) return false;
+    // Each label should be alphanumeric with hyphens
+    return /^[a-zA-Z0-9-]+$/.test(label);
+  });
+}
+
+/**
  * Formats a relay URL according to application standards
  * @param url - The URL to format
  * @returns RelayUrlValidationResult with formatted URL and validation info
@@ -142,7 +208,7 @@ export function formatRelayUrl(url: string): RelayUrlValidationResult {
   // Add protocol if missing (only for URLs that don't already have a protocol)
   if (!formatted.startsWith('ws://') && !formatted.startsWith('wss://')) {
     // Don't add protocol if it looks like it's just an invalid string
-    if (formatted.includes(' ')) {
+    if (formatted.includes(' ') || !isValidHostname(formatted)) {
       return {
         isValid: false,
         formatted: original,
@@ -157,16 +223,26 @@ export function formatRelayUrl(url: string): RelayUrlValidationResult {
     formatted = formatted.slice(0, -1);
   }
 
-  // Strict validation
-  const wsProtocolPattern = /^wss?:\/\//;
-  const validHostPattern = /^wss?:\/\/[a-zA-Z0-9.-]+(?::[0-9]+)?(?:\/[^?\s]*)?$/;
-  
-  const isValid = wsProtocolPattern.test(formatted) && 
-                 validHostPattern.test(formatted) && 
-                 formatted.length > 6 &&
-                 !formatted.includes(' ') &&
-                 formatted !== 'wss://' && 
-                 formatted !== 'ws://';
+  // Strict validation using URL parsing
+  let isValid = false;
+  try {
+    const urlObj = new URL(formatted);
+    
+    // Check protocol
+    if (urlObj.protocol !== 'ws:' && urlObj.protocol !== 'wss:') {
+      isValid = false;
+    } else {
+      // Validate the hostname part
+      const hostname = urlObj.port ? `${urlObj.hostname}:${urlObj.port}` : urlObj.hostname;
+      isValid = isValidHostname(hostname) && 
+                formatted.length > 6 &&
+                !formatted.includes(' ') &&
+                formatted !== 'wss://' && 
+                formatted !== 'ws://';
+    }
+  } catch (e) {
+    isValid = false;
+  }
   
   return {
     isValid,
