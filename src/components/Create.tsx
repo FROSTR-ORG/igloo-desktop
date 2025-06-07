@@ -62,10 +62,10 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         success: true,
         location: "New nsec key generated successfully"
       });
-    } catch (error: any) {
+    } catch (error) {
       setKeysetGenerated({
         success: false,
-        location: `Error generating nsec: ${error.message}`
+        location: `Error generating nsec: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       setIsGenerating(false);
@@ -115,10 +115,10 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         ...keyset,
         name: keysetName
       });
-    } catch (error: any) {
+    } catch (error) {
       setKeysetGenerated({
         success: false,
-        location: `Error creating keyset: ${error.message}`
+        location: `Error creating keyset: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     } finally {
       setIsGenerating(false);

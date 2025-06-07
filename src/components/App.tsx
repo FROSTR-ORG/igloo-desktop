@@ -31,9 +31,7 @@ const App: React.FC = () => {
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
-  const [showTooltip, setShowTooltip] = useState(false);
   const [hasShares, setHasShares] = useState(false);
-  const [showMainTooltip, setShowMainTooltip] = useState(false);
   const [activeTab, setActiveTab] = useState("signer");
   // Reference to the Signer component to call its stop method
   const signerRef = useRef<SignerHandle>(null);
@@ -102,7 +100,7 @@ const App: React.FC = () => {
                 <>
                   <p className="mb-2 font-semibold">Important!</p>
                   <p className="mb-2">This is the only screen where your complete keyset is shown. You must save each share you want to keep on this device (each with its own password) and/or copy and move individual shares to other devices, like our browser extension signer <a href="https://github.com/FROSTR-ORG/frost2x" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Frost2x</a>.</p>
-                  <p>Once you click "Finish", the keyset will be removed from memory and remain distributed where you manually saved them.</p>
+                  <p>Once you click &quot;Finish&quot;, the keyset will be removed from memory and remain distributed where you manually saved them.</p>
                 </>
               }
             />
@@ -192,8 +190,8 @@ const App: React.FC = () => {
                     content={
                       <>
                         <p className="mb-2 font-semibold">How to use Igloo:</p>
-                        <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the "Load" button.</p>
-                        <p className="mb-2">Once loaded, you'll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
+                        <p className="mb-2">To start signing Nostr notes, you need to load one of your saved shares by clicking the &quot;Load&quot; button.</p>
+                        <p className="mb-2">Once loaded, you&apos;ll be taken to the Signer interface where you can configure relays and start the signer to handle requests.</p>
                         <p className="mb-2">Igloo does not allow you to publish notes at this time only participate in signing.</p>
                         <p className="mb-2">Checkout <a href="https://frostr.org/apps" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">frostr.org/apps</a> for our other frostr clients including Frost2x which allows you to publish notes through the browser.</p>
                       </>

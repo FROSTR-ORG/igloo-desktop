@@ -1,7 +1,7 @@
 // Import electron and node modules
-const electron = require('electron');
-const fsModule = require('fs');
-const pathModule = require('path');
+import * as electron from 'electron';
+import * as fsModule from 'fs';
+import * as pathModule from 'path';
 
 /**
  * Interface for the share structure
@@ -11,7 +11,7 @@ interface IglooShare {
   name: string;
   share: string;
   groupCredential: string;
-  [key: string]: any; // Additional share properties
+  [key: string]: string | number | boolean | null | undefined | object; // Additional share properties
 }
 
 /**
@@ -153,8 +153,4 @@ function getAllShares(): IglooShare[] | false {
 }
 
 // Export the ShareManager class and helper functions
-module.exports = {
-  ShareManager,
-  getAllShares,
-  IglooShare: {} as IglooShare // TypeScript interface isn't directly exportable in CommonJS
-}; 
+export { ShareManager, getAllShares }; 
