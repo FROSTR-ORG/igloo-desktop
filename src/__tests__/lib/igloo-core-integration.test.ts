@@ -16,6 +16,7 @@ jest.mock('@frostr/igloo-core', () => ({
 }));
 
 describe('Igloo Core Integration Tests', () => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mockNode = {
     on: jest.fn(),
     off: jest.fn(),
@@ -26,19 +27,24 @@ describe('Igloo Core Integration Tests', () => {
     jest.clearAllMocks();
     
     // Setup default mock returns
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockValidateShare.mockReturnValue({ isValid: true } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockValidateGroup.mockReturnValue({ isValid: true } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockDecodeShare.mockReturnValue({
       idx: 1,
       seckey: 'test-key',
       binder_sn: 'test-binder',
       hidden_sn: 'test-hidden'
     } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockDecodeGroup.mockReturnValue({
       threshold: 2,
       group_pk: 'test-group-pk',
       commits: [{ content: 'commit1' }, { content: 'commit2' }]
     } as any);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     mockCreateConnectedNode.mockResolvedValue({
       node: mockNode,
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
@@ -172,6 +178,7 @@ describe('Igloo Core Integration Tests', () => {
 
     it('should handle node state transitions', async () => {
       // Test different node states
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockCreateConnectedNode.mockResolvedValue({
         node: mockNode,
         state: { isReady: false, isConnected: true, isConnecting: false, connectedRelays: ['relay1'] }
@@ -285,6 +292,7 @@ describe('Igloo Core Integration Tests', () => {
       | SignHandlerRejectionHandler;
 
     // Event mapping type for type-safe event handling
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface EventMap {
       'ready': ReadyHandler;
       'error': ErrorHandler;
@@ -323,6 +331,7 @@ describe('Igloo Core Integration Tests', () => {
       });
 
       // Add emit method to simulate event triggering with proper typing
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       mockNode.emit = jest.fn((event: string, data: any) => {
         if (eventHandlers.has(event)) {
           eventHandlers.get(event)!.forEach(handler => {

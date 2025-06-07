@@ -33,8 +33,10 @@ describe('Keyset Creation Workflow', () => {
       };
 
       // Test keyset display and share saving
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const sharePasswords = ['password1', 'password2', 'password3'];
-      const expectedSavedShares = mockKeyset.shareCredentials.map((share, index) => ({
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const expectedSavedShares = mockKeyset.shareCredentials.map((share) => ({
         id: expect.any(String),
         name: expect.stringContaining('Test Keyset'),
         share: expect.any(String), // encrypted share data
