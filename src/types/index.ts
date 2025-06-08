@@ -24,6 +24,11 @@ export interface ValidationResult {
 }
 
 // Igloo Share management types
+export interface IglooShareMetadata {
+  binder_sn?: string;
+  [key: string]: string | number | boolean | null | undefined;
+}
+
 export interface IglooShare {
   id: string;
   name: string;
@@ -32,11 +37,7 @@ export interface IglooShare {
   groupCredential: string;
   savedAt?: string;
   shareCredential?: string;
-  metadata?: {
-    binder_sn?: string;
-    [key: string]: string | number | boolean | null | undefined;
-  };
-  [key: string]: string | number | boolean | null | undefined | object;
+  metadata?: IglooShareMetadata;
 }
 
 // Bifrost types (from @frostr/bifrost)
@@ -155,8 +156,8 @@ export interface NoblePBKDF2Options {
 }
 
 export interface NobleCipher {
-  encrypt: (data: Uint8Array | Buffer) => Uint8Array | Buffer;
-  decrypt: (data: Uint8Array | Buffer) => Uint8Array | Buffer;
+  encrypt: (data: Uint8Array) => Uint8Array;
+  decrypt: (data: Uint8Array) => Uint8Array;
 }
 
 // Event handler types
