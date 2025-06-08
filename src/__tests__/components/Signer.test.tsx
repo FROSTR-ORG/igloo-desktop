@@ -2,7 +2,6 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Signer from '../../components/Signer';
-import type { BifrostNode } from '../../types';
 
 // Mock igloo-core module
 jest.mock('@frostr/igloo-core', () => ({
