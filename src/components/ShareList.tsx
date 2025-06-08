@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
-import { FolderOpen, Trash2 } from 'lucide-react';
+import { FolderOpen, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Modal } from '@/components/ui/modal';
@@ -13,7 +13,7 @@ interface ShareListProps {
   onNewKeyset?: () => void;
 }
 
-const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
+const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => {
   const [shares, setShares] = useState<IglooShare[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [loadingShare, setLoadingShare] = useState<IglooShare | null>(null);
@@ -133,7 +133,16 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded }) => {
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No shares available</p>
-          <p className="text-sm text-gray-500">Click the Create New button to create a keyset</p>
+          <p className="text-sm text-gray-500 mb-4">Get started by creating your first keyset</p>
+          {onNewKeyset && (
+            <Button
+              onClick={onNewKeyset}
+              className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Keyset
+            </Button>
+          )}
         </div>
       )}
 

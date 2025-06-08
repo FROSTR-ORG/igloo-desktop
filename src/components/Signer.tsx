@@ -5,7 +5,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
-import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
+import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import type { 
@@ -57,8 +57,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const nodeRef = useRef<any>(null); // BifrostNode from @frostr/bifrost library
+  const nodeRef = useRef<BifrostNode | null>(null);
+  
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
@@ -70,17 +70,18 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   }));
 
   // Helper function to safely detect duplicate log entries
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const isDuplicateLog = (newData: any, recentLogs: LogEntryData[]): boolean => {
+  const isDuplicateLog = (newData: unknown, recentLogs: LogEntryData[]): boolean => {
     if (!newData || typeof newData !== 'object') {
       return false;
     }
 
     // Fast path: check for duplicate IDs and tags without serialization
-    if (newData.id && newData.tag) {
+    if ('id' in newData && 'tag' in newData && newData.id && newData.tag) {
       return recentLogs.some(log => 
         log.data && 
         typeof log.data === 'object' && 
+        'id' in log.data &&
+        'tag' in log.data &&
         log.data.id === newData.id && 
         log.data.tag === newData.tag
       );
@@ -108,8 +109,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   };
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const addLog = useCallback((type: string, message: string, data?: any) => {
+  const addLog = useCallback((type: string, message: string, data?: unknown) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
     
@@ -131,14 +131,14 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     if (nodeRef.current) {
       // Temporarily suppress console.warn to hide expected igloo-core warnings
       const originalWarn = console.warn;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      console.warn = (message: string, ...args: any[]) => {
+      const warnOverride = (message: string, ...args: unknown[]) => {
         // Only suppress the specific expected warning about removeAllListeners
         if (typeof message === 'string' && message.includes('removeAllListeners not available')) {
           return; // Skip this expected warning
         }
         originalWarn(message, ...args);
       };
+      console.warn = warnOverride;
       
       try {
         // Use igloo-core's cleanup - it handles the manual cleanup internally
@@ -290,40 +290,27 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       });
 
       // Set up comprehensive event logging
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        result.node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+      result.node.on('bounced', (reason: string, msg: unknown) => addLog('bifrost', `Message bounced: ${reason}`, msg));
 
       // ECDH events
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/sender/res', (...msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
+      result.node.on('/ecdh/sender/req', (msg: unknown) => addLog('ecdh', 'ECDH request sent', msg));
+      result.node.on('/ecdh/sender/res', (...msgs: unknown[]) => addLog('ecdh', 'ECDH responses received', msgs));
       result.node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
       result.node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/ecdh/handler/rej', (reason: string, msg: any) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
+      result.node.on('/ecdh/sender/err', (reason: string, msgs: unknown[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
+      result.node.on('/ecdh/handler/req', (msg: unknown) => addLog('ecdh', 'ECDH request received', msg));
+      result.node.on('/ecdh/handler/res', (msg: unknown) => addLog('ecdh', 'ECDH response sent', msg));
+      result.node.on('/ecdh/handler/rej', (reason: string, msg: unknown) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
 
       // Signature events
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/sender/res', (...msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
+      result.node.on('/sign/sender/req', (msg: unknown) => addLog('sign', 'Signature request sent', msg));
+      result.node.on('/sign/sender/res', (...msgs: unknown[]) => addLog('sign', 'Signature responses received', msgs));
       result.node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
       result.node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/sender/err', (reason: string, msgs: any[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      result.node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+      result.node.on('/sign/sender/err', (reason: string, msgs: unknown[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
+      result.node.on('/sign/handler/req', (msg: unknown) => addLog('sign', 'Signature request received', msg));
+      result.node.on('/sign/handler/res', (msg: unknown) => addLog('sign', 'Signature response sent', msg));
+      result.node.on('/sign/handler/rej', (reason: string, msg: unknown) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
 
       // Use the enhanced state info from createConnectedNode
       if (result.state.isReady) {
