@@ -173,12 +173,14 @@ describe('User Input Validation and Error Handling', () => {
         '12-34',              // contains dash
       ];
 
+import { isValidHex, validateHexLength } from '../../lib/validation';
+
       validHexStrings.forEach(hex => {
-        expect(hex).toMatch(/^[0-9a-fA-F]+$/);
+        expect(isValidHex(hex)).toBe(true);
       });
 
       invalidHexStrings.forEach(hex => {
-        expect(hex).not.toMatch(/^[0-9a-fA-F]+$/);
+        expect(isValidHex(hex)).toBe(false);
       });
     });
 
