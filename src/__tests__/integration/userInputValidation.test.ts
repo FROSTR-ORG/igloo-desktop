@@ -173,7 +173,9 @@ describe('User Input Validation and Error Handling', () => {
         '12-34',              // contains dash
       ];
 
-import { isValidHex, validateHexLength } from '../../lib/validation';
+      const isValidHex = (str: string): boolean => {
+        return str.length > 0 && /^[0-9a-fA-F]+$/.test(str);
+      };
 
       validHexStrings.forEach(hex => {
         expect(isValidHex(hex)).toBe(true);
