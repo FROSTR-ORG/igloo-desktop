@@ -180,7 +180,7 @@ describe('Igloo Core Integration Tests', () => {
     it('should handle node state transitions', async () => {
       // Test different node states
       mockCreateConnectedNode.mockResolvedValue({
-        node: mockNode as any, // Mock node for testing
+        node: mockNode,
         state: { isReady: false, isConnected: true, isConnecting: false, connectedRelays: ['relay1'] }
       });
       
