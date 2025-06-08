@@ -44,7 +44,7 @@ describe('Igloo Core Integration Tests', () => {
       ]
     });
     mockCreateConnectedNode.mockResolvedValue({
-      node: mockNode as any, // Mock node for testing
+      node: mockNode, // Type should be inferred from proper mock setup
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
     });
   });
