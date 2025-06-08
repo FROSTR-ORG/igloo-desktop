@@ -22,21 +22,20 @@ jest.mock('electron', () => mockElectron);
 jest.mock('fs', () => mockFs);
 jest.mock('path', () => mockPath);
 
+// Import types and modules
+import type { IglooShare } from '../../types';
+import { ShareManager, getAllShares } from '../../lib/shareManager';
+
 describe('ShareManager', () => {
-  let ShareManagerClass: typeof import('../../lib/shareManager').ShareManager;
-  let getAllSharesFunc: typeof import('../../lib/shareManager').getAllShares;
-  let shareManager: import('../../lib/shareManager').ShareManager;
+  let shareManager: ShareManager;
 
   beforeAll(() => {
-    // Import after mocking
-    const shareManagerModule = require('../../lib/shareManager');
-    ShareManagerClass = shareManagerModule.ShareManager;
-    getAllSharesFunc = shareManagerModule.getAllShares;
+    // No longer need dynamic imports since we're using ES modules
   });
 
   beforeEach(() => {
     jest.clearAllMocks();
-    shareManager = new ShareManagerClass();
+    shareManager = new ShareManager();
     
     // Default mock behavior
     mockFs.existsSync.mockReturnValue(true);
@@ -53,7 +52,7 @@ describe('ShareManager', () => {
     it('should create directories if they do not exist', () => {
       mockFs.existsSync.mockReturnValue(false);
       
-      new ShareManagerClass();
+      new ShareManager();
       
       expect(mockFs.mkdirSync).toHaveBeenCalledTimes(2);
     });
@@ -66,7 +65,7 @@ describe('ShareManager', () => {
       
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       
-      expect(() => new ShareManagerClass()).not.toThrow();
+      expect(() => new ShareManager()).not.toThrow();
       expect(consoleSpy).toHaveBeenCalledWith('Failed to create shares directory:', expect.any(Error));
       
       consoleSpy.mockRestore();
@@ -118,6 +117,7 @@ describe('ShareManager', () => {
         id: 'test-share',
         name: 'Test Share',
         share: 'share-data',
+        salt: 'test-salt',
         groupCredential: 'group-cred'
       };
 
@@ -173,6 +173,7 @@ describe('ShareManager', () => {
         id: 'test-share',
         name: 'Test Share',
         share: 'share-data',
+        salt: 'test-salt',
         groupCredential: 'group-cred'
       };
       
@@ -189,12 +190,13 @@ describe('ShareManager', () => {
       const shareWithoutId = {
         name: 'Test Share',
         share: 'share-data',
+        salt: 'test-salt',
         groupCredential: 'group-cred'
       };
       
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       
-      const result = shareManager.saveShare(shareWithoutId as Partial<IglooShare>);
+      const result = shareManager.saveShare(shareWithoutId as IglooShare);
       
       expect(result).toBe(false);
       expect(consoleSpy).toHaveBeenCalledWith('Share must have an ID');
@@ -208,6 +210,7 @@ describe('ShareManager', () => {
         id: 'test-share',
         name: 'Test Share',
         share: 'share-data',
+        salt: 'test-salt',
         groupCredential: 'group-cred'
       };
       
@@ -270,7 +273,7 @@ describe('ShareManager', () => {
       mockFs.readdirSync.mockReturnValue(['share1.json']);
       mockFs.readFileSync.mockReturnValue('{"id": "share1", "name": "Share 1"}');
       
-      const result = getAllSharesFunc();
+      const result = getAllShares();
       
       expect(result).toEqual([{ id: 'share1', name: 'Share 1' }]);
     });
@@ -278,7 +281,7 @@ describe('ShareManager', () => {
     it('should return false when no shares found via helper', () => {
       mockFs.existsSync.mockReturnValue(false);
       
-      const result = getAllSharesFunc();
+      const result = getAllShares();
       
       expect(result).toBe(false);
     });
