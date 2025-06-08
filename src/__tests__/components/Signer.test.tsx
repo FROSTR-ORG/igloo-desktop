@@ -394,4 +394,48 @@ describe('Signer Component UI Tests', () => {
       });
     });
   });
+
+  describe('Additional Coverage Tests', () => {
+    it('should handle empty initial data gracefully', () => {
+      render(<Signer />);
+      
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
+      
+      expect(groupInput).toHaveValue('');
+      expect(shareInput).toHaveValue('');
+    });
+
+    it('should have proper input types', () => {
+      render(<Signer />);
+      
+      const groupInput = screen.getByPlaceholderText('Enter your group credential (bfgroup...)');
+      const shareInput = screen.getByPlaceholderText('Enter your secret share (bfshare...)');
+      
+      expect(groupInput).toHaveAttribute('type', 'text');
+      expect(shareInput).toHaveAttribute('type', 'password');
+    });
+
+    it('should disable start button when credentials are invalid', () => {
+      mockValidateShare.mockReturnValue({ isValid: false });
+      mockValidateGroup.mockReturnValue({ isValid: false });
+      
+      render(<Signer />);
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      expect(startButton).toBeDisabled();
+    });
+
+    it('should enable start button when credentials are valid', () => {
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      expect(startButton).not.toBeDisabled();
+    });
+  });
 }); 
