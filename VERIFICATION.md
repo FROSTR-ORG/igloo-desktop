@@ -1,6 +1,6 @@
 # Release Verification Instructions
 
-This document outlines how to verify Igloo release binaries. This process ensures the binaries you download are the ones created by the Igloo developers.
+This document outlines how to verify Igloo-desktop release binaries. This process ensures the binaries you download are the ones created by the Igloo developers.
 
 ## Quick Verification
 
@@ -13,17 +13,17 @@ To verify a release:
 
 1. Import the public key:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/igloo-signing-key.asc | gpg --import
+   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/igloo-signing-key.asc | gpg --import
    ```
 
 2. Verify the checksums signature:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS.asc | gpg --verify
+   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/SHA256SUMS.asc | gpg --verify
    ```
 
 3. Verify file checksums:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS | shasum -a 256 -c
+   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/SHA256SUMS | shasum -a 256 -c
    ```
 
 Replace `VERSION` with the version you're verifying (e.g., `v0.0.3`).
@@ -60,6 +60,6 @@ You need to import the developer's public key using the steps above. The key is 
 
 ## Security Notes
 
-- Always download release files directly from the [official GitHub releases page](https://github.com/FROSTR-ORG/igloo/releases)
+- Always download release files directly from the [official GitHub releases page](https://github.com/FROSTR-ORG/igloo-desktop/releases)
 - Cross-reference the signing key fingerprint through multiple sources
 - Report any verification issues immediately by opening a GitHub issue 
