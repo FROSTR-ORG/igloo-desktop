@@ -6,8 +6,15 @@ const fsModule = require('fs');
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pathModule = require('path');
 
-// Import the type from the types file
-import type { IglooShare } from '../types';
+// Local type definition to avoid ES module imports
+interface IglooShare {
+  id: string;
+  name: string;
+  share: string;
+  groupCredential: string;
+  createdAt: string;
+  lastUsed?: string;
+}
 
 /**
  * Class to handle share management operations
@@ -148,4 +155,4 @@ function getAllShares(): IglooShare[] | false {
 }
 
 // Export the ShareManager class and helper functions
-export { ShareManager, getAllShares }; 
+module.exports = { ShareManager, getAllShares }; 
