@@ -291,6 +291,21 @@ describe('Igloo Core Integration Tests', () => {
       | SignHandlerResponseHandler
       | SignHandlerRejectionHandler;
 
+    // Event data mapping for type-safe event emission
+    interface EventDataMap {
+      'ready': ReadyEventData;
+      'error': ErrorEventData;
+      'closed': ClosedEventData;
+      '/ecdh/sender/req': ECDHRequestData;
+      '/ecdh/sender/res': ECDHResponseData;
+      '/ecdh/sender/rej': ECDHRejectionData;
+      '/sign/sender/req': SignRequestData;
+      '/sign/sender/res': SignResponseData;
+      '/sign/handler/req': SignHandlerRequestData;
+      '/sign/handler/res': SignHandlerResponseData;
+      '/sign/handler/rej': SignHandlerRejectionData;
+    }
+
     // Event mapping type for type-safe event handling
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     interface EventMap {
@@ -331,14 +346,16 @@ describe('Igloo Core Integration Tests', () => {
       });
 
       // Add emit method to simulate event triggering with proper typing
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      mockNode.emit = jest.fn((event: string, data: any) => {
-        if (eventHandlers.has(event)) {
-          eventHandlers.get(event)!.forEach(handler => {
-            handler(data);
+      const emitImplementation = <K extends keyof EventDataMap>(event: K, data: EventDataMap[K]) => {
+        if (eventHandlers.has(event as string)) {
+          eventHandlers.get(event as string)!.forEach(handler => {
+            // Type assertion needed for the mock context - in real usage this would be type-safe
+            (handler as (data: EventDataMap[K]) => void)(data);
           });
         }
-      });
+      };
+      
+      mockNode.emit = jest.fn(emitImplementation);
     });
 
     it('should set up event listeners and handle ready event', () => {
