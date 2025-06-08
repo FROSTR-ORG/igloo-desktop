@@ -23,9 +23,9 @@ jest.mock('fs', () => mockFs);
 jest.mock('path', () => mockPath);
 
 describe('ShareManager', () => {
-  let ShareManagerClass: any;
-  let getAllSharesFunc: any;
-  let shareManager: any;
+  let ShareManagerClass: typeof import('../../lib/shareManager').ShareManager;
+  let getAllSharesFunc: typeof import('../../lib/shareManager').getAllShares;
+  let shareManager: import('../../lib/shareManager').ShareManager;
 
   beforeAll(() => {
     // Import after mocking
