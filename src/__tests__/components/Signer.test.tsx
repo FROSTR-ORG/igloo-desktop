@@ -1,7 +1,8 @@
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import Signer from '@/components/Signer';
+import Signer from '../../components/Signer';
+import type { BifrostNode } from '../../types';
 
 // Mock igloo-core module
 jest.mock('@frostr/igloo-core', () => ({
@@ -59,6 +60,7 @@ describe('Signer Component UI Tests', () => {
       ]
     });
     mockCreateConnectedNode.mockResolvedValue({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       node: mockNode as any, // Mock node for testing
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
     });

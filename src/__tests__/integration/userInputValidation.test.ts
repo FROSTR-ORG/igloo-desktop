@@ -1,6 +1,6 @@
 import { mockDeriveSecret } from '../setup';
-import { validatePassword, formatRelayUrl, isValidRelayUrl, validateSalt, isValidSalt } from '@/lib/validation';
-import { sanitizeShareFilename, isFilenameSafe, FILESYSTEM_LIMITS } from '@/lib/filesystem';
+import { validatePassword, formatRelayUrl, isValidRelayUrl, validateSalt, isValidSalt } from '../../lib/validation';
+import { sanitizeShareFilename, isFilenameSafe, FILESYSTEM_LIMITS } from '../../lib/filesystem';
 
 describe('User Input Validation and Error Handling', () => {
   beforeEach(() => {
@@ -65,7 +65,7 @@ describe('User Input Validation and Error Handling', () => {
       ];
 
       passwordsWithSpecialChars.forEach(password => {
-        expect(password).toMatch(/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>/?]/);
+        expect(password).toMatch(/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/);
       });
     });
   });
@@ -133,7 +133,7 @@ describe('User Input Validation and Error Handling', () => {
         expect(result.sanitized).not.toMatch(/[<>:"/\\|?*]/);
         
         // Should not contain control characters
-        expect(result.sanitized).not.toMatch(/[\x00-\x1f]/);
+        expect(result.sanitized).not.toMatch(/[\u0000-\u001f]/);
         
         // Should not end with dots or spaces
         expect(result.sanitized).not.toMatch(/[. ]$/);
