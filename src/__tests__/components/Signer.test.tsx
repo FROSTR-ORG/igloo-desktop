@@ -60,7 +60,7 @@ describe('Signer Component UI Tests', () => {
     });
     mockCreateConnectedNode.mockResolvedValue({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      node: mockNode as any, // Mock node for testing
+      node: mockNode, // Type should be inferred from proper mock setup
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
     });
   });
