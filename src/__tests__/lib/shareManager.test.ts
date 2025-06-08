@@ -194,7 +194,7 @@ describe('ShareManager', () => {
       
       const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
       
-      const result = shareManager.saveShare(shareWithoutId as any);
+      const result = shareManager.saveShare(shareWithoutId as Partial<IglooShare>);
       
       expect(result).toBe(false);
       expect(consoleSpy).toHaveBeenCalledWith('Share must have an ID');
