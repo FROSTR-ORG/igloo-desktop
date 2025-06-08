@@ -80,5 +80,57 @@ export const mockClientShareManager = {
 
 export const mockDeriveSecret = jest.fn();
 
+// Test utilities for better test organization
+export const createMockShare = (overrides = {}) => ({
+  id: 'mock-share-id',
+  name: 'Mock Share',
+  share: 'mock-share-data',
+  salt: 'mock-salt',
+  groupCredential: 'mock-group-credential',
+  savedAt: new Date().toISOString(),
+  ...overrides
+});
+
+export const createMockKeyset = (overrides = {}) => ({
+  groupCredential: 'mock-group-credential',
+  shareCredentials: ['share1', 'share2', 'share3'],
+  name: 'Mock Keyset',
+  threshold: 2,
+  ...overrides
+});
+
+export const waitForAsync = (ms = 0) => new Promise(resolve => setTimeout(resolve, ms));
+
+// Enhanced mock implementations for better testing
+export const mockValidationResults = {
+  validPassword: {
+    isValid: true,
+    hasMinLength: true,
+    hasUppercase: true,
+    hasLowercase: true,
+    hasNumbers: true,
+    hasSpecialChars: true
+  },
+  invalidPassword: {
+    isValid: false,
+    hasMinLength: false,
+    hasUppercase: false,
+    hasLowercase: false,
+    hasNumbers: false,
+    hasSpecialChars: false
+  },
+  validSalt: {
+    isValid: true,
+    hasMinLength: true,
+    isHexadecimal: true
+  },
+  invalidSalt: {
+    isValid: false,
+    hasMinLength: false,
+    isHexadecimal: false,
+    message: 'Salt is required'
+  }
+};
+
 // Export for use in tests
 export { mockIpcRenderer }; 
