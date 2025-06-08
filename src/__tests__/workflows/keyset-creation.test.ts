@@ -1,9 +1,9 @@
-import { clientShareManager } from '@/lib/clientShareManager';
+import { clientShareManager } from '../../lib/clientShareManager';
 import { mockDeriveSecret } from '../setup';
-import { validatePassword } from '@/lib/validation';
+import { validatePassword } from '../../lib/validation';
 
 // Mock the required modules  
-jest.mock('@/lib/clientShareManager');
+jest.mock('../../lib/clientShareManager');
 
 const mockClientShareManager = clientShareManager as jest.Mocked<typeof clientShareManager>;
 
