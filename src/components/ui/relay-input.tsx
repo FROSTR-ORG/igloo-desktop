@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from "@/components/ui/button";
 import { InputWithValidation } from "@/components/ui/input-with-validation";
 import { Plus, Trash2 } from "lucide-react";
-import { validateRelay } from '@/lib/validation';
+import { validateRelay } from '@frostr/igloo-core';
 
 interface RelayInputProps {
   relays: string[];
@@ -19,6 +19,10 @@ const RelayInput: React.FC<RelayInputProps> = ({
   const [isValidRelay, setIsValidRelay] = useState(false);
   const [relayError, setRelayError] = useState<string | undefined>(undefined);
   const [normalizedRelay, setNormalizedRelay] = useState<string | undefined>(undefined);
+  
+  // Use a ref to store the latest onChange function to avoid dependency issues
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   const handleRelayChange = (value: string) => {
     setNewRelayUrl(value);
@@ -46,9 +50,9 @@ const RelayInput: React.FC<RelayInputProps> = ({
   useEffect(() => {
     if (relays.length === 0) {
       const defaultRelay = "wss://relay.primal.net";
-      onChange([defaultRelay]);
+      onChangeRef.current([defaultRelay]);
     }
-  }, []);
+  }, [relays.length]);
 
   return (
     <div className={className}>

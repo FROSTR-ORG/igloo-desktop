@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
-import { FolderOpen, Trash2 } from 'lucide-react';
+import { FolderOpen, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Modal } from '@/components/ui/modal';
+import { Tooltip } from '@/components/ui/tooltip';
 import LoadShare from './LoadShare';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
@@ -91,20 +92,32 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
                 )}
               </div>
               <div className="flex items-center gap-2">
-                <IconButton
-                  variant="ghost"
-                  size="sm"
-                  icon={<FolderOpen className="h-4 w-4" />}
-                  onClick={() => handleOpenLocation(share)}
-                  tooltip="Open location"
-                  className="text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
+                <Tooltip 
+                  trigger={
+                    <IconButton
+                      variant="ghost"
+                      size="sm"
+                      icon={<FolderOpen className="h-4 w-4" />}
+                      onClick={() => handleOpenLocation(share)}
+                      className="text-gray-400 hover:text-gray-300 hover:bg-gray-700/50"
+                    />
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Open"
                 />
-                <IconButton
-                  variant="destructive"
-                  size="sm"
-                  icon={<Trash2 className="h-4 w-4" />}
-                  onClick={() => handleDeleteClick(share)}
-                  tooltip="Delete share"
+                <Tooltip 
+                  trigger={
+                    <IconButton
+                      variant="destructive"
+                      size="sm"
+                      icon={<Trash2 className="h-4 w-4" />}
+                      onClick={() => handleDeleteClick(share)}
+                    />
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Delete"
                 />
                 <Button
                   onClick={() => handleLoad(share)}
@@ -120,7 +133,16 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
       ) : (
         <div className="text-center py-8">
           <p className="text-gray-400 mb-4">No shares available</p>
-          <p className="text-sm text-gray-500">Click the Create New button to create a keyset</p>
+          <p className="text-sm text-gray-500 mb-4">Get started by creating your first keyset</p>
+          {onNewKeyset && (
+            <Button
+              onClick={onNewKeyset}
+              className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Create New Keyset
+            </Button>
+          )}
         </div>
       )}
 

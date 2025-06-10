@@ -1,5 +1,8 @@
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const { app, BrowserWindow, ipcMain, shell } = require('electron');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const path = require('path');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const shareManagerModule = require('./lib/shareManager');
 
 function createWindow() {
@@ -38,14 +41,17 @@ app.whenReady().then(() => {
     return shareManagerModule.getAllShares();
   });
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('save-share', async (_: any, share: any) => {
     return shareManager.saveShare(share);
   });
   
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('delete-share', async (_: any, shareId: string) => {
     return shareManager.deleteShare(shareId);
   });
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   ipcMain.handle('open-share-location', async (_: any, shareId: string) => {
     const filePath = shareManager.getSharePath(shareId);
     await shell.showItemInFolder(filePath);

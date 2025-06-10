@@ -1,307 +1,261 @@
-import { nip19 } from 'nostr-tools';
-import React from 'react';
-
-// Constants from Bifrost library (https://github.com/FROSTR-ORG/bifrost/blob/master/src/const.ts)
-// These are the exact binary sizes before bech32 encoding
-const SHARE_DATA_SIZE = 100;  // Exact binary size of a share
-const SHARE_INDEX_SIZE = 4;   // Size of share index
-const SHARE_SECKEY_SIZE = 32; // Size of share secret key
-const SHARE_SNONCE_SIZE = 32; // Size of share nonce
-
-const GROUP_DATA_SIZE = 37;   // Base size of a group
-const GROUP_PUBKEY_SIZE = 33; // Size of group public key
-const GROUP_THOLD_SIZE = 4;   // Size of threshold value
-const COMMIT_DATA_SIZE = 103; // Size of each commitment
-
-// Calculate expected bech32 encoded lengths (approximate)
-// Bech32 encoding: 8 bits -> 5 bits, so length increases by factor of 8/5 = 1.6
-// Plus prefix ('bfshare' or 'bfgroup') and checksum (typ. 6 chars)
-const MIN_BFSHARE_LENGTH = Math.floor(SHARE_DATA_SIZE * 1.6) + 'bfshare'.length + 6; // ~172 chars
-const MAX_BFSHARE_LENGTH = MIN_BFSHARE_LENGTH + 10; // Allow some flexibility
-
-// For groups, size depends on number of commits (n in m-of-n)
-// Base size + at least one commit
-const MIN_BFGROUP_LENGTH = Math.floor((GROUP_DATA_SIZE + COMMIT_DATA_SIZE) * 1.6) + 'bfgroup'.length + 6; // ~234 chars
-// Maximum reasonable number of commits (e.g., 15-of-15 would be a large setup)
-const MAX_COMMITS = 15;
-const MAX_BFGROUP_LENGTH = Math.floor((GROUP_DATA_SIZE + (COMMIT_DATA_SIZE * MAX_COMMITS)) * 1.6) + 'bfgroup'.length + 6;
-
-// Constants for bfcred validation
-const GROUP_ID_SIZE = 32; // Assumed size for group ID hash
-
-// Min group serialized size: ID (32) + Threshold (4) + Pubkey (33) + 1 Commit (103) = 172
-const MIN_GROUP_SERIALIZED_SIZE = GROUP_ID_SIZE + GROUP_THOLD_SIZE + GROUP_PUBKEY_SIZE + COMMIT_DATA_SIZE;
-// Max group serialized size: ID (32) + Threshold (4) + Pubkey (33) + MAX_COMMITS (15) * Commit (103) = 69 + 1545 = 1614
-const MAX_GROUP_SERIALIZED_SIZE = GROUP_ID_SIZE + GROUP_THOLD_SIZE + GROUP_PUBKEY_SIZE + (COMMIT_DATA_SIZE * MAX_COMMITS);
-
-// bfcred raw data = share data (100) + group data (min 172, max 1614)
-const MIN_BFCRED_RAW_DATA_SIZE = SHARE_DATA_SIZE + MIN_GROUP_SERIALIZED_SIZE; // 100 + 172 = 272
-const MAX_BFCRED_RAW_DATA_SIZE = SHARE_DATA_SIZE + MAX_GROUP_SERIALIZED_SIZE; // 100 + 1614 = 1714
-
-// Bech32m encoding: prefix('bfcred') + '1' + data + checksum(6). Overhead = prefix.length + 1 + 6
-const BFCRED_HRP = 'bfcred';
-const BFCRED_OVERHEAD = BFCRED_HRP.length + 1 + 6;
-
-const MIN_BFCRED_LENGTH = Math.floor(MIN_BFCRED_RAW_DATA_SIZE * 8 / 5) + BFCRED_OVERHEAD; // Using 8/5 factor for bech32
-const MAX_BFCRED_LENGTH = Math.ceil(MAX_BFCRED_RAW_DATA_SIZE * 8 / 5) + BFCRED_OVERHEAD + 15; // Add a small buffer, similar to other max lengths
-
-/**
- * Validates a nostr secret key (nsec) format
- * @param nsec The string to validate as nsec
- * @returns Validation result object
- */
-export function validateNsec(nsec: string): { isValid: boolean; message?: string } {
-  if (!nsec || !nsec.trim()) {
-    return { isValid: false, message: 'Nsec is required' };
-  }
-
-  try {
-    const { type, data } = nip19.decode(nsec);
-    if (type !== 'nsec') {
-      return { isValid: false, message: 'Invalid nsec format' };
-    }
-    return { isValid: true };
-  } catch (error) {
-    return { 
-      isValid: false, 
-      message: 'Invalid nsec format' 
-    };
-  }
+export interface PasswordValidationResult {
+  isValid: boolean;
+  hasMinLength: boolean;
+  hasUppercase: boolean;
+  hasLowercase: boolean;
+  hasNumbers: boolean;
+  hasSpecialChars: boolean;
 }
 
 /**
- * Validates a hex private key format
- * @param hexPrivkey The string to validate as hex privkey
- * @returns Validation result object
+ * Validates password strength according to application requirements
+ * @param password - The password to validate
+ * @returns PasswordValidationResult object with validation details
  */
-export function validateHexPrivkey(hexPrivkey: string): { isValid: boolean; message?: string } {
-  if (!hexPrivkey || !hexPrivkey.trim()) {
-    return { isValid: false, message: 'Private key is required' };
-  }
-
-  // Check if it's a valid hex string of correct length (64 characters for 32 bytes)
-  const hexRegex = /^[0-9a-fA-F]{64}$/;
-  if (!hexRegex.test(hexPrivkey)) {
-    return { isValid: false, message: 'Invalid hex private key format (should be 64 hex characters)' };
-  }
-
-  return { isValid: true };
-}
-
-/**
- * Validates a Bifrost share format
- * @param share The string to validate as a Bifrost share
- * @returns Validation result object
- */
-export function validateShare(share: string): { isValid: boolean; message?: string } {
-  if (!share || !share.trim()) {
-    return { isValid: false, message: 'Share is required' };
-  }
-
-  // Basic prefix check
-  if (!share.startsWith('bfshare')) {
-    return { isValid: false, message: 'Invalid share format (should start with bfshare)' };
-  }
+export function validatePassword(password: string): PasswordValidationResult {
+  const hasMinLength = password.length >= 8;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasLowercase = /[a-z]/.test(password);
+  const hasNumbers = /\d/.test(password);
+  const hasSpecialChars = /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(password);
   
-  // Length check based on expected bech32 encoded share
-  if (share.length < MIN_BFSHARE_LENGTH || share.length > MAX_BFSHARE_LENGTH) {
-    return { 
-      isValid: false, 
-      message: `Invalid share length (expected around ${MIN_BFSHARE_LENGTH} characters)` 
-    };
-  }
-
-  // Don't use nip19.decode for bech32m validation - it's incompatible
-  // Instead, use basic format checks and rely on Bifrost's decoder for deep validation
-  
-  // Basic format check - bech32m has a similar format to bech32:
-  // [prefix]1[data][checksum] - the '1' separates the human-readable part from the data
-  const formatCheck = /^bfshare1[023456789acdefghjklmnpqrstuvwxyz]+$/;
-  if (!formatCheck.test(share)) {
-    return {
-      isValid: false,
-      message: 'Invalid share format - must be in bech32m format'
-    };
-  }
-  
-  // Leave deeper validation to the Bifrost decoder function
-  return { isValid: true };
-}
-
-/**
- * Validates a Bifrost group format
- * @param group The string to validate as a Bifrost group
- * @returns Validation result object
- */
-export function validateGroup(group: string): { isValid: boolean; message?: string } {
-  if (!group || !group.trim()) {
-    return { isValid: false, message: 'Group is required' };
-  }
-
-  // Basic prefix check
-  if (!group.startsWith('bfgroup')) {
-    return { isValid: false, message: 'Invalid group format (should start with bfgroup)' };
-  }
-  
-  // Length check based on expected bech32 encoded group
-  if (group.length < MIN_BFGROUP_LENGTH) {
-    return { 
-      isValid: false, 
-      message: `Invalid group length (expected at least ${MIN_BFGROUP_LENGTH} characters)` 
-    };
-  }
-  
-  if (group.length > MAX_BFGROUP_LENGTH) {
-    return {
-      isValid: false,
-      message: `Group credential too long (maximum expected length is ${MAX_BFGROUP_LENGTH} characters)`
-    };
-  }
-
-  // Don't use nip19.decode for bech32m validation - it's incompatible
-  // Instead, use basic format checks and rely on Bifrost's decoder for deep validation
-  
-  // Basic format check - bech32m has a similar format to bech32:
-  // [prefix]1[data][checksum] - the '1' separates the human-readable part from the data
-  const formatCheck = /^bfgroup1[023456789acdefghjklmnpqrstuvwxyz]+$/;
-  if (!formatCheck.test(group)) {
-    return {
-      isValid: false,
-      message: 'Invalid group format - must be in bech32m format'
-    };
-  }
-  
-  // Leave deeper validation to the Bifrost decoder function
-  return { isValid: true };
-}
-
-/**
- * Validates a nostr relay URL
- * @param relay The string to validate as a relay URL
- * @returns Validation result object
- */
-export function validateRelay(relay: string): { isValid: boolean; message?: string; normalized?: string } {
-  if (!relay || !relay.trim()) {
-    return { isValid: false, message: 'Relay URL is required' };
-  }
-
-  // Normalize the relay URL
-  let normalized = relay.trim();
-  
-  // Replace http:// or https:// with wss://, or add wss:// if no protocol is present
-  if (normalized.startsWith('http://') || normalized.startsWith('https://')) {
-    // Extract the part after the protocol
-    const urlWithoutProtocol = normalized.split('//')[1];
-    normalized = `wss://${urlWithoutProtocol}`;
-  } else if (!normalized.startsWith('wss://') && !normalized.startsWith('ws://')) {
-    normalized = `wss://${normalized}`;
-  }
-  
-  // Remove trailing slash if present
-  if (normalized.endsWith('/')) {
-    normalized = normalized.slice(0, -1);
-  }
-
-  try {
-    // Check if it's a valid URL
-    const url = new URL(normalized);
-    if (url.protocol !== 'wss:' && url.protocol !== 'ws:') {
-      return { isValid: false, message: 'Relay URL must use wss:// or ws:// protocol' };
-    }
-    
-    return { 
-      isValid: true,
-      normalized
-    };
-  } catch (error) {
-    return { 
-      isValid: false, 
-      message: 'Invalid relay URL format' 
-    };
-  }
-}
-
-/**
- * A reusable form input component factory with validation
- * @param value The current value
- * @param validator The validation function to use
- * @returns An object with validation state and handler
- */
-export function useFormInput<T>(
-  initialValue: string,
-  validator: (value: string) => { isValid: boolean; message?: string; normalized?: string }
-) {
-  const [value, setValue] = React.useState(initialValue);
-  const [isValid, setIsValid] = React.useState(false);
-  const [errorMessage, setErrorMessage] = React.useState<string | undefined>(undefined);
-  const [normalized, setNormalized] = React.useState<string | undefined>(undefined);
-
-  const handleChange = (newValue: string) => {
-    setValue(newValue);
-    const result = validator(newValue);
-    setIsValid(result.isValid);
-    setErrorMessage(result.message);
-    setNormalized(result.normalized);
+  return {
+    isValid: hasMinLength && hasUppercase && hasLowercase && hasNumbers && hasSpecialChars,
+    hasMinLength,
+    hasUppercase,
+    hasLowercase,
+    hasNumbers,
+    hasSpecialChars
   };
+}
 
-  React.useEffect(() => {
-    // Validate initial value
-    if (initialValue) {
-      const result = validator(initialValue);
-      setIsValid(result.isValid);
-      setErrorMessage(result.message);
-      setNormalized(result.normalized);
-    }
-  }, [initialValue]);
+/**
+ * Password validation requirements for display purposes
+ */
+export const PASSWORD_REQUIREMENTS = {
+  minLength: 8,
+  requireUppercase: true,
+  requireLowercase: true,
+  requireNumbers: true,
+  requireSpecialChars: true,
+  specialCharsPattern: '[!@#$%^&*()_+\\-=\\[\\]{};\':"\\\\|,.<>\\/?]'
+} as const;
+
+export interface RelayUrlValidationResult {
+  isValid: boolean;
+  formatted: string;
+  message?: string;
+}
+
+export interface SaltValidationResult {
+  isValid: boolean;
+  hasMinLength: boolean;
+  isHexadecimal: boolean;
+  message?: string;
+}
+
+/**
+ * Salt validation requirements for display purposes
+ */
+export const SALT_REQUIREMENTS = {
+  minLength: 16, // Minimum 16 hex characters (8 bytes)
+  hexPattern: /^[0-9a-fA-F]+$/
+} as const;
+
+/**
+ * Validates a salt value according to application requirements
+ * @param salt - The salt to validate
+ * @returns SaltValidationResult object with validation details
+ */
+export function validateSalt(salt: string): SaltValidationResult {
+  if (!salt || typeof salt !== 'string') {
+    return {
+      isValid: false,
+      hasMinLength: false,
+      isHexadecimal: false,
+      message: 'Salt is required'
+    };
+  }
+
+  const hasMinLength = salt.length >= SALT_REQUIREMENTS.minLength;
+  const isHexadecimal = SALT_REQUIREMENTS.hexPattern.test(salt);
+  
+  let message: string | undefined;
+  if (!isHexadecimal) {
+    message = 'Salt must contain only hexadecimal characters (0-9, a-f, A-F)';
+  } else if (!hasMinLength) {
+    message = `Salt must be at least ${SALT_REQUIREMENTS.minLength} characters long`;
+  }
 
   return {
-    value,
-    isValid,
-    errorMessage,
-    normalized,
-    handleChange
+    isValid: hasMinLength && isHexadecimal,
+    hasMinLength,
+    isHexadecimal,
+    message
   };
 }
 
 /**
- * Validates a Bifrost credential string (bfcred)
- * @param cred The string to validate as a Bifrost credential
- * @returns Validation result object
+ * Validates if a string is a proper salt value
+ * @param salt - The salt to validate
+ * @returns boolean indicating if the salt is valid
  */
-export function validateBfcred(cred: string): { isValid: boolean; message?: string } {
-  if (!cred || !cred.trim()) {
-    return { isValid: false, message: 'Credential string is required' };
-  }
+export function isValidSalt(salt: string): boolean {
+  return validateSalt(salt).isValid;
+}
 
-  // Basic prefix check for the Human-Readable Part (HRP)
-  if (!cred.startsWith(BFCRED_HRP)) {
-    return { isValid: false, message: `Invalid credential format (should start with ${BFCRED_HRP})` };
+/**
+ * Validates if a string is a valid hostname
+ * @param hostname - The hostname to validate
+ * @returns boolean indicating if the hostname is valid
+ */
+function isValidHostname(hostname: string): boolean {
+  // Check for basic invalid cases
+  if (!hostname || hostname.length === 0) return false;
+  if (hostname.startsWith('.') || hostname.endsWith('.')) return false;
+  if (hostname.includes('..')) return false;
+  
+  // Valid hostname patterns:
+  // - Domain names: example.com, relay.nostr.com, sub.domain.example.com
+  // - IP addresses: 192.168.1.1, 127.0.0.1
+  // - Localhost: localhost
+  // - With port: example.com:8080, 192.168.1.1:7777
+  
+  // Split hostname and port if present
+  const parts = hostname.split(':');
+  if (parts.length > 2) return false; // Too many colons
+  
+  const host = parts[0];
+  const port = parts[1];
+  
+  // Validate port if present
+  if (port) {
+    const portNum = parseInt(port, 10);
+    if (isNaN(portNum) || portNum < 1 || portNum > 65535) return false;
   }
   
-  // Length check
-  if (cred.length < MIN_BFCRED_LENGTH) {
-    return { 
-      isValid: false, 
-      message: `Invalid credential length (expected at least ${MIN_BFCRED_LENGTH} characters, got ${cred.length})` 
-    };
+  // Validate the host part
+  // Check if it's an IP address
+  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipPattern.test(host)) {
+    // Validate IP address ranges
+    const ipParts = host.split('.').map(Number);
+    return ipParts.every(part => part >= 0 && part <= 255);
   }
   
-  if (cred.length > MAX_BFCRED_LENGTH) {
+  // Special case for localhost
+  if (host === 'localhost') return true;
+  
+  // Check if it's a valid domain name with at least one dot (for relay URLs we expect proper domains)
+  if (!host.includes('.')) {
+    // Single-label hostnames are generally not valid for WebSocket relays
+    // except for special cases like localhost (handled above)
+    return false;
+  }
+  
+  const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
+  if (!domainPattern.test(host)) return false;
+  
+  // Additional checks for domain names
+  const labels = host.split('.');
+  if (labels.length < 2) return false; // Must have at least domain.tld
+  
+  return labels.every(label => {
+    // Each label should be 1-63 characters
+    if (label.length === 0 || label.length > 63) return false;
+    // Each label should not start or end with hyphen
+    if (label.startsWith('-') || label.endsWith('-')) return false;
+    // Each label should be alphanumeric with hyphens
+    return /^[a-zA-Z0-9-]+$/.test(label);
+  });
+}
+
+/**
+ * Formats a relay URL according to application standards
+ * @param url - The URL to format
+ * @returns RelayUrlValidationResult with formatted URL and validation info
+ */
+export function formatRelayUrl(url: string): RelayUrlValidationResult {
+  if (!url || typeof url !== 'string') {
     return {
       isValid: false,
-      message: `Credential string too long (maximum expected length ${MAX_BFCRED_LENGTH} characters, got ${cred.length})`
+      formatted: '',
+      message: 'URL is required'
     };
   }
 
-  // Basic format check for bech32m: [hrp]1[data][checksum]
-  const formatCheck = new RegExp(`^${BFCRED_HRP}1[023456789acdefghjklmnpqrstuvwxyz]+$`);
-  if (!formatCheck.test(cred)) {
+  const original = url;
+  let formatted = url.trim();
+  
+  // Check if it's empty after trimming
+  if (!formatted) {
     return {
       isValid: false,
-      message: 'Invalid credential format - must be in bech32m format (e.g., bfcred1...)'
+      formatted: '',
+      message: 'URL is required'
     };
   }
   
-  // Deeper validation should be handled by the Bifrost library's decoder function
-  return { isValid: true };
+  // Check for invalid protocols first (before we potentially add wss://)
+  if (original.startsWith('http://') || original.startsWith('https://') || original.startsWith('ftp://')) {
+    return {
+      isValid: false,
+      formatted: original,
+      message: 'Must be a WebSocket URL (ws:// or wss://)'
+    };
+  }
+  
+  // Add protocol if missing (only for URLs that don't already have a protocol)
+  if (!formatted.startsWith('ws://') && !formatted.startsWith('wss://')) {
+    // Don't add protocol if it looks like it's just an invalid string
+    if (formatted.includes(' ') || !isValidHostname(formatted)) {
+      return {
+        isValid: false,
+        formatted: original,
+        message: 'Invalid URL format'
+      };
+    }
+    formatted = `wss://${formatted}`;
+  }
+  
+  // Remove trailing slash (except for root URLs)
+  if (formatted.endsWith('/') && formatted !== 'wss://' && formatted !== 'ws://') {
+    formatted = formatted.slice(0, -1);
+  }
+
+  // Strict validation using URL parsing
+  let isValid = false;
+  try {
+    const urlObj = new URL(formatted);
+    
+    // Check protocol
+    if (urlObj.protocol !== 'ws:' && urlObj.protocol !== 'wss:') {
+      isValid = false;
+    } else {
+      // Validate the hostname part
+      const hostname = urlObj.port ? `${urlObj.hostname}:${urlObj.port}` : urlObj.hostname;
+      isValid = isValidHostname(hostname) && 
+                formatted.length > 6 &&
+                !formatted.includes(' ') &&
+                formatted !== 'wss://' && 
+                formatted !== 'ws://';
+    }
+  } catch {
+    isValid = false;
+  }
+  
+  return {
+    isValid,
+    formatted,
+    message: isValid ? undefined : 'Invalid WebSocket URL format'
+  };
+}
+
+/**
+ * Validates if a URL is a proper WebSocket relay URL
+ * @param url - The URL to validate
+ * @returns boolean indicating if the URL is valid
+ */
+export function isValidRelayUrl(url: string): boolean {
+  return formatRelayUrl(url).isValid;
 } 

@@ -21,5 +21,11 @@
     "isolatedModules": true
   },
   "include": ["src/**/*", "src/types/*.d.ts"],
-  "exclude": ["node_modules"]
+  "exclude": [
+    "node_modules",
+    "src/**/*.test.ts",
+    "src/**/*.test.tsx", 
+    "src/__tests__/**/*",
+    "coverage/**/*"
+  ]
 }

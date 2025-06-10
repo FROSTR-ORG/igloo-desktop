@@ -1,15 +1,17 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
-import { get_node } from "@/lib/bifrost"
+import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle } from "lucide-react"
-import type { SignatureEntry, ECDHPackage, SignSessionPackage } from '@frostr/bifrost'
+import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
-import { validateShare, validateGroup } from "@/lib/validation"
-import { decode_share, decode_group } from "@/lib/bifrost"
+import type { 
+  SignerHandle, 
+  SignerProps
+} from '@/types';
 
 // Add CSS for the pulse animation
 const pulseStyle = `
@@ -34,54 +36,29 @@ const pulseStyle = `
   }
 `;
 
-interface SignerProps {
-  initialData?: {
-    share: string;
-    groupCredential: string;
-  } | null;
-}
-
-// Export the handle type for type safety
-export interface SignerHandle {
-  stopSigner: () => Promise<void>;
-}
+// SignerProps and SignerHandle are imported from types
 
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
 const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
+  const [isConnecting, setIsConnecting] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
   const [isShareValid, setIsShareValid] = useState(false);
-  const [shareError, setShareError] = useState<string | undefined>(undefined);
-  
   const [relayUrls, setRelayUrls] = useState<string[]>([DEFAULT_RELAY]);
   const [newRelayUrl, setNewRelayUrl] = useState("");
   
   const [groupCredential, setGroupCredential] = useState(initialData?.groupCredential || "");
   const [isGroupValid, setIsGroupValid] = useState(false);
-  const [groupError, setGroupError] = useState<string | undefined>(undefined);
   
   const [copiedStates, setCopiedStates] = useState({
     group: false,
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  const [showSignerTooltip, setShowSignerTooltip] = useState(false);
-  const [showRelayTooltip, setShowRelayTooltip] = useState(false);
   
-  const nodeRef = useRef<any>(null);
-
-  // Add effect to cleanup on unmount
-  useEffect(() => {
-    // Cleanup function that runs when component unmounts
-    return () => {
-      if (isSignerRunning) {
-        addLog('info', 'Signer stopped due to page navigation');
-        cleanupNode();
-        setIsSignerRunning(false);
-      }
-    };
-  }, [isSignerRunning]);
+  const nodeRef = useRef<BifrostNode | null>(null);
+  
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
@@ -92,101 +69,111 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   }));
 
-  const addLog = (type: string, message: string, data?: any) => {
-    const timestamp = new Date().toLocaleTimeString();
-    const id = Math.random().toString(36).substr(2, 9);
-    setLogs(prev => [...prev, { timestamp, type, message, data, id }]);
-  };
+  // Helper function to safely detect duplicate log entries
+  const isDuplicateLog = (newData: unknown, recentLogs: LogEntryData[]): boolean => {
+    if (!newData || typeof newData !== 'object') {
+      return false;
+    }
 
-  // Add cleanup function
-  const cleanupNode = () => {
-    if (nodeRef.current) {
-      try {
-        // Remove event listeners
-        if (nodeRef.current.listeners) {
-          const { ready, message, error, disconnect } = nodeRef.current.listeners;
-          nodeRef.current.client?.off('ready', ready);
-          nodeRef.current.client?.off('message', message);
-          nodeRef.current.client?.off('error', error);
-          nodeRef.current.client?.off('disconnect', disconnect);
-        }
+    // Fast path: check for duplicate IDs and tags without serialization
+    if ('id' in newData && 'tag' in newData && newData.id && newData.tag) {
+      return recentLogs.some(log => 
+        log.data && 
+        typeof log.data === 'object' && 
+        'id' in log.data &&
+        'tag' in log.data &&
+        log.data.id === newData.id && 
+        log.data.tag === newData.tag
+      );
+    }
 
-        // Remove Bifrost specific listeners
+    // Fallback: safe serialization comparison for complex objects
+    try {
+      const newDataString = JSON.stringify(newData);
+      return recentLogs.some(log => {
+        if (!log.data) return false;
+        
         try {
-          nodeRef.current.off('ready');
-          nodeRef.current.off('closed');
-          nodeRef.current.off('message');
-          nodeRef.current.off('bounced');
-
-          // Remove ECDH events
-          nodeRef.current.off('/ecdh/sender/req');
-          nodeRef.current.off('/ecdh/sender/res');
-          nodeRef.current.off('/ecdh/sender/rej');
-          nodeRef.current.off('/ecdh/sender/ret');
-          nodeRef.current.off('/ecdh/sender/err');
-          nodeRef.current.off('/ecdh/handler/req');
-          nodeRef.current.off('/ecdh/handler/res');
-          nodeRef.current.off('/ecdh/handler/rej');
-
-          // Remove Signature events
-          nodeRef.current.off('/sign/sender/req');
-          nodeRef.current.off('/sign/sender/res');
-          nodeRef.current.off('/sign/sender/rej');
-          nodeRef.current.off('/sign/sender/ret');
-          nodeRef.current.off('/sign/sender/err');
-          nodeRef.current.off('/sign/handler/req');
-          nodeRef.current.off('/sign/handler/res');
-          nodeRef.current.off('/sign/handler/rej');
-        } catch (e) {
-          console.warn('Error removing event listeners:', e);
+          const logDataString = typeof log.data === 'string' 
+            ? log.data 
+            : JSON.stringify(log.data);
+          return logDataString === newDataString;
+        } catch {
+          // If serialization fails, assume not duplicate to avoid false positives
+          return false;
         }
-
-        // Thoroughly attempt to disconnect the node
-        try {
-          // Try calling disconnect on the node itself (if available)
-          if (typeof nodeRef.current.disconnect === 'function') {
-            nodeRef.current.disconnect();
-          }
-          
-          // Disconnect the client
-          if (nodeRef.current.client) {
-            // Try force close method if it exists
-            if (typeof nodeRef.current.client.close === 'function') {
-              nodeRef.current.client.close();
-            }
-            
-            // Try normal disconnect
-            if (typeof nodeRef.current.client.disconnect === 'function') {
-              nodeRef.current.client.disconnect();
-            }
-            
-            // Null out the client reference
-            nodeRef.current.client = null;
-          }
-        } catch (e) {
-          console.warn('Error disconnecting:', e);
-        }
-      } catch (error) {
-        console.error('Error during cleanup:', error);
-      }
-      
-      // Completely clear the node reference
-      nodeRef.current = null;
+      });
+    } catch {
+      // If initial serialization fails (circular refs, etc.), skip duplicate check
+      return false;
     }
   };
+
+  const addLog = useCallback((type: string, message: string, data?: unknown) => {
+    const timestamp = new Date().toLocaleTimeString();
+    const id = Math.random().toString(36).substr(2, 9);
+    
+    setLogs(prev => {
+      // Only check for duplicates if we have data to compare
+      if (data) {
+        const recentLogs = prev.slice(-5); // Check last 5 entries for performance
+        if (isDuplicateLog(data, recentLogs)) {
+          return prev; // Skip adding duplicate
+        }
+      }
+      
+      return [...prev, { timestamp, type, message, data, id }];
+    });
+  }, []);
+
+  // Clean node cleanup using igloo-core
+  const cleanupNode = useCallback(() => {
+    if (nodeRef.current) {
+      // Temporarily suppress console.warn to hide expected igloo-core warnings
+      const originalWarn = console.warn;
+      const warnOverride = (message: string, ...args: unknown[]) => {
+        // Only suppress the specific expected warning about removeAllListeners
+        if (typeof message === 'string' && message.includes('removeAllListeners not available')) {
+          return; // Skip this expected warning
+        }
+        originalWarn(message, ...args);
+      };
+      console.warn = warnOverride;
+      
+      try {
+        // Use igloo-core's cleanup - it handles the manual cleanup internally
+        cleanupBifrostNode(nodeRef.current);
+      } catch (error) {
+        console.error('Unexpected error during cleanup:', error);
+      } finally {
+        // Restore original console.warn
+        console.warn = originalWarn;
+        nodeRef.current = null;
+      }
+    }
+  }, []);
+
+  // Add effect to cleanup on unmount
+  useEffect(() => {
+    // Cleanup function that runs when component unmounts
+    return () => {
+      if (nodeRef.current) {
+        addLog('info', 'Signer stopped due to page navigation');
+        cleanupNode();
+      }
+    };
+  }, [addLog, cleanupNode]); // Include dependencies
 
   // Validate initial data
   useEffect(() => {
     if (initialData?.share) {
       const validation = validateShare(initialData.share);
       setIsShareValid(validation.isValid);
-      setShareError(validation.message);
     }
     
     if (initialData?.groupCredential) {
       const validation = validateGroup(initialData.groupCredential);
       setIsGroupValid(validation.isValid);
-      setGroupError(validation.message);
     }
   }, [initialData]);
 
@@ -210,7 +197,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid share
-        const decodedShare = decode_share(value);
+        const decodedShare = decodeShare(value);
         
         // Additional structure validation could be done here
         if (typeof decodedShare.idx !== 'number' || 
@@ -218,28 +205,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             typeof decodedShare.binder_sn !== 'string' || 
             typeof decodedShare.hidden_sn !== 'string') {
           setIsShareValid(false);
-          setShareError('Share has invalid internal structure');
           return;
         }
         
         setIsShareValid(true);
-        setShareError(undefined);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Invalid share structure';
+      } catch {
         setIsShareValid(false);
-        
-        // If the error appears to be related to bech32m decode
-        if (errorMessage.includes('malformed') || 
-            errorMessage.includes('decode') || 
-            errorMessage.includes('bech32')) {
-          setShareError('Invalid bfshare format - must be a valid bech32m encoded credential');
-        } else {
-          setShareError(`Invalid share: ${errorMessage}`);
-        }
       }
     } else {
       setIsShareValid(validation.isValid);
-      setShareError(validation.message);
     }
   };
 
@@ -251,7 +225,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid group
-        const decodedGroup = decode_group(value);
+        const decodedGroup = decodeGroup(value);
         
         // Additional structure validation
         if (typeof decodedGroup.threshold !== 'number' || 
@@ -259,28 +233,15 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             !Array.isArray(decodedGroup.commits) ||
             decodedGroup.commits.length === 0) {
           setIsGroupValid(false);
-          setGroupError('Group credential has invalid internal structure');
           return;
         }
         
         setIsGroupValid(true);
-        setGroupError(undefined);
-      } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : 'Invalid group structure';
+      } catch {
         setIsGroupValid(false);
-        
-        // If the error appears to be related to bech32m decode
-        if (errorMessage.includes('malformed') || 
-            errorMessage.includes('decode') || 
-            errorMessage.includes('bech32')) {
-          setGroupError('Invalid bfgroup format - must be a valid bech32m encoded credential');
-        } else {
-          setGroupError(`Invalid group: ${errorMessage}`);
-        }
       }
     } else {
       setIsGroupValid(validation.isValid);
-      setGroupError(validation.message);
     }
   };
 
@@ -304,81 +265,68 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     try {
       // Ensure cleanup before starting
       cleanupNode();
+      setIsConnecting(true);
+      addLog('info', 'Creating and connecting node...');
 
-      const node = get_node({ 
+      // Use the improved createConnectedNode API which returns enhanced state info
+      const result = await createConnectedNode({ 
         group: groupCredential, 
         share: signerSecret, 
         relays: relayUrls 
       });
 
-      nodeRef.current = node;
+      nodeRef.current = result.node;
 
-      // Store event listener references for cleanup
-      const readyListener = () => {
-        addLog('ready', 'Node connected');
-        setIsSignerRunning(true);
-      };
-      
-      const messageListener = (msg: any) => {
-        addLog('message', 'Received message', msg);
-      };
-
-      const errorListener = (error: unknown) => {
+      // Set up event listeners for state changes
+      result.node.on('closed', () => {
+        addLog('bifrost', 'Bifrost node is closed');
+        setIsSignerRunning(false);
+        setIsConnecting(false);
+      });
+      result.node.on('error', (error: unknown) => {
         addLog('error', 'Node error', error);
         setIsSignerRunning(false);
-      };
+        setIsConnecting(false);
+      });
 
-      const disconnectListener = () => {
-        addLog('disconnect', 'Node disconnected');
-        setIsSignerRunning(false);
-      };
-
-      // Store listeners in nodeRef for cleanup
-      nodeRef.current.listeners = {
-        ready: readyListener,
-        message: messageListener,
-        error: errorListener,
-        disconnect: disconnectListener
-      };
-
-      // Attach listeners
-      node.client.on('ready', readyListener);
-      node.client.on('message', messageListener);
-      node.client.on('error', errorListener);
-      node.client.on('disconnect', disconnectListener);
-
-      // Add Bifrost specific event listeners
-      node.on('ready', () => addLog('bifrost', 'Bifrost node is ready'));
-      node.on('closed', () => addLog('bifrost', 'Bifrost node is closed'));
-      node.on('message', (msg: any) => addLog('bifrost', 'Received message', msg));
-      node.on('bounced', (reason: string, msg: any) => addLog('bifrost', `Message bounced: ${reason}`, msg));
+      // Set up comprehensive event logging
+      result.node.on('bounced', (reason: string, msg: unknown) => addLog('bifrost', `Message bounced: ${reason}`, msg));
 
       // ECDH events
-      node.on('/ecdh/sender/req', (msg: any) => addLog('ecdh', 'ECDH request sent', msg));
-      node.on('/ecdh/sender/res', (...msgs: any[]) => addLog('ecdh', 'ECDH responses received', msgs));
-      node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
-      node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
-      node.on('/ecdh/sender/err', (reason: string, msgs: any[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
-      node.on('/ecdh/handler/req', (msg: any) => addLog('ecdh', 'ECDH request received', msg));
-      node.on('/ecdh/handler/res', (msg: any) => addLog('ecdh', 'ECDH response sent', msg));
-      node.on('/ecdh/handler/rej', (reason: string, msg: any) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
+      result.node.on('/ecdh/sender/req', (msg: unknown) => addLog('ecdh', 'ECDH request sent', msg));
+      result.node.on('/ecdh/sender/res', (...msgs: unknown[]) => addLog('ecdh', 'ECDH responses received', msgs));
+      result.node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
+      result.node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
+      result.node.on('/ecdh/sender/err', (reason: string, msgs: unknown[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
+      result.node.on('/ecdh/handler/req', (msg: unknown) => addLog('ecdh', 'ECDH request received', msg));
+      result.node.on('/ecdh/handler/res', (msg: unknown) => addLog('ecdh', 'ECDH response sent', msg));
+      result.node.on('/ecdh/handler/rej', (reason: string, msg: unknown) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
 
       // Signature events
-      node.on('/sign/sender/req', (msg: any) => addLog('sign', 'Signature request sent', msg));
-      node.on('/sign/sender/res', (...msgs: any[]) => addLog('sign', 'Signature responses received', msgs));
-      node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
-      node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
-      node.on('/sign/sender/err', (reason: string, msgs: any[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
-      node.on('/sign/handler/req', (msg: any) => addLog('sign', 'Signature request received', msg));
-      node.on('/sign/handler/res', (msg: any) => addLog('sign', 'Signature response sent', msg));
-      node.on('/sign/handler/rej', (reason: string, msg: any) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+      result.node.on('/sign/sender/req', (msg: unknown) => addLog('sign', 'Signature request sent', msg));
+      result.node.on('/sign/sender/res', (...msgs: unknown[]) => addLog('sign', 'Signature responses received', msgs));
+      result.node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
+      result.node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
+      result.node.on('/sign/sender/err', (reason: string, msgs: unknown[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
+      result.node.on('/sign/handler/req', (msg: unknown) => addLog('sign', 'Signature request received', msg));
+      result.node.on('/sign/handler/res', (msg: unknown) => addLog('sign', 'Signature response sent', msg));
+      result.node.on('/sign/handler/rej', (reason: string, msg: unknown) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
 
-      await node.connect();
+      // Use the enhanced state info from createConnectedNode
+      if (result.state.isReady) {
+        addLog('info', 'Node connected and ready');
+        setIsConnecting(false);
+        setIsSignerRunning(true);
+      } else {
+        addLog('warning', 'Node created but not yet ready, waiting...');
+        // Keep connecting state until ready
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
       cleanupNode();
       setIsSignerRunning(false);
+      setIsConnecting(false);
     }
   };
 
@@ -387,6 +335,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       cleanupNode();
       addLog('info', 'Signer stopped');
       setIsSignerRunning(false);
+      setIsConnecting(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to stop signer', { error: errorMessage });
@@ -412,6 +361,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
             <Tooltip 
               trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+              position="right"
               content={
                 <>
                   <p className="mb-2 font-semibold">Important:</p>
@@ -424,57 +374,108 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           <div className="space-y-6">
             <div className="space-y-3">
               <div className="flex">
-                <Input
-                  type="text"
-                  value={groupCredential}
-                  onChange={(e) => handleGroupChange(e.target.value)}
-                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                  disabled={isSignerRunning}
+                <Tooltip 
+                  trigger={
+                    <Input
+                      type="text"
+                      value={groupCredential}
+                      onChange={(e) => handleGroupChange(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                      disabled={isSignerRunning || isConnecting}
+                      placeholder="Enter your group credential (bfgroup...)"
+                      aria-label="Group credential input"
+                    />
+                  }
+                  position="top"
+                  triggerClassName="w-full block"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Group Credential:</p>
+                      <p>
+                        This is your group data that contains the public information about
+                        your keyset, including the threshold and group public key. It starts
+                        with &apos;bfgroup&apos; and is shared among all signers. It is used to
+                        identify the group and the threshold for signing.
+                      </p>
+                    </>
+                  }
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(groupCredential, 'group')}
-                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!groupCredential || !isGroupValid}
-                >
-                  {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(groupCredential, 'group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                      aria-label="Copy group credential"
+                    >
+                      {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
-              {groupError && (
-                <p className="text-red-400 text-sm">{groupError}</p>
-              )}
               
               <div className="flex">
-                <Input
-                  type="password"
-                  value={signerSecret}
-                  onChange={(e) => handleShareChange(e.target.value)}
-                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                  disabled={isSignerRunning}
+                <Tooltip 
+                  trigger={
+                    <Input
+                      type="password"
+                      value={signerSecret}
+                      onChange={(e) => handleShareChange(e.target.value)}
+                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                      disabled={isSignerRunning || isConnecting}
+                      placeholder="Enter your secret share (bfshare...)"
+                      aria-label="Secret share input"
+                    />
+                  }
+                  position="top"
+                  triggerClassName="w-full block"
+                  content={
+                    <>
+                      <p className="mb-2 font-semibold">Secret Share:</p>
+                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with &apos;bfshare&apos; and should be kept private and secure. Each signer needs a share to participate in signing.</p>
+                    </>
+                  }
                 />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={() => handleCopy(signerSecret, 'share')}
-                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!signerSecret || !isShareValid}
-                >
-                  {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                </Button>
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopy(signerSecret, 'share')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!signerSecret || !isShareValid}
+                      aria-label="Copy secret share"
+                    >
+                      {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Copy"
+                />
               </div>
-              {shareError && (
-                <p className="text-red-400 text-sm">{shareError}</p>
-              )}
               
               <div className="flex items-center justify-between mt-6">
                 <div className="flex items-center gap-2">
                   <div className={`w-3 h-3 rounded-full ${
                     isSignerRunning 
                       ? 'bg-green-500 pulse-animation' 
+                      : isConnecting
+                      ? 'bg-yellow-500 pulse-animation'
                       : 'bg-red-500'
                   }`}></div>
-                  <span className="text-gray-300">Signer {isSignerRunning ? 'Running' : 'Stopped'}</span>
+                  <span className="text-gray-300">
+                    Signer {
+                      isSignerRunning ? 'Running' : 
+                      isConnecting ? 'Connecting...' : 
+                      'Stopped'
+                    }
+                  </span>
                 </div>
                 <Button
                   onClick={handleSignerButtonClick}
@@ -483,9 +484,9 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       ? "bg-red-600 hover:bg-red-700"
                       : "bg-green-600 hover:bg-green-700"
                   } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
-                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0}
+                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0 || isConnecting}
                 >
-                  {isSignerRunning ? "Stop Signer" : "Start Signer"}
+                  {isSignerRunning ? "Stop Signer" : isConnecting ? "Connecting..." : "Start Signer"}
                 </Button>
               </div>
             </div>
@@ -495,6 +496,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                 <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
                 <Tooltip 
                   trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
+                  position="right"
                   content={
                     <>
                       <p className="mb-2 font-semibold">Important:</p>
@@ -510,12 +512,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   value={newRelayUrl}
                   onChange={(e) => setNewRelayUrl(e.target.value)}
                   className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
-                  disabled={isSignerRunning}
+                  disabled={isSignerRunning || isConnecting}
                 />
                 <Button
                   onClick={handleAddRelay}
                   className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!newRelayUrl.trim() || isSignerRunning}
+                  disabled={!newRelayUrl.trim() || isSignerRunning || isConnecting}
                 >
                   Add
                 </Button>
@@ -531,7 +533,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                       icon={<X className="h-4 w-4" />}
                       onClick={() => handleRemoveRelay(relay)}
                       tooltip="Remove relay"
-                      disabled={isSignerRunning || relayUrls.length <= 1}
+                      disabled={isSignerRunning || isConnecting || relayUrls.length <= 1}
                     />
                   </div>
                 ))}
@@ -550,4 +552,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   );
 });
 
-export default Signer; 
+Signer.displayName = 'Signer';
+
+export default Signer;
+export type { SignerHandle }; 
