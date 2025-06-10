@@ -3,3 +3,25 @@ dist
 node_modules
 .DS_Store
 /release
+
+# Test coverage reports
+coverage/
+*.lcov
+
+# Jest cache
+.jest/
+
+# Test artifacts  
+*.log
+junit.xml
+test-results/
+
+# IDE/Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS generated files
+Thumbs.db
+ehthumbs.db

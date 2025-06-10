@@ -1,6 +1,6 @@
 # Igloo Build and Release Process
 
-This document outlines the process for building and releasing Igloo.
+This document outlines the process for building and releasing Igloo-desktop.
 
 ## Prerequisites
 

@@ -1,22 +1,12 @@
 import { ipcRenderer } from 'electron';
+import { decodeShare } from '@frostr/igloo-core';
+import type { IglooShare } from '@/types';
 
 // Debug helper for group auto-population
 const DEBUG_GROUP_AUTO = true;
 
-export interface IglooShare {
-  id: string;
-  name: string;
-  share: string;
-  salt: string;
-  groupCredential: string;
-  savedAt?: string;
-  shareCredential?: string;
-  metadata?: {
-    binder_sn?: string;
-    [key: string]: any;
-  };
-  [key: string]: any;
-}
+// Re-export for backward compatibility
+export type { IglooShare };
 
 class ClientShareManager {
   async getShares(): Promise<IglooShare[] | false> {
@@ -36,26 +26,31 @@ class ClientShareManager {
     const shares = await this.getShares();
     if (!shares || !Array.isArray(shares)) return [];
     
-    // Filter shares that might have the matching binder_sn
+    // Compute prefix once for efficiency
+    const prefix = binderSN.substring(0, 8);
+    
+        // Filter shares that might have the matching binder_sn
     const matches = shares.filter(share => {
       // Match by metadata if available
       if (share.metadata && share.metadata.binder_sn === binderSN) {
         return true;
       }
       
-      // Match by partial share ID (some implementations store this)
-      if (share.id && share.id.includes(binderSN.substring(0, 8))) {
-        return true;
+      // Match by discrete ID segments to prevent false positives
+      if (share.id) {
+        const idSegments = share.id.split('-');
+        const idMatch = idSegments.some(segment => segment === prefix);
+        if (idMatch) {
+          return true;
+        }
       }
       
       // Match by share value if unencrypted
       if (share.shareCredential) {
         try {
-          // You would need to import decode_share here or pass it as a parameter
-          // const decodedShare = decode_share(share.shareCredential);
-          // return decodedShare.binder_sn === binderSN;
-          return false; // Uncomment above after importing decode_share
-        } catch (e) {
+          const decodedShare = decodeShare(share.shareCredential);
+          return decodedShare.binder_sn === binderSN;
+        } catch {
           return false;
         }
       }

@@ -1,17 +1,19 @@
 // Import electron and node modules
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const electron = require('electron');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const fsModule = require('fs');
+// eslint-disable-next-line @typescript-eslint/no-require-imports
 const pathModule = require('path');
 
-/**
- * Interface for the share structure
- */
+// Local type definition to avoid ES module imports
 interface IglooShare {
   id: string;
   name: string;
   share: string;
   groupCredential: string;
-  [key: string]: any; // Additional share properties
+  createdAt: string;
+  lastUsed?: string;
 }
 
 /**
@@ -153,8 +155,4 @@ function getAllShares(): IglooShare[] | false {
 }
 
 // Export the ShareManager class and helper functions
-module.exports = {
-  ShareManager,
-  getAllShares,
-  IglooShare: {} as IglooShare // TypeScript interface isn't directly exportable in CommonJS
-}; 
+module.exports = { ShareManager, getAllShares }; 
