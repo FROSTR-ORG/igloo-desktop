@@ -36,7 +36,21 @@ const pulseStyle = `
   }
 `;
 
-// SignerProps and SignerHandle are imported from types
+// Event mapping for cleaner message handling
+const EVENT_MAPPINGS = {
+  '/sign/req': { type: 'sign', message: 'Signature request received' },
+  '/sign/res': { type: 'sign', message: 'Signature response sent' },
+  '/sign/rej': { type: 'sign', message: 'Signature request rejected' },
+  '/sign/ret': { type: 'sign', message: 'Signature shares aggregated' },
+  '/sign/err': { type: 'sign', message: 'Signature share aggregation failed' },
+  '/ecdh/req': { type: 'ecdh', message: 'ECDH request received' },
+  '/ecdh/res': { type: 'ecdh', message: 'ECDH response sent' },
+  '/ecdh/rej': { type: 'ecdh', message: 'ECDH request rejected' },
+  '/ecdh/ret': { type: 'ecdh', message: 'ECDH shares aggregated' },
+  '/ecdh/err': { type: 'ecdh', message: 'ECDH share aggregation failed' },
+  '/ping/req': { type: 'bifrost', message: 'Ping request' },
+  '/ping/res': { type: 'bifrost', message: 'Ping response' },
+} as const;
 
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
@@ -125,6 +139,136 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       return [...prev, { timestamp, type, message, data, id }];
     });
   }, []);
+
+  // Extracted event handling functions for cleaner code
+  const setupBasicEventListeners = useCallback((node: BifrostNode) => {
+    node.on('closed', () => {
+      addLog('bifrost', 'Bifrost node is closed');
+      setIsSignerRunning(false);
+      setIsConnecting(false);
+    });
+    
+    node.on('error', (error: unknown) => {
+      addLog('error', 'Node error', error);
+      setIsSignerRunning(false);
+      setIsConnecting(false);
+    });
+    
+    node.on('ready', (data: unknown) => {
+      addLog('ready', 'Node is ready', data);
+      setIsConnecting(false);
+      setIsSignerRunning(true);
+    });
+    
+    node.on('bounced', (reason: string, msg: unknown) => 
+      addLog('bifrost', `Message bounced: ${reason}`, msg)
+    );
+  }, [addLog, setIsSignerRunning, setIsConnecting]);
+
+  const setupMessageEventListener = useCallback((node: BifrostNode) => {
+    node.on('message', (msg: unknown) => {
+      try {
+        if (msg && typeof msg === 'object' && 'tag' in msg) {
+          const messageData = msg as { tag: string; [key: string]: unknown };
+          const tag = messageData.tag;
+          
+          // Use the event mapping for cleaner code
+          const eventInfo = EVENT_MAPPINGS[tag as keyof typeof EVENT_MAPPINGS];
+          if (eventInfo) {
+            addLog(eventInfo.type, eventInfo.message, msg);
+          } else if (tag.startsWith('/sign/')) {
+            addLog('sign', `Signature event: ${tag}`, msg);
+          } else if (tag.startsWith('/ecdh/')) {
+            addLog('ecdh', `ECDH event: ${tag}`, msg);
+          } else if (tag.startsWith('/ping/')) {
+            addLog('bifrost', `Ping event: ${tag}`, msg);
+          } else {
+            addLog('bifrost', `Message received: ${tag}`, msg);
+          }
+        } else {
+          addLog('bifrost', 'Message received (no tag)', msg);
+        }
+      } catch (error) {
+        addLog('bifrost', 'Error parsing message event', { error, originalMessage: msg });
+      }
+    });
+  }, [addLog]);
+
+  const setupLegacyEventListeners = useCallback((node: BifrostNode) => {
+    const nodeAny = node as any;
+    
+    // Legacy direct event listeners for backward compatibility
+    const legacyEvents = [
+      // ECDH events
+      { event: '/ecdh/sender/req', type: 'ecdh', message: 'ECDH request sent' },
+      { event: '/ecdh/sender/res', type: 'ecdh', message: 'ECDH responses received' },
+      { event: '/ecdh/handler/req', type: 'ecdh', message: 'ECDH request received' },
+      { event: '/ecdh/handler/res', type: 'ecdh', message: 'ECDH response sent' },
+      // Signature events
+      { event: '/sign/sender/req', type: 'sign', message: 'Signature request sent' },
+      { event: '/sign/sender/res', type: 'sign', message: 'Signature responses received' },
+      { event: '/sign/handler/req', type: 'sign', message: 'Signature request received' },
+      { event: '/sign/handler/res', type: 'sign', message: 'Signature response sent' },
+      // Ping events
+      { event: '/ping/sender/req', type: 'bifrost', message: 'Ping request sent' },
+      { event: '/ping/sender/res', type: 'bifrost', message: 'Ping response received' },
+      { event: '/ping/handler/req', type: 'bifrost', message: 'Ping request received' },
+      { event: '/ping/handler/res', type: 'bifrost', message: 'Ping response sent' },
+    ];
+
+    legacyEvents.forEach(({ event, type, message }) => {
+      try {
+        nodeAny.on(event, (msg: unknown) => addLog(type, message, msg));
+      } catch (e) {
+        // Silently ignore if event doesn't exist
+      }
+    });
+
+    // Special handlers for events with different signatures
+    try {
+      node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => 
+        addLog('ecdh', `ECDH request rejected: ${reason}`, pkg)
+      );
+      node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => 
+        addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs)
+      );
+      node.on('/ecdh/sender/err', (reason: string, msgs: unknown[]) => 
+        addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs)
+      );
+      node.on('/ecdh/handler/rej', (reason: string, msg: unknown) => 
+        addLog('ecdh', `ECDH rejection sent: ${reason}`, msg)
+      );
+
+      node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => 
+        addLog('sign', `Signature request rejected: ${reason}`, pkg)
+      );
+      node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => 
+        addLog('sign', `Signature shares aggregated: ${reason}`, msgs)
+      );
+      node.on('/sign/sender/err', (reason: string, msgs: unknown[]) => 
+        addLog('sign', `Signature share aggregation failed: ${reason}`, msgs)
+      );
+      node.on('/sign/handler/rej', (reason: string, msg: unknown) => 
+        addLog('sign', `Signature rejection sent: ${reason}`, msg)
+      );
+
+      // Ping events with special signatures
+      nodeAny.on('/ping/sender/ret', (reason: string, msg: unknown) => 
+        addLog('bifrost', `Ping operation completed: ${reason}`, msg)
+      );
+      nodeAny.on('/ping/sender/err', (reason: string, msg: unknown) => 
+        addLog('bifrost', `Ping operation failed: ${reason}`, msg)
+      );
+      nodeAny.on('/ping/handler/ret', (reason: string, msg: unknown) => 
+        addLog('bifrost', `Ping handled: ${reason}`, msg)
+      );
+      nodeAny.on('/ping/handler/err', (reason: string, msg: unknown) => 
+        addLog('bifrost', `Ping handling failed: ${reason}`, msg)
+      );
+    } catch (e) {
+      addLog('bifrost', 'Error setting up some legacy event listeners', e);
+    }
+  }, [addLog]);
 
   // Clean node cleanup using igloo-core
   const cleanupNode = useCallback(() => {
@@ -277,40 +421,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
       nodeRef.current = result.node;
 
-      // Set up event listeners for state changes
-      result.node.on('closed', () => {
-        addLog('bifrost', 'Bifrost node is closed');
-        setIsSignerRunning(false);
-        setIsConnecting(false);
-      });
-      result.node.on('error', (error: unknown) => {
-        addLog('error', 'Node error', error);
-        setIsSignerRunning(false);
-        setIsConnecting(false);
-      });
-
-      // Set up comprehensive event logging
-      result.node.on('bounced', (reason: string, msg: unknown) => addLog('bifrost', `Message bounced: ${reason}`, msg));
-
-      // ECDH events
-      result.node.on('/ecdh/sender/req', (msg: unknown) => addLog('ecdh', 'ECDH request sent', msg));
-      result.node.on('/ecdh/sender/res', (...msgs: unknown[]) => addLog('ecdh', 'ECDH responses received', msgs));
-      result.node.on('/ecdh/sender/rej', (reason: string, pkg: ECDHPackage) => addLog('ecdh', `ECDH request rejected: ${reason}`, pkg));
-      result.node.on('/ecdh/sender/ret', (reason: string, pkgs: string) => addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs));
-      result.node.on('/ecdh/sender/err', (reason: string, msgs: unknown[]) => addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs));
-      result.node.on('/ecdh/handler/req', (msg: unknown) => addLog('ecdh', 'ECDH request received', msg));
-      result.node.on('/ecdh/handler/res', (msg: unknown) => addLog('ecdh', 'ECDH response sent', msg));
-      result.node.on('/ecdh/handler/rej', (reason: string, msg: unknown) => addLog('ecdh', `ECDH rejection sent: ${reason}`, msg));
-
-      // Signature events
-      result.node.on('/sign/sender/req', (msg: unknown) => addLog('sign', 'Signature request sent', msg));
-      result.node.on('/sign/sender/res', (...msgs: unknown[]) => addLog('sign', 'Signature responses received', msgs));
-      result.node.on('/sign/sender/rej', (reason: string, pkg: SignSessionPackage) => addLog('sign', `Signature request rejected: ${reason}`, pkg));
-      result.node.on('/sign/sender/ret', (reason: string, msgs: SignatureEntry[]) => addLog('sign', `Signature shares aggregated: ${reason}`, msgs));
-      result.node.on('/sign/sender/err', (reason: string, msgs: unknown[]) => addLog('sign', `Signature share aggregation failed: ${reason}`, msgs));
-      result.node.on('/sign/handler/req', (msg: unknown) => addLog('sign', 'Signature request received', msg));
-      result.node.on('/sign/handler/res', (msg: unknown) => addLog('sign', 'Signature response sent', msg));
-      result.node.on('/sign/handler/rej', (reason: string, msg: unknown) => addLog('sign', `Signature rejection sent: ${reason}`, msg));
+      // Set up all event listeners using our extracted functions
+      setupBasicEventListeners(result.node);
+      setupMessageEventListener(result.node);
+      setupLegacyEventListeners(result.node);
 
       // Use the enhanced state info from createConnectedNode
       if (result.state.isReady) {
