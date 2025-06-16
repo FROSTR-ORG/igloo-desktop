@@ -188,8 +188,18 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     const messageHandler = (msg: unknown) => {
       try {
         if (msg && typeof msg === 'object' && 'tag' in msg) {
-          const messageData = msg as { tag: string; [key: string]: unknown };
+          const messageData = msg as { tag: unknown; [key: string]: unknown };
           const tag = messageData.tag;
+          
+          // Ensure tag is a string before calling string methods
+          if (typeof tag !== 'string') {
+            addLog('bifrost', 'Message received (invalid tag type)', { 
+              tagType: typeof tag, 
+              tag, 
+              originalMessage: msg 
+            });
+            return;
+          }
           
           // Use the event mapping for cleaner code
           const eventInfo = EVENT_MAPPINGS[tag as keyof typeof EVENT_MAPPINGS];
