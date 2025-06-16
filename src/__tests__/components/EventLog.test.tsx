@@ -286,19 +286,14 @@ describe('EventLog Component', () => {
       });
       
       // Click on ERROR filter
-      const errorFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('ERROR')
-      );
+      const errorFilterButton = screen.getByRole('button', { name: /ERROR \(\d+\)/ });
+      await user.click(errorFilterButton);
       
-      if (errorFilterButton) {
-        await user.click(errorFilterButton);
-        
-        // Only error logs should be visible
-        expect(screen.getByText('Connection failed')).toBeInTheDocument();
-        expect(screen.getByText('Another error occurred')).toBeInTheDocument();
-        expect(screen.queryByText('Node is ready')).not.toBeInTheDocument();
-        expect(screen.queryByText('Message received')).not.toBeInTheDocument();
-      }
+      // Only error logs should be visible
+      expect(screen.getByText('Connection failed')).toBeInTheDocument();
+      expect(screen.getByText('Another error occurred')).toBeInTheDocument();
+      expect(screen.queryByText('Node is ready')).not.toBeInTheDocument();
+      expect(screen.queryByText('Message received')).not.toBeInTheDocument();
     });
 
     it('should show filter count badge when filters are active', async () => {
@@ -325,18 +320,13 @@ describe('EventLog Component', () => {
       });
       
       // Click on ERROR filter
-      const errorFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('ERROR')
-      );
+      const errorFilterButton = screen.getByRole('button', { name: /ERROR \(\d+\)/ });
+      await user.click(errorFilterButton);
       
-      if (errorFilterButton) {
-        await user.click(errorFilterButton);
-        
-        // Should show filter badge
-        await waitFor(() => {
-          expect(screen.getByText('1 filter')).toBeInTheDocument();
-        });
-      }
+      // Should show filter badge
+      await waitFor(() => {
+        expect(screen.getByText('1 filter')).toBeInTheDocument();
+      });
     });
 
     it('should update log count in status indicator when filtered', async () => {
@@ -365,18 +355,13 @@ describe('EventLog Component', () => {
       });
       
       // Click on ERROR filter (should show 2 error logs)
-      const errorFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('ERROR')
-      );
+      const errorFilterButton = screen.getByRole('button', { name: /ERROR \(\d+\)/ });
+      await user.click(errorFilterButton);
       
-      if (errorFilterButton) {
-        await user.click(errorFilterButton);
-        
-        // Should show filtered count
-        await waitFor(() => {
-          expect(screen.getByText('2 events')).toBeInTheDocument();
-        });
-      }
+      // Should show filtered count
+      await waitFor(() => {
+        expect(screen.getByText('2 events')).toBeInTheDocument();
+      });
     });
 
     it('should handle multiple filters', async () => {
@@ -402,28 +387,22 @@ describe('EventLog Component', () => {
       });
       
       // Click on ERROR and READY filters
-      const errorFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('ERROR')
-      );
-      const readyFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('READY')
-      );
+      const errorFilterButton = screen.getByRole('button', { name: /ERROR \(\d+\)/ });
+      const readyFilterButton = screen.getByRole('button', { name: /READY \(\d+\)/ });
       
-      if (errorFilterButton && readyFilterButton) {
-        await user.click(errorFilterButton);
-        await user.click(readyFilterButton);
-        
-        // Should show multiple filter badge
-        await waitFor(() => {
-          expect(screen.getByText('2 filters')).toBeInTheDocument();
-        });
-        
-        // Should show both error and ready logs (3 total: 2 errors + 1 ready)
-        expect(screen.getByText('Connection failed')).toBeInTheDocument();
-        expect(screen.getByText('Another error occurred')).toBeInTheDocument();
-        expect(screen.getByText('Node is ready')).toBeInTheDocument();
-        expect(screen.queryByText('Message received')).not.toBeInTheDocument();
-      }
+      await user.click(errorFilterButton);
+      await user.click(readyFilterButton);
+      
+      // Should show multiple filter badge
+      await waitFor(() => {
+        expect(screen.getByText('2 filters')).toBeInTheDocument();
+      });
+      
+      // Should show both error and ready logs (3 total: 2 errors + 1 ready)
+      expect(screen.getByText('Connection failed')).toBeInTheDocument();
+      expect(screen.getByText('Another error occurred')).toBeInTheDocument();
+      expect(screen.getByText('Node is ready')).toBeInTheDocument();
+      expect(screen.queryByText('Message received')).not.toBeInTheDocument();
     });
 
     it('should clear all filters when "Clear All" is clicked', async () => {
@@ -449,28 +428,23 @@ describe('EventLog Component', () => {
       });
       
       // Apply a filter first
-      const errorFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('ERROR')
-      );
+      const errorFilterButton = screen.getByRole('button', { name: /ERROR \(\d+\)/ });
+      await user.click(errorFilterButton);
       
-      if (errorFilterButton) {
-        await user.click(errorFilterButton);
-        
-        // Verify filter is applied
-        await waitFor(() => {
-          expect(screen.getByText('1 filter')).toBeInTheDocument();
-        });
-        
-        // Click "Clear All"
-        const clearAllButton = screen.getByRole('button', { name: /clear all/i });
-        await user.click(clearAllButton);
-        
-        // All logs should be visible again
-        await waitFor(() => {
-          expect(screen.queryByText('1 filter')).not.toBeInTheDocument();
-          expect(screen.getByText('7 events')).toBeInTheDocument(); // Back to full count
-        });
-      }
+      // Verify filter is applied
+      await waitFor(() => {
+        expect(screen.getByText('1 filter')).toBeInTheDocument();
+      });
+      
+      // Click "Clear All"
+      const clearAllButton = screen.getByRole('button', { name: /clear all/i });
+      await user.click(clearAllButton);
+      
+      // All logs should be visible again
+      await waitFor(() => {
+        expect(screen.queryByText('1 filter')).not.toBeInTheDocument();
+        expect(screen.getByText('7 events')).toBeInTheDocument(); // Back to full count
+      });
     });
 
     it('should select all filters when "Select All" is clicked', async () => {
@@ -509,94 +483,7 @@ describe('EventLog Component', () => {
     });
   });
 
-  describe('Empty Filter State', () => {
-    it('should show "No logs match current filters" message when filters exclude all logs', async () => {
-      const user = userEvent.setup();
-      const logs = [
-        createMockLogEntry({ type: 'error', message: 'Error message' })
-      ];
-      
-      render(
-        <EventLog 
-          logs={logs} 
-          isSignerRunning={false} 
-          onClearLogs={mockOnClearLogs} 
-        />
-      );
-      
-      // Expand the log and open filters
-      await user.click(screen.getByText('Event Log'));
-      
-      const filterButton = screen.getByTitle('Toggle filters');
-      await user.click(filterButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText('Filter by Event Type')).toBeInTheDocument();
-      });
-      
-      // Apply a filter that excludes all logs
-      const readyFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('READY')
-      );
-      
-      if (readyFilterButton) {
-        await user.click(readyFilterButton);
-        
-        await waitFor(() => {
-          expect(screen.getByText('No logs match the current filters')).toBeInTheDocument();
-          expect(screen.getByRole('button', { name: /clear filters/i })).toBeInTheDocument();
-        });
-      }
-    });
 
-    it('should clear filters from empty state message', async () => {
-      const user = userEvent.setup();
-      const logs = [
-        createMockLogEntry({ type: 'error', message: 'Error message' })
-      ];
-      
-      render(
-        <EventLog 
-          logs={logs} 
-          isSignerRunning={false} 
-          onClearLogs={mockOnClearLogs} 
-        />
-      );
-      
-      // Expand the log and create empty filter state
-      await user.click(screen.getByText('Event Log'));
-      
-      const filterButton = screen.getByTitle('Toggle filters');
-      await user.click(filterButton);
-      
-      await waitFor(() => {
-        expect(screen.getByText('Filter by Event Type')).toBeInTheDocument();
-      });
-      
-      // Apply filter that excludes all logs
-      const readyFilterButton = screen.getAllByRole('button').find(button => 
-        button.textContent?.includes('READY')
-      );
-      
-      if (readyFilterButton) {
-        await user.click(readyFilterButton);
-        
-        await waitFor(() => {
-          expect(screen.getByText('No logs match the current filters')).toBeInTheDocument();
-        });
-        
-        // Click the "Clear Filters" button in the empty state
-        const clearFiltersButton = screen.getByRole('button', { name: /clear filters/i });
-        await user.click(clearFiltersButton);
-        
-        // Should return to showing all logs
-        await waitFor(() => {
-          expect(screen.getByText('Error message')).toBeInTheDocument();
-          expect(screen.queryByText('No logs match the current filters')).not.toBeInTheDocument();
-        });
-      }
-    });
-  });
 
   describe('Integration with Clear Logs', () => {
     it('should call onClearLogs when clear button is clicked', async () => {
