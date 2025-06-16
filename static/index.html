@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🏔️ Igloo Environment Manager</title>
+  <link rel="stylesheet" href="/style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono:wght@400&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body class="bg-gradient-to-br from-slate-900 via-blue-900 to-slate-900 min-h-screen">
+  <div class="container max-w-4xl mx-auto px-6 py-8">
+    <!-- Header -->
+    <div class="text-center mb-8">
+      <h1 class="text-4xl font-bold text-blue-300 mb-2 font-sharetech">🏔️ Igloo Environment Manager</h1>
+      <div class="flex items-center justify-end">
+        <button id="backToShares" class="text-blue-400 hover:text-blue-300 text-sm cursor-pointer font-sharetech transition-colors">
+          ← Back to Shares
+        </button>
+      </div>
+    </div>
+
+    <!-- Main Content -->
+    <div class="space-y-6">
+      <!-- Environment Configuration Card -->
+      <div class="bg-gray-900/30 border border-blue-900/30 backdrop-blur-sm shadow-lg rounded-lg">
+        <div class="p-8 space-y-8">
+          <!-- Section Header with Help -->
+          <div class="flex items-center">
+            <h2 class="text-blue-300 text-lg font-sharetech">Configure your environment settings</h2>
+            <div class="ml-2 text-blue-400 cursor-pointer" id="helpIcon" title="Environment variables configure how your Igloo server behaves. These settings require a server restart to take effect.">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+              </svg>
+            </div>
+          </div>
+          
+          <!-- Environment Variables Section -->
+          <div class="space-y-6">
+            <!-- Quick Setup Templates -->
+            <div class="space-y-3">
+              <div class="flex items-center">
+                <h3 class="text-blue-300 text-sm font-medium font-sharetech">Quick Setup</h3>
+                <div class="ml-2 text-blue-400 cursor-pointer" title="Use these templates to quickly configure common settings">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                  </svg>
+                </div>
+              </div>
+              <div class="flex gap-3">
+                <button class="bg-gray-700/50 hover:bg-gray-700/70 text-blue-300 px-4 py-2 rounded text-sm transition-colors font-medium font-sharetech border border-gray-600 hover:border-gray-500" id="basicTemplateBtn">
+                  Basic Setup
+                </button>
+                <button class="bg-gray-700/50 hover:bg-gray-700/70 text-blue-300 px-4 py-2 rounded text-sm transition-colors font-medium font-sharetech border border-gray-600 hover:border-gray-500" id="fullTemplateBtn">
+                  Full Template
+                </button>
+              </div>
+            </div>
+
+            <!-- Status and Actions -->
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2">
+                <div class="w-3 h-3 rounded-full status-dot" id="statusDot"></div>
+                <span class="text-gray-300 font-sharetech" id="statusText">Loading...</span>
+              </div>
+              <button class="bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded font-sharetech font-medium transition-all duration-200 hover:opacity-90 cursor-pointer" id="addVarBtn">
+                + Add Variable
+              </button>
+            </div>
+
+            <!-- Current Environment Variables -->
+            <div class="space-y-3">
+              <div class="flex items-center">
+                <h3 class="text-blue-300 text-sm font-medium font-sharetech">Environment Variables</h3>
+                <div class="ml-2 text-blue-400 cursor-pointer" title="Manage your server configuration variables">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                  </svg>
+                </div>
+              </div>
+              
+              <!-- Environment Variables List -->
+              <div id="envSection" class="space-y-3">
+                <div id="envList" class="space-y-3">
+                  <!-- Variables will be loaded here -->
+                </div>
+                
+                <div id="noVars" class="text-center py-12 text-gray-500" style="display: none;">
+                  <div class="space-y-3">
+                    <svg class="w-12 h-12 mx-auto text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                    </svg>
+                    <p class="text-lg mb-2">No environment variables configured yet.</p>
+                    <p class="text-sm">Click "Add Variable" to get started.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- Event Log Component -->
+          <div class="space-y-2 mt-8 pt-6 border-t border-gray-800/30" id="eventLogSection">
+            <div class="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors" id="eventLogHeader">
+              <div class="flex items-center gap-2">
+                <svg class="w-4 h-4 text-blue-400 transition-transform duration-200" id="eventLogChevron" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                </svg>
+                <span class="text-blue-200 text-sm font-medium select-none font-sharetech">Event Log</span>
+                <div class="flex items-center gap-2">
+                  <div class="w-2 h-2 rounded-full bg-green-500" id="eventLogStatus"></div>
+                  <span class="text-xs text-gray-500 font-sharetech" id="eventLogCount">0 events</span>
+                </div>
+              </div>
+              <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-500 italic font-sharetech">Click to expand</span>
+                <button class="text-gray-400 hover:text-gray-300 p-1 rounded hover:bg-gray-700/50 transition-colors" id="clearLogsBtn" title="Clear logs">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                  </svg>
+                </button>
+              </div>
+            </div>
+            
+            <div class="transition-all duration-300 ease-in-out overflow-hidden" id="eventLogContent" style="max-height: 0; opacity: 0;">
+              <div class="bg-gray-900/30 rounded border border-gray-800/30 p-3 h-[300px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900/30">
+                <div id="eventLogEntries" class="space-y-2">
+                  <div class="text-center text-gray-500 text-sm py-8">No events yet</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Warning -->
+      <div class="bg-yellow-900/20 border border-yellow-800/30 rounded-lg p-4 text-center">
+        <p class="text-yellow-400 text-sm font-sharetech">
+          <strong>⚠️ Important:</strong> Server restart required for environment changes to take effect
+        </p>
+      </div>
+    </div>
+
+    <!-- Add/Edit Modal -->
+    <div class="modal-overlay" id="envModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 id="modalTitle" class="text-blue-300 text-lg font-medium font-sharetech">Add Environment Variable</h3>
+          <button class="modal-close" id="closeModal">&times;</button>
+        </div>
+        <form id="envForm" class="modal-body">
+          <div class="form-group">
+            <div class="flex items-center mb-3">
+              <label for="envKey" class="text-blue-300 text-sm font-medium font-sharetech">Variable Name:</label>
+              <div class="ml-2 text-blue-400 cursor-pointer" title="Environment variable names should use uppercase letters, numbers, and underscores only">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                </svg>
+              </div>
+            </div>
+            <input type="text" id="envKey" required placeholder="e.g., HOST_PORT" class="form-input">
+            <small class="form-hint">Use uppercase letters and underscores only</small>
+          </div>
+          <div class="form-group">
+            <div class="flex items-center mb-3">
+              <label for="envValue" class="text-blue-300 text-sm font-medium font-sharetech">Value:</label>
+              <div class="ml-2 text-blue-400 cursor-pointer" title="Be careful with sensitive values like credentials">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"></path>
+                </svg>
+              </div>
+            </div>
+            <input type="text" id="envValue" required placeholder="Enter value" class="form-input">
+            <small class="form-hint">Be careful with sensitive values like credentials</small>
+          </div>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="cancelBtn">Cancel</button>
+            <button type="submit" class="btn-primary">Save</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div class="modal-overlay" id="deleteModal">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3 class="text-blue-300 text-lg font-medium font-sharetech">Confirm Deletion</h3>
+          <button class="modal-close" id="closeDeleteModal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <p class="text-gray-300 mb-3 font-sharetech">Are you sure you want to delete this environment variable?</p>
+          <p class="text-blue-300 font-mono font-semibold mb-6" id="deleteVarName"></p>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="cancelDeleteBtn">Cancel</button>
+            <button type="button" class="btn-danger" id="confirmDeleteBtn">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
