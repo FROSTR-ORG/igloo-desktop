@@ -3,6 +3,7 @@ dist
 node_modules
 .DS_Store
 /release
+static-igloo/
 
 # Test coverage reports
 coverage/
