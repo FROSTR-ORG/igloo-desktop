@@ -1,0 +1,28 @@
+{
+  "name": "static-igloo",
+  "version": "1.0.0",
+  "description": "Static HTML/CSS/JS version of the Igloo UI",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve . -p 3000",
+    "dev": "npx serve . -p 3000 -s",
+    "build": "echo 'No build step needed for static files'",
+    "serve": "python3 -m http.server 8000"
+  },
+  "keywords": [
+    "igloo",
+    "frostr",
+    "static",
+    "frontend",
+    "nostr",
+    "threshold-signatures"
+  ],
+  "author": "Igloo Team",
+  "license": "MIT",
+  "devDependencies": {
+    "serve": "^14.2.1"
+  },
+  "engines": {
+    "node": ">=14.0.0"
+  }
+} 
