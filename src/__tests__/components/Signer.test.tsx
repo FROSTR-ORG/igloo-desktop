@@ -791,4 +791,121 @@ describe('Signer Component UI Tests', () => {
       expect(typeof signerHandle.stopSigner).toBe('function');
     });
   });
+
+  describe('Message Handler Type Safety', () => {
+    it('should handle non-string tag values without crashing', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start the signer to activate message listeners
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Verify the createConnectedNode was called and node event handlers are set up
+      expect(mockCreateConnectedNode).toHaveBeenCalled();
+      expect(mockNode.on).toHaveBeenCalledWith('message', expect.any(Function));
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      expect(messageCall).toBeDefined();
+      const messageHandler = messageCall![1];
+
+      // Test various non-string tag types that could cause .startsWith() to crash
+      const invalidTagMessages = [
+        { tag: 123 }, // number
+        { tag: true }, // boolean
+        { tag: null }, // null
+        { tag: undefined }, // undefined
+        { tag: {} }, // object
+        { tag: [] }, // array
+      ];
+
+      // None of these should throw errors
+      invalidTagMessages.forEach(msg => {
+        expect(() => messageHandler(msg)).not.toThrow();
+      });
+
+      // Verify that valid string tags still work correctly
+      expect(() => messageHandler({ tag: '/sign/req' })).not.toThrow();
+      expect(() => messageHandler({ tag: '/ecdh/res' })).not.toThrow();
+      expect(() => messageHandler({ tag: '/ping/req' })).not.toThrow();
+    });
+
+    it('should log appropriate messages for invalid tag types', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const { container } = render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      const messageHandler = messageCall![1];
+
+      // Send a message with a non-string tag
+      messageHandler({ tag: 123 });
+
+      // Check that the appropriate log entry appears
+      await waitFor(() => {
+        expect(container.textContent).toContain('Message received (invalid tag type)');
+      });
+    });
+
+    it('should continue processing valid messages after encountering invalid tags', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const { container } = render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      const messageHandler = messageCall![1];
+
+      // Send invalid tag, then valid tag
+      messageHandler({ tag: 123 });
+      messageHandler({ tag: '/sign/req' });
+
+      // Both should be processed without the listener crashing
+      await waitFor(() => {
+        expect(container.textContent).toContain('Message received (invalid tag type)');
+        expect(container.textContent).toContain('Signature request received');
+      });
+    });
+  });
 }); 
