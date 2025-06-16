@@ -4,7 +4,7 @@ import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
-import { Copy, Check, X, HelpCircle } from "lucide-react"
+import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -69,6 +69,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     group: false,
     share: false
   });
+  const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
   const [logs, setLogs] = useState<LogEntryData[]>([]);
   
   const nodeRef = useRef<BifrostNode | null>(null);
@@ -445,6 +446,34 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   };
 
+  const toggleExpanded = (id: string) => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  const renderDecodedInfo = (data: unknown, rawString?: string) => {
+    return (
+      <div className="space-y-3">
+        {rawString && (
+          <div className="space-y-1">
+            <div className="text-xs text-gray-400 font-medium">Raw String:</div>
+            <div className="bg-gray-900/50 p-3 rounded text-xs text-blue-300 font-mono break-all">
+              {rawString}
+            </div>
+          </div>
+        )}
+        <div className="space-y-1">
+          <div className="text-xs text-gray-400 font-medium">Decoded Data:</div>
+          <pre className="bg-gray-900/50 p-3 rounded text-xs text-blue-300 font-mono overflow-x-auto">
+            {JSON.stringify(data, null, 2)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
   const handleShareChange = (value: string) => {
     setSignerSecret(value);
     const validation = validateShare(value);
@@ -648,7 +677,41 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   width="w-fit"
                   content="Copy"
                 />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleExpanded('group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                      aria-label="Toggle group credential details"
+                    >
+                      {expandedItems['group'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Decoded"
+                />
               </div>
+              
+              {expandedItems['group'] && groupCredential && isGroupValid && (
+                <div className="mt-2">
+                  {(() => {
+                    try {
+                      const decodedGroup = decodeGroup(groupCredential);
+                      return renderDecodedInfo(decodedGroup, groupCredential);
+                    } catch (error) {
+                      return (
+                        <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                          Failed to decode group credential: {error instanceof Error ? error.message : 'Unknown error'}
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
               
               <div className="flex">
                 <Tooltip 
@@ -689,7 +752,41 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   width="w-fit"
                   content="Copy"
                 />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleExpanded('share')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!signerSecret || !isShareValid}
+                      aria-label="Toggle share details"
+                    >
+                      {expandedItems['share'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Decoded"
+                />
               </div>
+              
+              {expandedItems['share'] && signerSecret && isShareValid && (
+                <div className="mt-2">
+                  {(() => {
+                    try {
+                      const decodedShare = decodeShare(signerSecret);
+                      return renderDecodedInfo(decodedShare, signerSecret);
+                    } catch (error) {
+                      return (
+                        <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                          Failed to decode share credential: {error instanceof Error ? error.message : 'Unknown error'}
+                        </div>
+                      );
+                    }
+                  })()}
+                </div>
+              )}
               
               <div className="flex items-center justify-between mt-6">
                 <div className="flex items-center gap-2">
