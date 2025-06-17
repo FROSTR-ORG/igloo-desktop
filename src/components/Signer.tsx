@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
@@ -453,7 +453,53 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }));
   };
 
+  // Memoize decoded data to avoid repeated decoding on every render
+  const decodedGroupData = useMemo(() => {
+    if (!groupCredential || !isGroupValid) return null;
+    try {
+      return decodeGroup(groupCredential);
+    } catch (error) {
+      console.warn('Failed to decode group credential:', error);
+      return null;
+    }
+  }, [groupCredential, isGroupValid]);
+
+  const decodedShareData = useMemo(() => {
+    if (!signerSecret || !isShareValid) return null;
+    try {
+      return decodeShare(signerSecret);
+    } catch (error) {
+      console.warn('Failed to decode share credential:', error);
+      return null;
+    }
+  }, [signerSecret, isShareValid]);
+
   const renderDecodedInfo = (data: unknown, rawString?: string) => {
+    // Safe JSON stringification with error handling
+    const getJsonString = (obj: unknown): string => {
+      try {
+        return JSON.stringify(obj, null, 2);
+      } catch (error) {
+        // Handle circular references and other serialization errors
+        try {
+          // Attempt to stringify with a replacer function to handle circular refs
+          const seen = new WeakSet();
+          return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) {
+                return '[Circular Reference]';
+              }
+              seen.add(value);
+            }
+            return value;
+          }, 2);
+        } catch (fallbackError) {
+          // Final fallback - show error message
+          return `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+        }
+      }
+    };
+
     return (
       <div className="space-y-3">
         {rawString && (
@@ -467,7 +513,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         <div className="space-y-1">
           <div className="text-xs text-gray-400 font-medium">Decoded Data:</div>
           <pre className="bg-gray-900/50 p-3 rounded text-xs text-blue-300 font-mono overflow-x-auto">
-            {JSON.stringify(data, null, 2)}
+            {getJsonString(data)}
           </pre>
         </div>
       </div>
@@ -698,18 +744,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
               
               {expandedItems['group'] && groupCredential && isGroupValid && (
                 <div className="mt-2">
-                  {(() => {
-                    try {
-                      const decodedGroup = decodeGroup(groupCredential);
-                      return renderDecodedInfo(decodedGroup, groupCredential);
-                    } catch (error) {
-                      return (
-                        <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
-                          Failed to decode group credential: {error instanceof Error ? error.message : 'Unknown error'}
-                        </div>
-                      );
-                    }
-                  })()}
+                  {decodedGroupData ? (
+                    renderDecodedInfo(decodedGroupData, groupCredential)
+                  ) : (
+                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                      Failed to decode group credential
+                    </div>
+                  )}
                 </div>
               )}
               
@@ -773,18 +814,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
               
               {expandedItems['share'] && signerSecret && isShareValid && (
                 <div className="mt-2">
-                  {(() => {
-                    try {
-                      const decodedShare = decodeShare(signerSecret);
-                      return renderDecodedInfo(decodedShare, signerSecret);
-                    } catch (error) {
-                      return (
-                        <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
-                          Failed to decode share credential: {error instanceof Error ? error.message : 'Unknown error'}
-                        </div>
-                      );
-                    }
-                  })()}
+                  {decodedShareData ? (
+                    renderDecodedInfo(decodedShareData, signerSecret)
+                  ) : (
+                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                      Failed to decode share credential
+                    </div>
+                  )}
                 </div>
               )}
               
