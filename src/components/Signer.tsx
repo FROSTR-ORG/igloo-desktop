@@ -69,7 +69,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     group: false,
     share: false
   });
-  const [expandedItems, setExpandedItems] = useState<{[key: string]: boolean}>({});
+  const [expandedItems, setExpandedItems] = useState<Record<'group' | 'share', boolean>>({
+    group: false,
+    share: false
+  });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
   
   const nodeRef = useRef<BifrostNode | null>(null);
@@ -446,7 +449,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   };
 
-  const toggleExpanded = (id: string) => {
+  const toggleExpanded = (id: 'group' | 'share') => {
     setExpandedItems(prev => ({
       ...prev,
       [id]: !prev[id]
