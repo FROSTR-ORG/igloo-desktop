@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback } from "react"
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
-import { Copy, Check, X, HelpCircle } from "lucide-react"
+import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -66,6 +66,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isGroupValid, setIsGroupValid] = useState(false);
   
   const [copiedStates, setCopiedStates] = useState({
+    group: false,
+    share: false
+  });
+  const [expandedItems, setExpandedItems] = useState<Record<'group' | 'share', boolean>>({
     group: false,
     share: false
   });
@@ -445,6 +449,81 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   };
 
+  const toggleExpanded = (id: 'group' | 'share') => {
+    setExpandedItems(prev => ({
+      ...prev,
+      [id]: !prev[id]
+    }));
+  };
+
+  // Memoize decoded data to avoid repeated decoding on every render
+  // Only decode when the corresponding pane is expanded to improve performance
+  const decodedGroupData = useMemo(() => {
+    if (!expandedItems.group || !groupCredential || !isGroupValid) return null;
+    try {
+      return decodeGroup(groupCredential);
+    } catch (error) {
+      console.warn('Failed to decode group credential:', error);
+      return null;
+    }
+  }, [expandedItems.group, groupCredential, isGroupValid]);
+
+  const decodedShareData = useMemo(() => {
+    if (!expandedItems.share || !signerSecret || !isShareValid) return null;
+    try {
+      return decodeShare(signerSecret);
+    } catch (error) {
+      console.warn('Failed to decode share credential:', error);
+      return null;
+    }
+  }, [expandedItems.share, signerSecret, isShareValid]);
+
+  const renderDecodedInfo = (data: unknown, rawString?: string) => {
+    // Safe JSON stringification with error handling
+    const getJsonString = (obj: unknown): string => {
+      try {
+        return JSON.stringify(obj, null, 2);
+      } catch (error) {
+        // Handle circular references and other serialization errors
+        try {
+          // Attempt to stringify with a replacer function to handle circular refs
+          const seen = new WeakSet();
+          return JSON.stringify(obj, (key, value) => {
+            if (typeof value === 'object' && value !== null) {
+              if (seen.has(value)) {
+                return '[Circular Reference]';
+              }
+              seen.add(value);
+            }
+            return value;
+          }, 2);
+        } catch (fallbackError) {
+          // Final fallback - show error message
+          return `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`;
+        }
+      }
+    };
+
+    return (
+      <div className="space-y-3">
+        {rawString && (
+          <div className="space-y-1">
+            <div className="text-xs text-gray-400 font-medium">Raw String:</div>
+            <div className="bg-gray-900/50 p-3 rounded text-xs text-blue-300 font-mono break-all">
+              {rawString}
+            </div>
+          </div>
+        )}
+        <div className="space-y-1">
+          <div className="text-xs text-gray-400 font-medium">Decoded Data:</div>
+          <pre className="bg-gray-900/50 p-3 rounded text-xs text-blue-300 font-mono overflow-x-auto">
+            {getJsonString(data)}
+          </pre>
+        </div>
+      </div>
+    );
+  };
+
   const handleShareChange = (value: string) => {
     setSignerSecret(value);
     const validation = validateShare(value);
@@ -648,7 +727,36 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   width="w-fit"
                   content="Copy"
                 />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleExpanded('group')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!groupCredential || !isGroupValid}
+                      aria-label="Toggle group credential details"
+                    >
+                      {expandedItems['group'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Decoded"
+                />
               </div>
+              
+              {expandedItems['group'] && groupCredential && isGroupValid && (
+                <div className="mt-2">
+                  {decodedGroupData ? (
+                    renderDecodedInfo(decodedGroupData, groupCredential)
+                  ) : (
+                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                      Failed to decode group credential
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex">
                 <Tooltip 
@@ -689,7 +797,36 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   width="w-fit"
                   content="Copy"
                 />
+                <Tooltip 
+                  trigger={
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => toggleExpanded('share')}
+                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                      disabled={!signerSecret || !isShareValid}
+                      aria-label="Toggle share details"
+                    >
+                      {expandedItems['share'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                    </Button>
+                  }
+                  position="top"
+                  width="w-fit"
+                  content="Decoded"
+                />
               </div>
+              
+              {expandedItems['share'] && signerSecret && isShareValid && (
+                <div className="mt-2">
+                  {decodedShareData ? (
+                    renderDecodedInfo(decodedShareData, signerSecret)
+                  ) : (
+                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                      Failed to decode share credential
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="flex items-center justify-between mt-6">
                 <div className="flex items-center gap-2">
