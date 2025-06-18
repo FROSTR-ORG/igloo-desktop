@@ -457,25 +457,26 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   };
 
   // Memoize decoded data to avoid repeated decoding on every render
+  // Only decode when the corresponding pane is expanded to improve performance
   const decodedGroupData = useMemo(() => {
-    if (!groupCredential || !isGroupValid) return null;
+    if (!expandedItems.group || !groupCredential || !isGroupValid) return null;
     try {
       return decodeGroup(groupCredential);
     } catch (error) {
       console.warn('Failed to decode group credential:', error);
       return null;
     }
-  }, [groupCredential, isGroupValid]);
+  }, [expandedItems.group, groupCredential, isGroupValid]);
 
   const decodedShareData = useMemo(() => {
-    if (!signerSecret || !isShareValid) return null;
+    if (!expandedItems.share || !signerSecret || !isShareValid) return null;
     try {
       return decodeShare(signerSecret);
     } catch (error) {
       console.warn('Failed to decode share credential:', error);
       return null;
     }
-  }, [signerSecret, isShareValid]);
+  }, [expandedItems.share, signerSecret, isShareValid]);
 
   const renderDecodedInfo = (data: unknown, rawString?: string) => {
     // Safe JSON stringification with error handling
