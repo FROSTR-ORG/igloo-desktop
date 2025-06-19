@@ -139,7 +139,7 @@ export const EventLog = memo(({
   };
 
   return (
-    <div className="space-y-2 mt-8 pt-6 border-t border-gray-800/30">
+    <div>
       {!hideHeader && (
         <div 
           className="flex items-center justify-between bg-gray-800/50 p-2.5 rounded cursor-pointer hover:bg-gray-800/70 transition-colors"
