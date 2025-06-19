@@ -1,5 +1,12 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { createPeerManagerRobust, decodeShare, decodeGroup } from '@frostr/igloo-core';
+import { 
+  createPeerManagerRobust, 
+  decodeShare, 
+  decodeGroup,
+  normalizePubkey,
+  comparePubkeys,
+  extractSelfPubkeyFromCredentials
+} from '@frostr/igloo-core';
 import type { BifrostNode } from '@frostr/bifrost';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -40,66 +47,21 @@ const PeerList: React.FC<PeerListProps> = ({
   const [selfPubkey, setSelfPubkey] = useState<string | null>(null);
   const [pingingPeers, setPingingPeers] = useState<Set<string>>(new Set());
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isPingingAll, setIsPingingAll] = useState(false);
+
   const [isInitialPingSweep, setIsInitialPingSweep] = useState(false);
 
-  // Normalize pubkey by removing 02/03 prefix if present
-  const normalizePubkey = useCallback((pubkey: string): string => {
-    if (!pubkey) return pubkey;
-    // Remove 02 or 03 prefix if present
-    if ((pubkey.startsWith('02') || pubkey.startsWith('03')) && pubkey.length === 66) {
-      return pubkey.slice(2);
-    }
-    return pubkey;
-  }, []);
-
-  // Extract self pubkey from credentials
-  const extractSelfPubkey = useCallback((): string | null => {
-    try {
-      if (!shareCredential || !groupCredential) {
-        console.debug('[PeerList] Missing credentials for self pubkey extraction');
-        return null;
-      }
-
-      const decodedShare = decodeShare(shareCredential);
-      const decodedGroup = decodeGroup(groupCredential);
-      
-      if (!decodedShare?.idx || !decodedGroup?.commits) {
-        console.debug('[PeerList] Invalid credential structure');
-        return null;
-      }
-
-      const shareIndex = decodedShare.idx - 1; // Convert to 0-based index
-      if (shareIndex < 0 || shareIndex >= decodedGroup.commits.length) {
-        console.debug('[PeerList] Share index out of range');
-        return null;
-      }
-
-      const selfPubkeyCommit = decodedGroup.commits[shareIndex];
-      // Handle both string and CommitPackage types
-      const selfPubkey = typeof selfPubkeyCommit === 'string' ? selfPubkeyCommit : selfPubkeyCommit.pubkey;
-      const normalized = normalizePubkey(selfPubkey);
-      console.debug(`[PeerList] Detected self pubkey: ${selfPubkey} -> normalized: ${normalized}`);
-      return normalized;
-    } catch (error) {
-      console.debug('[PeerList] Failed to extract self pubkey:', error);
-      return null;
-    }
-  }, [shareCredential, groupCredential, normalizePubkey]);
-
-  // Filter out self pubkey and normalize peer pubkeys
+  // Filter out self pubkey using the new comparePubkeys utility
   const filteredPeers = useMemo(() => {
     if (!selfPubkey) return peers;
     
     return peers.filter(peer => {
-      const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-      const isSelf = normalizedPeerPubkey === selfPubkey;
+      const isSelf = comparePubkeys(peer.pubkey, selfPubkey);
       if (isSelf) {
-        console.debug(`[PeerList] Filtering out self pubkey: ${peer.pubkey} -> ${normalizedPeerPubkey}`);
+        console.debug(`[PeerList] Filtering out self pubkey: ${peer.pubkey}`);
       }
       return !isSelf;
     });
-  }, [peers, selfPubkey, normalizePubkey]);
+  }, [peers, selfPubkey]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -130,8 +92,7 @@ const PeerList: React.FC<PeerListProps> = ({
         console.debug(`[PeerList] Ping request from: ${msg.from} -> ${normalizedFrom}`);
         
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedFrom) {
+          if (comparePubkeys(peer.pubkey, msg.from)) {
             return {
               ...peer,
               online: true,
@@ -150,8 +111,7 @@ const PeerList: React.FC<PeerListProps> = ({
         console.debug(`[PeerList] Ping response from: ${msg.from} -> ${normalizedFrom}${latency ? ` (${latency}ms)` : ''}`);
         
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedFrom) {
+          if (comparePubkeys(peer.pubkey, msg.from)) {
             return {
               ...peer,
               online: true,
@@ -183,7 +143,7 @@ const PeerList: React.FC<PeerListProps> = ({
         console.warn('[PeerList] Error cleaning up ping listeners:', error);
       }
     };
-  }, [node, normalizePubkey]);
+  }, [node]);
 
   // Initialize peer manager and setup listeners
   useEffect(() => {
@@ -204,44 +164,51 @@ const PeerList: React.FC<PeerListProps> = ({
         setIsLoading(true);
         setError(null);
 
-        // Extract self pubkey
-        const extractedSelfPubkey = extractSelfPubkey();
-        if (isActive) {
-          setSelfPubkey(extractedSelfPubkey);
+        // Extract self pubkey using the new utility
+        const selfPubkeyResult = extractSelfPubkeyFromCredentials(
+          groupCredential,
+          shareCredential,
+          { 
+            normalize: true,
+            suppressWarnings: true 
+          }
+        );
+        
+        if (isActive && selfPubkeyResult.pubkey) {
+          setSelfPubkey(selfPubkeyResult.pubkey);
+          console.debug(`[PeerList] Extracted self pubkey: ${selfPubkeyResult.pubkey}`);
+        } else if (selfPubkeyResult.warnings.length > 0) {
+          console.debug(`[PeerList] Could not extract self pubkey:`, selfPubkeyResult.warnings);
         }
 
-        // Create peer manager with warning filtering
-        const originalWarn = console.warn;
-        console.warn = (message: string, ...args: unknown[]) => {
-          if (typeof message === 'string' && 
-              (message.includes('Could not extract self public key') ||
-               message.includes('Fallback to static peer list enabled'))) {
-            // Filter out expected warnings from peer manager
-            console.debug(`[PeerList] Expected warning suppressed: ${message}`);
-            return;
-          }
-          originalWarn(message, ...args);
-        };
-
-        // For now, let's simplify and use manual peer extraction since the peer manager API seems inconsistent
-        // We can still create the peer manager for other functionality
+        // Create peer manager with enhanced configuration (no more console.warn workaround!)
         try {
           peerManager = await createPeerManagerRobust(
             node,
             groupCredential,
             shareCredential,
             {
-              pingInterval: 10000 // 10 seconds for better responsiveness
+              pingInterval: 10000, // 10 seconds for better responsiveness
+              suppressWarnings: true, // Clean suppression instead of global override
+              customLogger: (level, message, data) => {
+                // Use debug level for expected warnings to keep console clean
+                if (level === 'warn') {
+                  console.debug(`[PeerList] ${message}`, data);
+                } else {
+                  console[level](`[PeerList] ${message}`, data);
+                }
+              }
             }
           );
           console.debug('[PeerList] Peer manager created successfully for monitoring');
-        } finally {
-          console.warn = originalWarn;
+        } catch (peerManagerError) {
+          // Gracefully handle peer manager creation issues
+          console.debug('[PeerList] Peer manager creation had issues, continuing with manual peer management:', peerManagerError);
         }
 
         if (!isActive) return;
 
-        // Extract peers directly from group credential - this is more reliable
+        // Extract peers directly from group credential - this is reliable
         let peerList: string[] = [];
         try {
           const decodedGroup = decodeGroup(groupCredential);
@@ -296,8 +263,7 @@ const PeerList: React.FC<PeerListProps> = ({
                   console.debug(`[PeerList] Initial ping successful to ${normalizedPubkey} (${latency}ms)`);
                   if (isActive) {
                     setPeers(prev => prev.map(p => {
-                      const normalizedPeerPubkey = normalizePubkey(p.pubkey);
-                      if (normalizedPeerPubkey === normalizedPubkey) {
+                      if (comparePubkeys(p.pubkey, peer.pubkey)) {
                         return { ...p, online: true, lastSeen: new Date(), latency };
                       }
                       return p;
@@ -355,7 +321,7 @@ const PeerList: React.FC<PeerListProps> = ({
         }
       }
     };
-  }, [isSignerRunning, node, groupCredential, shareCredential, disabled, extractSelfPubkey, setupPingEventListeners, normalizePubkey]);
+  }, [isSignerRunning, node, groupCredential, shareCredential, disabled, setupPingEventListeners]);
 
   // Ping individual peer
   const handlePingPeer = useCallback(async (peerPubkey: string) => {
@@ -374,8 +340,7 @@ const PeerList: React.FC<PeerListProps> = ({
       if (result.ok) {
         console.debug(`[PeerList] Manual ping successful to ${normalizedPubkey} (${latency}ms)`);
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedPubkey) {
+          if (comparePubkeys(peer.pubkey, peerPubkey)) {
             return {
               ...peer,
               online: true,
@@ -388,8 +353,7 @@ const PeerList: React.FC<PeerListProps> = ({
       } else {
         console.info(`[PeerList] Ping timeout to ${normalizedPubkey} - this is normal in P2P networks`);
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedPubkey) {
+          if (comparePubkeys(peer.pubkey, peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -405,8 +369,7 @@ const PeerList: React.FC<PeerListProps> = ({
       if (errorMessage.includes('peer data not found')) {
         console.info(`[PeerList] Peer ${normalizedPubkey} not yet discovered by node - this is normal in P2P networks`);
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedPubkey) {
+          if (comparePubkeys(peer.pubkey, peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -418,8 +381,7 @@ const PeerList: React.FC<PeerListProps> = ({
       } else {
         console.warn(`[PeerList] Ping failed to ${normalizedPubkey}:`, error);
         setPeers(prev => prev.map(peer => {
-          const normalizedPeerPubkey = normalizePubkey(peer.pubkey);
-          if (normalizedPeerPubkey === normalizedPubkey) {
+          if (comparePubkeys(peer.pubkey, peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -436,65 +398,57 @@ const PeerList: React.FC<PeerListProps> = ({
         return newSet;
       });
     }
-  }, [node, isSignerRunning, normalizePubkey]);
+  }, [node, isSignerRunning]);
 
   // Ping all peers
   const pingAllPeers = useCallback(async () => {
     if (!node || !isSignerRunning || filteredPeers.length === 0) return;
 
-    setIsPingingAll(true);
     console.debug(`[PeerList] Pinging all ${filteredPeers.length} peers`);
 
-    try {
-      const pingPromises = filteredPeers.map(async (peer) => {
-        const normalizedPubkey = normalizePubkey(peer.pubkey);
-        try {
-          const startTime = Date.now();
-          const result = await Promise.race([
-            node.req.ping(normalizedPubkey),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
-          ]);
-          
-          const latency = Date.now() - startTime;
-          
-          if ((result as any).ok) {
-            setPeers(prev => prev.map(p => {
-              const normalizedPeerPubkey = normalizePubkey(p.pubkey);
-              if (normalizedPeerPubkey === normalizedPubkey) {
-                return { ...p, online: true, lastSeen: new Date(), latency };
-              }
-              return p;
-            }));
-          } else {
-            setPeers(prev => prev.map(p => {
-              const normalizedPeerPubkey = normalizePubkey(p.pubkey);
-              if (normalizedPeerPubkey === normalizedPubkey) {
-                return { ...p, online: false, lastPingAttempt: new Date() };
-              }
-              return p;
-            }));
-          }
-        } catch (error) {
-          // Handle "peer data not found" errors gracefully
-          const errorMessage = error instanceof Error ? error.message : String(error);
-          if (!errorMessage.includes('peer data not found')) {
-            console.debug(`[PeerList] Ping error to ${normalizedPubkey}:`, error);
-          }
+    const pingPromises = filteredPeers.map(async (peer) => {
+      const normalizedPubkey = normalizePubkey(peer.pubkey);
+      try {
+        const startTime = Date.now();
+        const result = await Promise.race([
+          node.req.ping(normalizedPubkey),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Timeout')), 3000))
+        ]);
+        
+        const latency = Date.now() - startTime;
+        
+        if ((result as any).ok) {
           setPeers(prev => prev.map(p => {
-            const normalizedPeerPubkey = normalizePubkey(p.pubkey);
-            if (normalizedPeerPubkey === normalizedPubkey) {
+            if (comparePubkeys(p.pubkey, peer.pubkey)) {
+              return { ...p, online: true, lastSeen: new Date(), latency };
+            }
+            return p;
+          }));
+        } else {
+          setPeers(prev => prev.map(p => {
+            if (comparePubkeys(p.pubkey, peer.pubkey)) {
               return { ...p, online: false, lastPingAttempt: new Date() };
             }
             return p;
           }));
         }
-      });
+      } catch (error) {
+        // Handle "peer data not found" errors gracefully
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('peer data not found')) {
+          console.debug(`[PeerList] Ping error to ${normalizedPubkey}:`, error);
+        }
+        setPeers(prev => prev.map(p => {
+          if (comparePubkeys(p.pubkey, peer.pubkey)) {
+            return { ...p, online: false, lastPingAttempt: new Date() };
+          }
+          return p;
+        }));
+      }
+    });
 
-      await Promise.allSettled(pingPromises);
-    } finally {
-      setIsPingingAll(false);
-    }
-  }, [node, isSignerRunning, filteredPeers, normalizePubkey]);
+    await Promise.allSettled(pingPromises);
+  }, [node, isSignerRunning, filteredPeers]);
 
   // Enhanced refresh that includes pinging
   const handleRefresh = useCallback(async () => {
@@ -528,21 +482,6 @@ const PeerList: React.FC<PeerListProps> = ({
       <span className="text-xs text-gray-500 italic">
         {isExpanded ? "Click to collapse" : "Click to expand"}
       </span>
-      <IconButton
-        variant="default"
-        size="sm"
-        icon={<Radio className="h-4 w-4" />}
-        onClick={(e) => {
-          e.stopPropagation();
-          pingAllPeers();
-        }}
-        tooltip="Ping all peers"
-        disabled={!isSignerRunning || disabled || filteredPeers.length === 0 || isPingingAll}
-        className={cn(
-          "transition-all duration-200",
-          isPingingAll && "animate-pulse"
-        )}
-      />
       <IconButton
         variant="default"
         size="sm"
@@ -707,7 +646,7 @@ const PeerList: React.FC<PeerListProps> = ({
                       <IconButton
                         variant="default"
                         size="sm"
-                        icon={<RadioTower className="h-3 w-3" />}
+                        icon={<Radio className="h-3 w-3" />}
                         onClick={() => handlePingPeer(peer.pubkey)}
                         tooltip="Ping this peer"
                         disabled={!isSignerRunning || disabled || isPinging}
