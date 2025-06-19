@@ -19,6 +19,7 @@ const InputWithValidation: React.FC<InputWithValidationProps> = ({
   errorMessage,
   className,
   id,
+  isRequired,
   ...props
 }) => {
   const inputId = id || Math.random().toString(36).substr(2, 9);
