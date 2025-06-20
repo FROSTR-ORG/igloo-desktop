@@ -162,7 +162,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     };
     
     const readyHandler = (data: unknown) => {
-      addLog('ready', 'Node is ready', data);
+      // Log basic info about the ready event without the potentially problematic data object
+      const logData = data && typeof data === 'object' ? 
+        { message: 'Node ready event received', hasData: true, dataType: typeof data } : 
+        data;
+      addLog('ready', 'Node is ready', logData);
       setIsConnecting(false);
       setIsSignerRunning(true);
     };
