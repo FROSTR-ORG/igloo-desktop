@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, useCallback, useMemo } from "react"
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
-import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
