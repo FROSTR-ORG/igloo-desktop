@@ -22,6 +22,7 @@ interface KeysetData {
 interface SignerData {
   share: string;
   groupCredential: string;
+  name?: string;
   threshold?: number;
   totalShares?: number;
 }
@@ -42,7 +43,6 @@ const App: React.FC = () => {
       const shares = await clientShareManager.getShares();
       setHasShares(Array.isArray(shares) && shares.length > 0);
     };
-    
     checkForShares();
   }, []);
 
@@ -52,8 +52,8 @@ const App: React.FC = () => {
     setShowingCreate(false);
   };
 
-  const handleShareLoaded = (share: string, groupCredential: string) => {
-    setSignerData({ share, groupCredential });
+  const handleShareLoaded = (share: string, groupCredential: string, shareName: string) => {
+    setSignerData({ share, groupCredential, name: shareName });
     // Ensure we're on the signer tab when a share is loaded
     const signerTab = document.querySelector('[data-state="active"][value="signer"]');
     if (!signerTab) {
