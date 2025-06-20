@@ -43,8 +43,34 @@ export const LogEntry = memo(({ log }: LogEntryProps) => {
     if (!hasData) return null;
     try {
       return JSON.stringify(log.data, null, 2);
-    } catch {
-      return 'Error: Unable to format data';
+    } catch (error) {
+      // Try to provide more useful information about the data
+      try {
+        const dataType = typeof log.data;
+        const isArray = Array.isArray(log.data);
+        const constructor = log.data?.constructor?.name;
+        
+        let preview = '';
+        if (dataType === 'object' && log.data !== null) {
+          try {
+            const keys = Object.keys(log.data);
+            preview = `Object with keys: [${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}]`;
+          } catch {
+            preview = `${constructor || 'Object'} (non-enumerable)`;
+          }
+        } else {
+          preview = `${dataType}: ${String(log.data).slice(0, 100)}${String(log.data).length > 100 ? '...' : ''}`;
+        }
+        
+        return `Unable to serialize data to JSON
+Type: ${isArray ? 'Array' : dataType}${constructor ? ` (${constructor})` : ''}
+Preview: ${preview}
+Error: ${error instanceof Error ? error.message : 'Circular reference or non-serializable data'}
+
+This is likely a complex object from the Bifrost node containing circular references or functions.`;
+      } catch {
+        return 'Error: Unable to format data (complex object with circular references or non-serializable data)';
+      }
     }
   }, [log.data, hasData]);
 
