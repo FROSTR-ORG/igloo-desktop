@@ -8,6 +8,7 @@ import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight } from "lucide-re
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
+import PeerList from "@/components/ui/peer-list"
 import type { 
   SignerHandle, 
   SignerProps
@@ -161,7 +162,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     };
     
     const readyHandler = (data: unknown) => {
-      addLog('ready', 'Node is ready', data);
+      // Log basic info about the ready event without the potentially problematic data object
+      const logData = data && typeof data === 'object' ? 
+        { message: 'Node ready event received', hasData: true, dataType: typeof data } : 
+        data;
+      addLog('ready', 'Node is ready', logData);
       setIsConnecting(false);
       setIsSignerRunning(true);
     };
@@ -255,11 +260,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       { event: '/sign/sender/res', type: 'sign', message: 'Signature responses received' },
       { event: '/sign/handler/req', type: 'sign', message: 'Signature request received' },
       { event: '/sign/handler/res', type: 'sign', message: 'Signature response sent' },
-      // Ping events
-      { event: '/ping/sender/req', type: 'bifrost', message: 'Ping request sent' },
-      { event: '/ping/sender/res', type: 'bifrost', message: 'Ping response received' },
-      { event: '/ping/handler/req', type: 'bifrost', message: 'Ping request received' },
-      { event: '/ping/handler/res', type: 'bifrost', message: 'Ping response sent' },
+      // Note: Ping events are handled by the main message handler - no duplicates needed
     ];
 
     legacyEvents.forEach(({ event, type, message }) => {
@@ -330,31 +331,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         }
       });
 
-      // Ping events with special signatures
-      const pingSenderRetHandler = (reason: string, msg: unknown) => 
-        addLog('bifrost', `Ping operation completed: ${reason}`, msg);
-      const pingSenderErrHandler = (reason: string, msg: unknown) => 
-        addLog('bifrost', `Ping operation failed: ${reason}`, msg);
-      const pingHandlerRetHandler = (reason: string, msg: unknown) => 
-        addLog('bifrost', `Ping handled: ${reason}`, msg);
-      const pingHandlerErrHandler = (reason: string, msg: unknown) => 
-        addLog('bifrost', `Ping handling failed: ${reason}`, msg);
-
-      nodeAny.on('/ping/sender/ret', pingSenderRetHandler);
-      nodeAny.on('/ping/sender/err', pingSenderErrHandler);
-      nodeAny.on('/ping/handler/ret', pingHandlerRetHandler);
-      nodeAny.on('/ping/handler/err', pingHandlerErrHandler);
-
-      cleanupFunctions.push(() => {
-        try {
-          nodeAny.off('/ping/sender/ret', pingSenderRetHandler);
-          nodeAny.off('/ping/sender/err', pingSenderErrHandler);
-          nodeAny.off('/ping/handler/ret', pingHandlerRetHandler);
-          nodeAny.off('/ping/handler/err', pingHandlerErrHandler);
-        } catch (e) {
-          console.warn('Error removing ping event listeners:', e);
-        }
-      });
+      // Note: Ping events are handled by the main message handler and PeerList component
+      // No need for additional ping event handlers here as they create duplicate/useless logs
     } catch (e) {
       addLog('bifrost', 'Error setting up some legacy event listeners', e);
     }
@@ -907,13 +885,25 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                 ))}
               </div>
             </div>
+            
           </div>
           
-          <EventLog 
-            logs={logs} 
-            isSignerRunning={isSignerRunning} 
-            onClearLogs={() => setLogs([])}
-          />
+          {/* Peer List and Event Log with consistent spacing */}
+          <div className="space-y-4">
+            <PeerList
+              node={nodeRef.current}
+              groupCredential={groupCredential}
+              shareCredential={signerSecret}
+              isSignerRunning={isSignerRunning}
+              disabled={!isGroupValid || !isShareValid}
+            />
+            
+            <EventLog 
+              logs={logs} 
+              isSignerRunning={isSignerRunning} 
+              onClearLogs={() => setLogs([])}
+            />
+          </div>
         </CardContent>
       </Card>
     </div>
