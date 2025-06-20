@@ -4,13 +4,13 @@ import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
-import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
+import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import PeerList from "@/components/ui/peer-list"
-import type { 
-  SignerHandle, 
+import type {
+  SignerHandle,
   SignerProps
 } from '@/types';
 
@@ -55,6 +55,33 @@ const EVENT_MAPPINGS = {
 
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
+// Helper function to extract share information
+const getShareInfo = (groupCredential: string, shareCredential: string, shareName?: string) => {
+  try {
+    if (!groupCredential || !shareCredential) return null;
+
+    const decodedGroup = decodeGroup(groupCredential);
+    const decodedShare = decodeShare(shareCredential);
+
+    // Find the corresponding commit in the group
+    const commit = decodedGroup.commits.find(c => c.idx === decodedShare.idx);
+
+    if (commit) {
+      return {
+        index: decodedShare.idx,
+        pubkey: commit.pubkey,
+        shareName: shareName || `Share ${decodedShare.idx}`,
+        threshold: decodedGroup.threshold,
+        totalShares: decodedGroup.commits.length
+      };
+    }
+
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
 const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
@@ -62,10 +89,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isShareValid, setIsShareValid] = useState(false);
   const [relayUrls, setRelayUrls] = useState<string[]>([DEFAULT_RELAY]);
   const [newRelayUrl, setNewRelayUrl] = useState("");
-  
+
   const [groupCredential, setGroupCredential] = useState(initialData?.groupCredential || "");
   const [isGroupValid, setIsGroupValid] = useState(false);
-  
+
   const [copiedStates, setCopiedStates] = useState({
     group: false,
     share: false
@@ -75,11 +102,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     share: false
   });
   const [logs, setLogs] = useState<LogEntryData[]>([]);
-  
+
   const nodeRef = useRef<BifrostNode | null>(null);
   // Track cleanup functions for event listeners to prevent memory leaks
   const cleanupListenersRef = useRef<(() => void)[]>([]);
-  
+
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
     stopSigner: async () => {
@@ -98,12 +125,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
     // Fast path: check for duplicate IDs and tags without serialization
     if ('id' in newData && 'tag' in newData && newData.id && newData.tag) {
-      return recentLogs.some(log => 
-        log.data && 
-        typeof log.data === 'object' && 
+      return recentLogs.some(log =>
+        log.data &&
+        typeof log.data === 'object' &&
         'id' in log.data &&
         'tag' in log.data &&
-        log.data.id === newData.id && 
+        log.data.id === newData.id &&
         log.data.tag === newData.tag
       );
     }
@@ -113,10 +140,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       const newDataString = JSON.stringify(newData);
       return recentLogs.some(log => {
         if (!log.data) return false;
-        
+
         try {
-          const logDataString = typeof log.data === 'string' 
-            ? log.data 
+          const logDataString = typeof log.data === 'string'
+            ? log.data
             : JSON.stringify(log.data);
           return logDataString === newDataString;
         } catch {
@@ -133,7 +160,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const addLog = useCallback((type: string, message: string, data?: unknown) => {
     const timestamp = new Date().toLocaleTimeString();
     const id = Math.random().toString(36).substr(2, 9);
-    
+
     setLogs(prev => {
       // Only check for duplicates if we have data to compare
       if (data) {
@@ -142,7 +169,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           return prev; // Skip adding duplicate
         }
       }
-      
+
       return [...prev, { timestamp, type, message, data, id }];
     });
   }, []);
@@ -154,24 +181,24 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       setIsSignerRunning(false);
       setIsConnecting(false);
     };
-    
+
     const errorHandler = (error: unknown) => {
       addLog('error', 'Node error', error);
       setIsSignerRunning(false);
       setIsConnecting(false);
     };
-    
+
     const readyHandler = (data: unknown) => {
       // Log basic info about the ready event without the potentially problematic data object
-      const logData = data && typeof data === 'object' ? 
-        { message: 'Node ready event received', hasData: true, dataType: typeof data } : 
+      const logData = data && typeof data === 'object' ?
+        { message: 'Node ready event received', hasData: true, dataType: typeof data } :
         data;
       addLog('ready', 'Node is ready', logData);
       setIsConnecting(false);
       setIsSignerRunning(true);
     };
-    
-    const bouncedHandler = (reason: string, msg: unknown) => 
+
+    const bouncedHandler = (reason: string, msg: unknown) =>
       addLog('bifrost', `Message bounced: ${reason}`, msg);
 
     // Add event listeners
@@ -197,19 +224,19 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     const messageHandler = (msg: unknown) => {
       try {
         if (msg && typeof msg === 'object' && 'tag' in msg) {
-          const messageData = msg as { tag: unknown; [key: string]: unknown };
+          const messageData = msg as { tag: unknown;[key: string]: unknown };
           const tag = messageData.tag;
-          
+
           // Ensure tag is a string before calling string methods
           if (typeof tag !== 'string') {
-            addLog('bifrost', 'Message received (invalid tag type)', { 
-              tagType: typeof tag, 
-              tag, 
-              originalMessage: msg 
+            addLog('bifrost', 'Message received (invalid tag type)', {
+              tagType: typeof tag,
+              tag,
+              originalMessage: msg
             });
             return;
           }
-          
+
           // Use the event mapping for cleaner code
           const eventInfo = EVENT_MAPPINGS[tag as keyof typeof EVENT_MAPPINGS];
           if (eventInfo) {
@@ -247,7 +274,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const setupLegacyEventListeners = useCallback((node: BifrostNode) => {
     const nodeAny = node as any;
     const cleanupFunctions: (() => void)[] = [];
-    
+
     // Legacy direct event listeners for backward compatibility
     const legacyEvents = [
       // ECDH events
@@ -281,13 +308,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
     // Special handlers for events with different signatures
     try {
-      const ecdhSenderRejHandler = (reason: string, pkg: ECDHPackage) => 
+      const ecdhSenderRejHandler = (reason: string, pkg: ECDHPackage) =>
         addLog('ecdh', `ECDH request rejected: ${reason}`, pkg);
-      const ecdhSenderRetHandler = (reason: string, pkgs: string) => 
+      const ecdhSenderRetHandler = (reason: string, pkgs: string) =>
         addLog('ecdh', `ECDH shares aggregated: ${reason}`, pkgs);
-      const ecdhSenderErrHandler = (reason: string, msgs: unknown[]) => 
+      const ecdhSenderErrHandler = (reason: string, msgs: unknown[]) =>
         addLog('ecdh', `ECDH share aggregation failed: ${reason}`, msgs);
-      const ecdhHandlerRejHandler = (reason: string, msg: unknown) => 
+      const ecdhHandlerRejHandler = (reason: string, msg: unknown) =>
         addLog('ecdh', `ECDH rejection sent: ${reason}`, msg);
 
       node.on('/ecdh/sender/rej', ecdhSenderRejHandler);
@@ -306,13 +333,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         }
       });
 
-      const signSenderRejHandler = (reason: string, pkg: SignSessionPackage) => 
+      const signSenderRejHandler = (reason: string, pkg: SignSessionPackage) =>
         addLog('sign', `Signature request rejected: ${reason}`, pkg);
-      const signSenderRetHandler = (reason: string, msgs: SignatureEntry[]) => 
+      const signSenderRetHandler = (reason: string, msgs: SignatureEntry[]) =>
         addLog('sign', `Signature shares aggregated: ${reason}`, msgs);
-      const signSenderErrHandler = (reason: string, msgs: unknown[]) => 
+      const signSenderErrHandler = (reason: string, msgs: unknown[]) =>
         addLog('sign', `Signature share aggregation failed: ${reason}`, msgs);
-      const signHandlerRejHandler = (reason: string, msg: unknown) => 
+      const signHandlerRejHandler = (reason: string, msg: unknown) =>
         addLog('sign', `Signature rejection sent: ${reason}`, msg);
 
       node.on('/sign/sender/rej', signSenderRejHandler);
@@ -377,7 +404,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         originalWarn(message, ...args);
       };
       console.warn = warnOverride;
-      
+
       try {
         // Use igloo-core's cleanup - it handles the manual cleanup internally
         cleanupBifrostNode(nodeRef.current);
@@ -408,7 +435,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       const validation = validateShare(initialData.share);
       setIsShareValid(validation.isValid);
     }
-    
+
     if (initialData?.groupCredential) {
       const validation = validateGroup(initialData.groupCredential);
       setIsGroupValid(validation.isValid);
@@ -505,22 +532,22 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const handleShareChange = (value: string) => {
     setSignerSecret(value);
     const validation = validateShare(value);
-    
+
     // Try deeper validation with bifrost decoder if basic validation passes
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid share
         const decodedShare = decodeShare(value);
-        
+
         // Additional structure validation could be done here
-        if (typeof decodedShare.idx !== 'number' || 
-            typeof decodedShare.seckey !== 'string' || 
-            typeof decodedShare.binder_sn !== 'string' || 
-            typeof decodedShare.hidden_sn !== 'string') {
+        if (typeof decodedShare.idx !== 'number' ||
+          typeof decodedShare.seckey !== 'string' ||
+          typeof decodedShare.binder_sn !== 'string' ||
+          typeof decodedShare.hidden_sn !== 'string') {
           setIsShareValid(false);
           return;
         }
-        
+
         setIsShareValid(true);
       } catch {
         setIsShareValid(false);
@@ -533,22 +560,22 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const handleGroupChange = (value: string) => {
     setGroupCredential(value);
     const validation = validateGroup(value);
-    
+
     // Try deeper validation with bifrost decoder if basic validation passes
     if (validation.isValid && value.trim()) {
       try {
         // If this doesn't throw, it's a valid group
         const decodedGroup = decodeGroup(value);
-        
+
         // Additional structure validation
-        if (typeof decodedGroup.threshold !== 'number' || 
-            typeof decodedGroup.group_pk !== 'string' || 
-            !Array.isArray(decodedGroup.commits) ||
-            decodedGroup.commits.length === 0) {
+        if (typeof decodedGroup.threshold !== 'number' ||
+          typeof decodedGroup.group_pk !== 'string' ||
+          !Array.isArray(decodedGroup.commits) ||
+          decodedGroup.commits.length === 0) {
           setIsGroupValid(false);
           return;
         }
-        
+
         setIsGroupValid(true);
       } catch {
         setIsGroupValid(false);
@@ -582,10 +609,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       addLog('info', 'Creating and connecting node...');
 
       // Use the improved createConnectedNode API which returns enhanced state info
-      const result = await createConnectedNode({ 
-        group: groupCredential, 
-        share: signerSecret, 
-        relays: relayUrls 
+      const result = await createConnectedNode({
+        group: groupCredential,
+        share: signerSecret,
+        relays: relayUrls
       });
 
       nodeRef.current = result.node;
@@ -642,270 +669,291 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     <div className="space-y-6">
       {/* Add the pulse style */}
       <style>{pulseStyle}</style>
-      
-      <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
-        <CardContent className="p-8 space-y-8">
+      <div className="flex items-center">
+        <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
+        <Tooltip
+          trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+          position="right"
+          content={
+            <>
+              <p className="mb-2 font-semibold">Important:</p>
+              <p>The signer must be running to handle signature requests from clients. When active, it will communicate with other nodes through your configured relays.</p>
+            </>
+          }
+        />
+      </div>
+
+      {/* Share Information Header */}
+      {(() => {
+        const shareInfo = getShareInfo(groupCredential, signerSecret, initialData?.name);
+        return shareInfo && isGroupValid && isShareValid ? (
+          <div className="border border-blue-800/30 rounded-lg p-4">
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2">
+                <User className="h-5 w-5 text-blue-400" />
+                <span className="text-blue-200 font-medium">{shareInfo.shareName}</span>
+              </div>
+              <div className="text-gray-400">•</div>
+              <div className="text-gray-300 text-sm">
+                Index: <span className="text-blue-400 font-mono">{shareInfo.index}</span>
+              </div>
+              <div className="text-gray-400">•</div>
+              <div className="text-gray-300 text-sm">
+                Threshold: <span className="text-blue-400">{shareInfo.threshold}</span>/<span className="text-blue-400">{shareInfo.totalShares}</span>
+              </div>
+            </div>
+            <div className="mt-2">
+              <div className="text-gray-300 text-sm">
+                Pubkey: <span className="font-mono text-xs truncate block">{shareInfo.pubkey}</span>
+              </div>
+            </div>
+          </div>
+        ) : null;
+      })()}
+
+      <div className="space-y-6">
+        <div className="space-y-3">
+          <div className="flex">
+            <Tooltip
+              trigger={
+                <Input
+                  type="text"
+                  value={groupCredential}
+                  onChange={(e) => handleGroupChange(e.target.value)}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                  disabled={isSignerRunning || isConnecting}
+                  placeholder="Enter your group credential (bfgroup...)"
+                  aria-label="Group credential input"
+                />
+              }
+              position="top"
+              triggerClassName="w-full block"
+              content={
+                <>
+                  <p className="mb-2 font-semibold">Group Credential:</p>
+                  <p>
+                    This is your group data that contains the public information about
+                    your keyset, including the threshold and group public key. It starts
+                    with &apos;bfgroup&apos; and is shared among all signers. It is used to
+                    identify the group and the threshold for signing.
+                  </p>
+                </>
+              }
+            />
+            <Tooltip
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopy(groupCredential, 'group')}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!groupCredential || !isGroupValid}
+                  aria-label="Copy group credential"
+                >
+                  {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </Button>
+              }
+              position="top"
+              width="w-fit"
+              content="Copy"
+            />
+            <Tooltip
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleExpanded('group')}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!groupCredential || !isGroupValid}
+                  aria-label="Toggle group credential details"
+                >
+                  {expandedItems['group'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                </Button>
+              }
+              position="top"
+              width="w-fit"
+              content="Decoded"
+            />
+          </div>
+
+          {expandedItems['group'] && groupCredential && isGroupValid && (
+            <div className="mt-2">
+              {decodedGroupData ? (
+                renderDecodedInfo(decodedGroupData, groupCredential)
+              ) : (
+                <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                  Failed to decode group credential
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex">
+            <Tooltip
+              trigger={
+                <Input
+                  type="password"
+                  value={signerSecret}
+                  onChange={(e) => handleShareChange(e.target.value)}
+                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
+                  disabled={isSignerRunning || isConnecting}
+                  placeholder="Enter your secret share (bfshare...)"
+                  aria-label="Secret share input"
+                />
+              }
+              position="top"
+              triggerClassName="w-full block"
+              content={
+                <>
+                  <p className="mb-2 font-semibold">Secret Share:</p>
+                  <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with &apos;bfshare&apos; and should be kept private and secure. Each signer needs a share to participate in signing.</p>
+                </>
+              }
+            />
+            <Tooltip
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleCopy(signerSecret, 'share')}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!signerSecret || !isShareValid}
+                  aria-label="Copy secret share"
+                >
+                  {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
+                </Button>
+              }
+              position="top"
+              width="w-fit"
+              content="Copy"
+            />
+            <Tooltip
+              trigger={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => toggleExpanded('share')}
+                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+                  disabled={!signerSecret || !isShareValid}
+                  aria-label="Toggle share details"
+                >
+                  {expandedItems['share'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
+                </Button>
+              }
+              position="top"
+              width="w-fit"
+              content="Decoded"
+            />
+          </div>
+
+          {expandedItems['share'] && signerSecret && isShareValid && (
+            <div className="mt-2">
+              {decodedShareData ? (
+                renderDecodedInfo(decodedShareData, signerSecret)
+              ) : (
+                <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
+                  Failed to decode share credential
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between mt-6">
+            <div className="flex items-center gap-2">
+              <div className={`w-3 h-3 rounded-full ${isSignerRunning
+                  ? 'bg-green-500 pulse-animation'
+                  : isConnecting
+                    ? 'bg-yellow-500 pulse-animation'
+                    : 'bg-red-500'
+                }`}></div>
+              <span className="text-gray-300">
+                Signer {
+                  isSignerRunning ? 'Running' :
+                    isConnecting ? 'Connecting...' :
+                      'Stopped'
+                }
+              </span>
+            </div>
+            <Button
+              onClick={handleSignerButtonClick}
+              className={`px-6 py-2 ${isSignerRunning
+                  ? "bg-red-600 hover:bg-red-700"
+                  : "bg-green-600 hover:bg-green-700"
+                } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
+              disabled={!isShareValid || !isGroupValid || relayUrls.length === 0 || isConnecting}
+            >
+              {isSignerRunning ? "Stop Signer" : isConnecting ? "Connecting..." : "Start Signer"}
+            </Button>
+          </div>
+        </div>
+
+        <div className="space-y-3">
           <div className="flex items-center">
-            <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
-            <Tooltip 
-              trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+            <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
+            <Tooltip
+              trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
               position="right"
               content={
                 <>
                   <p className="mb-2 font-semibold">Important:</p>
-                  <p>The signer must be running to handle signature requests from clients. When active, it will communicate with other nodes through your configured relays.</p>
+                  <p>You must be connected to at least one relay to communicate with other signers. Ensure all signers have at least one common relay to coordinate successfully.</p>
                 </>
               }
             />
           </div>
-          
-          <div className="space-y-6">
-            <div className="space-y-3">
-              <div className="flex">
-                <Tooltip 
-                  trigger={
-                    <Input
-                      type="text"
-                      value={groupCredential}
-                      onChange={(e) => handleGroupChange(e.target.value)}
-                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                      disabled={isSignerRunning || isConnecting}
-                      placeholder="Enter your group credential (bfgroup...)"
-                      aria-label="Group credential input"
-                    />
-                  }
-                  position="top"
-                  triggerClassName="w-full block"
-                  content={
-                    <>
-                      <p className="mb-2 font-semibold">Group Credential:</p>
-                      <p>
-                        This is your group data that contains the public information about
-                        your keyset, including the threshold and group public key. It starts
-                        with &apos;bfgroup&apos; and is shared among all signers. It is used to
-                        identify the group and the threshold for signing.
-                      </p>
-                    </>
-                  }
-                />
-                <Tooltip 
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleCopy(groupCredential, 'group')}
-                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                      disabled={!groupCredential || !isGroupValid}
-                      aria-label="Copy group credential"
-                    >
-                      {copiedStates.group ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                    </Button>
-                  }
-                  position="top"
-                  width="w-fit"
-                  content="Copy"
-                />
-                <Tooltip 
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => toggleExpanded('group')}
-                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                      disabled={!groupCredential || !isGroupValid}
-                      aria-label="Toggle group credential details"
-                    >
-                      {expandedItems['group'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                    </Button>
-                  }
-                  position="top"
-                  width="w-fit"
-                  content="Decoded"
-                />
-              </div>
-              
-              {expandedItems['group'] && groupCredential && isGroupValid && (
-                <div className="mt-2">
-                  {decodedGroupData ? (
-                    renderDecodedInfo(decodedGroupData, groupCredential)
-                  ) : (
-                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
-                      Failed to decode group credential
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="flex">
-                <Tooltip 
-                  trigger={
-                    <Input
-                      type="password"
-                      value={signerSecret}
-                      onChange={(e) => handleShareChange(e.target.value)}
-                      className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full font-mono"
-                      disabled={isSignerRunning || isConnecting}
-                      placeholder="Enter your secret share (bfshare...)"
-                      aria-label="Secret share input"
-                    />
-                  }
-                  position="top"
-                  triggerClassName="w-full block"
-                  content={
-                    <>
-                      <p className="mb-2 font-semibold">Secret Share:</p>
-                      <p>This is an individual secret share of the private key. Your keyset is split into shares and this is one of them. It starts with &apos;bfshare&apos; and should be kept private and secure. Each signer needs a share to participate in signing.</p>
-                    </>
-                  }
-                />
-                <Tooltip 
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleCopy(signerSecret, 'share')}
-                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                      disabled={!signerSecret || !isShareValid}
-                      aria-label="Copy secret share"
-                    >
-                      {copiedStates.share ? <Check className="h-5 w-5" /> : <Copy className="h-5 w-5" />}
-                    </Button>
-                  }
-                  position="top"
-                  width="w-fit"
-                  content="Copy"
-                />
-                <Tooltip 
-                  trigger={
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => toggleExpanded('share')}
-                      className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                      disabled={!signerSecret || !isShareValid}
-                      aria-label="Toggle share details"
-                    >
-                      {expandedItems['share'] ? <ChevronDown className="h-5 w-5" /> : <ChevronRight className="h-5 w-5" />}
-                    </Button>
-                  }
-                  position="top"
-                  width="w-fit"
-                  content="Decoded"
-                />
-              </div>
-              
-              {expandedItems['share'] && signerSecret && isShareValid && (
-                <div className="mt-2">
-                  {decodedShareData ? (
-                    renderDecodedInfo(decodedShareData, signerSecret)
-                  ) : (
-                    <div className="bg-red-900/30 p-3 rounded text-xs text-red-300">
-                      Failed to decode share credential
-                    </div>
-                  )}
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between mt-6">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${
-                    isSignerRunning 
-                      ? 'bg-green-500 pulse-animation' 
-                      : isConnecting
-                      ? 'bg-yellow-500 pulse-animation'
-                      : 'bg-red-500'
-                  }`}></div>
-                  <span className="text-gray-300">
-                    Signer {
-                      isSignerRunning ? 'Running' : 
-                      isConnecting ? 'Connecting...' : 
-                      'Stopped'
-                    }
-                  </span>
-                </div>
-                <Button
-                  onClick={handleSignerButtonClick}
-                  className={`px-6 py-2 ${
-                    isSignerRunning
-                      ? "bg-red-600 hover:bg-red-700"
-                      : "bg-green-600 hover:bg-green-700"
-                  } transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer`}
-                  disabled={!isShareValid || !isGroupValid || relayUrls.length === 0 || isConnecting}
-                >
-                  {isSignerRunning ? "Stop Signer" : isConnecting ? "Connecting..." : "Start Signer"}
-                </Button>
-              </div>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center">
-                <h3 className="text-blue-300 text-sm font-medium">Relay URLs</h3>
-                <Tooltip 
-                  trigger={<HelpCircle size={16} className="ml-2 text-blue-400 cursor-pointer" />}
-                  position="right"
-                  content={
-                    <>
-                      <p className="mb-2 font-semibold">Important:</p>
-                      <p>You must be connected to at least one relay to communicate with other signers. Ensure all signers have at least one common relay to coordinate successfully.</p>
-                    </>
-                  }
-                />
-              </div>
-              <div className="flex">
-                <Input
-                  type="text"
-                  placeholder="Add relay URL"
-                  value={newRelayUrl}
-                  onChange={(e) => setNewRelayUrl(e.target.value)}
-                  className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
-                  disabled={isSignerRunning || isConnecting}
-                />
-                <Button
-                  onClick={handleAddRelay}
-                  className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
-                  disabled={!newRelayUrl.trim() || isSignerRunning || isConnecting}
-                >
-                  Add
-                </Button>
-              </div>
-              
-              <div className="space-y-2">
-                {relayUrls.map((relay, index) => (
-                  <div key={index} className="flex justify-between items-center bg-gray-800/30 py-2 px-3 rounded-md">
-                    <span className="text-blue-300 text-sm font-mono">{relay}</span>
-                    <IconButton
-                      variant="destructive"
-                      size="sm"
-                      icon={<X className="h-4 w-4" />}
-                      onClick={() => handleRemoveRelay(relay)}
-                      tooltip="Remove relay"
-                      disabled={isSignerRunning || isConnecting || relayUrls.length <= 1}
-                    />
-                  </div>
-                ))}
-              </div>
-            </div>
-            
-          </div>
-          
-          {/* Peer List and Event Log with consistent spacing */}
-          <div className="space-y-4">
-            <PeerList
-              node={nodeRef.current}
-              groupCredential={groupCredential}
-              shareCredential={signerSecret}
-              isSignerRunning={isSignerRunning}
-              disabled={!isGroupValid || !isShareValid}
+          <div className="flex">
+            <Input
+              type="text"
+              placeholder="Add relay URL"
+              value={newRelayUrl}
+              onChange={(e) => setNewRelayUrl(e.target.value)}
+              className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
+              disabled={isSignerRunning || isConnecting}
             />
-            
-            <EventLog 
-              logs={logs} 
-              isSignerRunning={isSignerRunning} 
-              onClearLogs={() => setLogs([])}
-            />
+            <Button
+              onClick={handleAddRelay}
+              className="ml-2 bg-blue-800/30 text-blue-400 hover:text-blue-300 hover:bg-blue-800/50"
+              disabled={!newRelayUrl.trim() || isSignerRunning || isConnecting}
+            >
+              Add
+            </Button>
           </div>
-        </CardContent>
-      </Card>
+
+          <div className="space-y-2">
+            {relayUrls.map((relay, index) => (
+              <div key={index} className="flex justify-between items-center bg-gray-800/30 py-2 px-3 rounded-md">
+                <span className="text-blue-300 text-sm font-mono">{relay}</span>
+                <IconButton
+                  variant="destructive"
+                  size="sm"
+                  icon={<X className="h-4 w-4" />}
+                  onClick={() => handleRemoveRelay(relay)}
+                  tooltip="Remove relay"
+                  disabled={isSignerRunning || isConnecting || relayUrls.length <= 1}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+
+      {/* Peer List and Event Log with consistent spacing */}
+      <div className="space-y-4">
+        <PeerList
+          node={nodeRef.current}
+          groupCredential={groupCredential}
+          shareCredential={signerSecret}
+          isSignerRunning={isSignerRunning}
+          disabled={!isGroupValid || !isShareValid}
+        />
+
+        <EventLog
+          logs={logs}
+          isSignerRunning={isSignerRunning}
+          onClearLogs={() => setLogs([])}
+        />
+      </div>
     </div>
   );
 });
