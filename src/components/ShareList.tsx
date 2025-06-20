@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import { decodeGroup, decodeShare } from '@frostr/igloo-core';
 import { FolderOpen, Trash2, Plus } from 'lucide-react';
@@ -17,28 +17,14 @@ interface ShareListProps {
 // Helper function to extract pubkey from share
 const extractPubkeyFromShare = (share: IglooShare): string | null => {
   try {
-    console.log('Extracting pubkey for share:', share.name, {
-      hasShareCredential: !!share.shareCredential,
-      hasMetadata: !!share.metadata,
-      metadataBinderSn: share.metadata?.binder_sn,
-      shareId: share.id
-    });
-
     // First, decode the group to get all pubkeys
     const decodedGroup = decodeGroup(share.groupCredential);
-    console.log('Decoded group:', {
-      threshold: decodedGroup.threshold,
-      commitsLength: decodedGroup.commits?.length,
-      commits: decodedGroup.commits?.map(c => ({ idx: c.idx, pubkey: c.pubkey?.slice(0, 16) + '...' }))
-    });
     
     // If we have a shareCredential, decode it to get the index
     if (share.shareCredential) {
       const decodedShare = decodeShare(share.shareCredential);
-      console.log('Decoded share credential:', { idx: decodedShare.idx });
       const commit = decodedGroup.commits.find(c => c.idx === decodedShare.idx);
       if (commit) {
-        console.log('Found matching commit by shareCredential idx:', commit.idx);
         return commit.pubkey;
       }
     }
@@ -47,14 +33,12 @@ const extractPubkeyFromShare = (share: IglooShare): string | null => {
     if (share.metadata?.binder_sn) {
       const commit = decodedGroup.commits.find(c => c.binder_pn === share.metadata!.binder_sn);
       if (commit) {
-        console.log('Found matching commit by binder_sn:', commit.idx);
         return commit.pubkey;
       }
     }
     
     // If we only have one commit, return that pubkey
     if (decodedGroup.commits.length === 1) {
-      console.log('Using single commit pubkey');
       return decodedGroup.commits[0].pubkey;
     }
     
@@ -64,7 +48,6 @@ const extractPubkeyFromShare = (share: IglooShare): string | null => {
       const shareIndex = parseInt(nameMatch[1], 10); // Use 1-based index as-is
       const commit = decodedGroup.commits.find(c => c.idx === shareIndex);
       if (commit) {
-        console.log('Found matching commit by name parsing:', commit.idx);
         return commit.pubkey;
       }
     }
@@ -75,15 +58,12 @@ const extractPubkeyFromShare = (share: IglooShare): string | null => {
       const shareIndex = parseInt(idMatch[1], 10); // Use 1-based index as-is
       const commit = decodedGroup.commits.find(c => c.idx === shareIndex);
       if (commit) {
-        console.log('Found matching commit by ID parsing:', commit.idx);
         return commit.pubkey;
       }
     }
     
-    console.log('No pubkey found for share:', share.name);
     return null;
   } catch (error) {
-    console.error('Error extracting pubkey from share:', share.name, error);
     return null;
   }
 };
