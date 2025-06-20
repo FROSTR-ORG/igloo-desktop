@@ -10,7 +10,7 @@ import LoadShare from './LoadShare';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
 interface ShareListProps {
-  onShareLoaded?: (share: string, groupCredential: string) => void;
+  onShareLoaded?: (share: string, groupCredential: string, shareName: string) => void;
   onNewKeyset?: () => void;
 }
 
@@ -90,8 +90,8 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
   };
 
   const handleLoadComplete = (decryptedShare: string, groupCredential: string) => {
-    if (onShareLoaded) {
-      onShareLoaded(decryptedShare, groupCredential);
+    if (onShareLoaded && loadingShare) {
+      onShareLoaded(decryptedShare, groupCredential, loadingShare.name);
     }
     setLoadingShare(null);
   };

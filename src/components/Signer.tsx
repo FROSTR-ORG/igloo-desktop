@@ -4,7 +4,7 @@ import { IconButton } from "@/components/ui/icon-button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tooltip } from "@/components/ui/tooltip"
 import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
-import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight } from "lucide-react"
+import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -55,7 +55,35 @@ const EVENT_MAPPINGS = {
 
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
+// Helper function to extract share information
+const getShareInfo = (groupCredential: string, shareCredential: string, shareName?: string) => {
+  try {
+    if (!groupCredential || !shareCredential) return null;
+    
+    const decodedGroup = decodeGroup(groupCredential);
+    const decodedShare = decodeShare(shareCredential);
+    
+    // Find the corresponding commit in the group
+    const commit = decodedGroup.commits.find(c => c.idx === decodedShare.idx);
+    
+    if (commit) {
+      return {
+        index: decodedShare.idx,
+        pubkey: commit.pubkey,
+        shareName: shareName || `Share ${decodedShare.idx}`,
+        threshold: decodedGroup.threshold,
+        totalShares: decodedGroup.commits.length
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
+
 const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
+  console.log("initialData", initialData);
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
   const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
@@ -643,8 +671,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       {/* Add the pulse style */}
       <style>{pulseStyle}</style>
       
-      <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
-        <CardContent className="p-8 space-y-8">
+      {/* <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
+        <CardContent className="p-8 space-y-8"> */}
           <div className="flex items-center">
             <h2 className="text-blue-300 text-lg">Start your signer to handle requests</h2>
             <Tooltip 
@@ -658,6 +686,34 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
               }
             />
           </div>
+
+          {/* Share Information Header */}
+          {(() => {
+            const shareInfo = getShareInfo(groupCredential, signerSecret, initialData?.name);
+            return shareInfo && isGroupValid && isShareValid ? (
+              <div className="border border-blue-800/30 rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
+                    <User className="h-5 w-5 text-blue-400" />
+                    <span className="text-blue-200 font-medium">{shareInfo.shareName}</span>
+                  </div>
+                  <div className="text-gray-400">•</div>
+                  <div className="text-gray-300 text-sm">
+                    Index: <span className="text-blue-400 font-mono">{shareInfo.index}</span>
+                  </div>
+                  <div className="text-gray-400">•</div>
+                  <div className="text-gray-300 text-sm">
+                    Threshold: <span className="text-blue-400">{shareInfo.threshold}</span>/<span className="text-blue-400">{shareInfo.totalShares}</span>
+                  </div>
+                </div>
+                <div className="mt-2">
+                  <div className="text-gray-300 text-sm">
+                    Pubkey: <span className="font-mono text-xs truncate block">{shareInfo.pubkey}</span>
+                  </div>
+                </div>
+              </div>
+            ) : null;
+          })()}
           
           <div className="space-y-6">
             <div className="space-y-3">
@@ -904,8 +960,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
               onClearLogs={() => setLogs([])}
             />
           </div>
-        </CardContent>
-      </Card>
+        {/* </CardContent>
+      </Card> */}
     </div>
   );
 });
