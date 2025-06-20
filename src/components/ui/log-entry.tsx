@@ -48,7 +48,7 @@ export const LogEntry = memo(({ log }: LogEntryProps) => {
       try {
         const dataType = typeof log.data;
         const isArray = Array.isArray(log.data);
-        const constructor = log.data?.constructor?.name;
+        const constructorName = log.data?.constructor?.name;
         
         let preview = '';
         if (dataType === 'object' && log.data !== null) {
@@ -56,14 +56,14 @@ export const LogEntry = memo(({ log }: LogEntryProps) => {
             const keys = Object.keys(log.data);
             preview = `Object with keys: [${keys.slice(0, 5).join(', ')}${keys.length > 5 ? '...' : ''}]`;
           } catch {
-            preview = `${constructor || 'Object'} (non-enumerable)`;
+            preview = `${constructorName || 'Object'} (non-enumerable)`;
           }
         } else {
           preview = `${dataType}: ${String(log.data).slice(0, 100)}${String(log.data).length > 100 ? '...' : ''}`;
         }
         
         return `Unable to serialize data to JSON
-Type: ${isArray ? 'Array' : dataType}${constructor ? ` (${constructor})` : ''}
+Type: ${isArray ? 'Array' : dataType}${constructorName ? ` (${constructorName})` : ''}
 Preview: ${preview}
 Error: ${error instanceof Error ? error.message : 'Circular reference or non-serializable data'}
 
