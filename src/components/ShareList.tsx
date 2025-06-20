@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
+import { decodeGroup, decodeShare } from '@frostr/igloo-core';
 import { FolderOpen, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
@@ -9,9 +10,63 @@ import LoadShare from './LoadShare';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
 interface ShareListProps {
-  onShareLoaded?: (share: string, groupCredential: string) => void;
+  onShareLoaded?: (share: string, groupCredential: string, shareName: string) => void;
   onNewKeyset?: () => void;
 }
+
+// Helper function to extract pubkey from share
+const extractPubkeyFromShare = (share: IglooShare): string | null => {
+  try {
+    // First, decode the group to get all pubkeys
+    const decodedGroup = decodeGroup(share.groupCredential);
+    
+    // If we have a shareCredential, decode it to get the index
+    if (share.shareCredential) {
+      const decodedShare = decodeShare(share.shareCredential);
+      const commit = decodedGroup.commits.find(c => c.idx === decodedShare.idx);
+      if (commit) {
+        return commit.pubkey;
+      }
+    }
+    
+    // If no shareCredential but we have metadata with binder_sn, try to match
+    if (share.metadata?.binder_sn) {
+      const commit = decodedGroup.commits.find(c => c.binder_pn === share.metadata!.binder_sn);
+      if (commit) {
+        return commit.pubkey;
+      }
+    }
+    
+    // If we only have one commit, return that pubkey
+    if (decodedGroup.commits.length === 1) {
+      return decodedGroup.commits[0].pubkey;
+    }
+    
+    // Try to extract from the share name if it contains index information
+    const nameMatch = share.name.match(/share[_\s]+(\d+)$/i);
+    if (nameMatch) {
+      const shareIndex = parseInt(nameMatch[1], 10); // Use 1-based index as-is
+      const commit = decodedGroup.commits.find(c => c.idx === shareIndex);
+      if (commit) {
+        return commit.pubkey;
+      }
+    }
+
+    // Also try to extract from the share ID if it contains index information
+    const idMatch = share.id.match(/share[_\s]*(\d+)$/i);
+    if (idMatch) {
+      const shareIndex = parseInt(idMatch[1], 10); // Use 1-based index as-is
+      const commit = decodedGroup.commits.find(c => c.idx === shareIndex);
+      if (commit) {
+        return commit.pubkey;
+      }
+    }
+    
+    return null;
+  } catch (error) {
+    return null;
+  }
+};
 
 const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => {
   const [shares, setShares] = useState<IglooShare[]>([]);
@@ -35,8 +90,8 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
   };
 
   const handleLoadComplete = (decryptedShare: string, groupCredential: string) => {
-    if (onShareLoaded) {
-      onShareLoaded(decryptedShare, groupCredential);
+    if (onShareLoaded && loadingShare) {
+      onShareLoaded(decryptedShare, groupCredential, loadingShare.name);
     }
     setLoadingShare(null);
   };
@@ -80,11 +135,19 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
               key={share.id} 
               className="bg-gray-800/60 rounded-md p-4 flex justify-between items-center border border-gray-700 hover:border-blue-700 transition-colors"
             >
-              <div className="flex-1">
+                            <div className="flex-1 min-w-0">
                 <h3 className="text-blue-200 font-medium">{share.name}</h3>
                 <p className="text-gray-400 text-sm mt-1">
                   ID: <span className="text-blue-400 font-mono">{share.id}</span>
                 </p>
+                {(() => {
+                  const pubkey = extractPubkeyFromShare(share);
+                  return pubkey ? (
+                    <p className="text-gray-400 text-sm mt-1">
+                      Pubkey: <span className="font-mono text-xs truncate block">{pubkey}</span>
+                    </p>
+                  ) : null;
+                })()}
                 {share.savedAt && (
                   <p className="text-gray-500 text-xs mt-1">
                     Saved: {new Date(share.savedAt).toLocaleDateString()}

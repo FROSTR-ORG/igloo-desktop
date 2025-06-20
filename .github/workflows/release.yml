@@ -10,31 +10,19 @@ permissions:
   packages: write
 
 jobs:
-  release:
-    name: Create Release
+  get-version:
+    name: Get Version
     runs-on: ubuntu-latest
     outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
       version: ${{ steps.get_version.outputs.version }}
     steps:
       - name: Extract version
         id: get_version
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
-      - name: Create Release
-        id: create_release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          name: Release ${{ github.ref }}
-          draft: true
-          prerelease: false
-
   build-linux:
     name: Build Linux
-    needs: release
+    needs: get-version
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -62,7 +50,7 @@ jobs:
 
   build-macos:
     name: Build macOS
-    needs: release
+    needs: get-version
     runs-on: macos-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -90,7 +78,7 @@ jobs:
 
   build-windows:
     name: Build Windows
-    needs: release
+    needs: get-version
     runs-on: windows-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -118,7 +106,7 @@ jobs:
 
   publish:
     name: Publish Release
-    needs: [release, build-linux, build-macos, build-windows]
+    needs: [get-version, build-linux, build-macos, build-windows]
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -194,25 +182,25 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: false
           body: |
-            # Igloo v${{ needs.release.outputs.version }}
+            # Igloo v${{ needs.get-version.outputs.version }}
             
             ## Downloads
             
             Choose the appropriate file for your platform:
             
             - **Windows**:
-              - `Igloo-Setup-${{ needs.release.outputs.version }}.exe` - Installer
-              - `Igloo-${{ needs.release.outputs.version }}-portable.exe` - Portable
+              - `Igloo-Setup-${{ needs.get-version.outputs.version }}.exe` - Installer
+              - `Igloo-${{ needs.get-version.outputs.version }}-portable.exe` - Portable
             
             - **macOS**:
-              - `Igloo-${{ needs.release.outputs.version }}-x64.dmg` - Intel Mac Disk Image
-              - `Igloo-${{ needs.release.outputs.version }}-arm64.dmg` - Apple Silicon Mac Disk Image
-              - `Igloo-${{ needs.release.outputs.version }}-x64.zip` - Intel Mac ZIP Archive
-              - `Igloo-${{ needs.release.outputs.version }}-arm64.zip` - Apple Silicon Mac ZIP Archive
+              - `Igloo-${{ needs.get-version.outputs.version }}-x64.dmg` - Intel Mac Disk Image
+              - `Igloo-${{ needs.get-version.outputs.version }}-arm64.dmg` - Apple Silicon Mac Disk Image
+              - `Igloo-${{ needs.get-version.outputs.version }}-x64.zip` - Intel Mac ZIP Archive
+              - `Igloo-${{ needs.get-version.outputs.version }}-arm64.zip` - Apple Silicon Mac ZIP Archive
             
             - **Linux**:
-              - `igloo-${{ needs.release.outputs.version }}.AppImage` - AppImage
-              - `igloo_${{ needs.release.outputs.version }}_amd64.deb` - Debian Package
+              - `igloo-${{ needs.get-version.outputs.version }}.AppImage` - AppImage
+              - `igloo_${{ needs.get-version.outputs.version }}_amd64.deb` - Debian Package
             
             ## Verification
             
@@ -225,17 +213,17 @@ jobs:
             
             2. Import the public key:
                ```bash
-               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/igloo-signing-key.asc | gpg --import
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.get-version.outputs.version }}/igloo-signing-key.asc | gpg --import
                ```
             
             3. Verify the checksums signature:
                ```bash
-               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/SHA256SUMS.asc | gpg --verify
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.get-version.outputs.version }}/SHA256SUMS.asc | gpg --verify
                ```
             
             4. Verify file checksums:
                ```bash
-               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.release.outputs.version }}/SHA256SUMS | shasum -a 256 -c
+               curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/v${{ needs.get-version.outputs.version }}/SHA256SUMS | shasum -a 256 -c
                ```
             
             For detailed verification instructions, see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md) 

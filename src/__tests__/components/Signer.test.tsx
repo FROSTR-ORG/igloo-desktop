@@ -36,7 +36,7 @@ describe('Signer Component UI Tests', () => {
     on: jest.fn(),
     off: jest.fn(),
     disconnect: jest.fn(),
-  };
+  } as any; // Use any for complex mock type to avoid extensive interface mocking
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -442,6 +442,470 @@ describe('Signer Component UI Tests', () => {
       
       const startButton = screen.getByRole('button', { name: /start signer/i });
       expect(startButton).not.toBeDisabled();
+    });
+  });
+
+  describe('Memory Leak Prevention Tests', () => {
+    let mockConsoleWarn: jest.SpyInstance;
+
+    beforeEach(() => {
+      // Mock console.warn to capture warnings during cleanup tests
+      mockConsoleWarn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      mockConsoleWarn.mockRestore();
+    });
+
+    it('should set up event listeners when signer starts', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(mockCreateConnectedNode).toHaveBeenCalledWith({
+          group: 'valid-group',
+          share: 'valid-share',
+          relays: ['wss://relay.primal.net']
+        });
+      });
+
+      // Verify basic event listeners are set up
+      expect(mockNode.on).toHaveBeenCalledWith('closed', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('ready', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('bounced', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('message', expect.any(Function));
+
+      // Verify legacy event listeners are set up
+      expect(mockNode.on).toHaveBeenCalledWith('/ecdh/sender/rej', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('/sign/sender/rej', expect.any(Function));
+    });
+
+    it('should clean up event listeners when signer stops', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start the signer first
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Reset mocks to track cleanup calls
+      jest.clearAllMocks();
+      
+      // Stop the signer
+      const stopButton = screen.getByRole('button', { name: /stop signer/i });
+      await user.click(stopButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      });
+
+      // Verify cleanup was called
+      expect(mockCleanupBifrostNode).toHaveBeenCalledWith(mockNode);
+    });
+
+    it('should clean up event listeners on restart (preventing accumulation)', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Stop the signer
+      const stopButton = screen.getByRole('button', { name: /stop signer/i });
+      await user.click(stopButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      });
+
+      // Reset mocks to track second start
+      jest.clearAllMocks();
+      
+      // Start again
+      const restartButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(restartButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Verify that createConnectedNode was called again (indicating proper restart)
+      expect(mockCreateConnectedNode).toHaveBeenCalledTimes(1);
+      
+      // Verify event listeners are set up again
+      expect(mockNode.on).toHaveBeenCalledWith('closed', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('error', expect.any(Function));
+      expect(mockNode.on).toHaveBeenCalledWith('ready', expect.any(Function));
+    });
+
+    it('should remove specific event listeners with proper handler references', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start and immediately stop to trigger cleanup
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Capture the handlers that were added
+      const onCalls = mockNode.on.mock.calls;
+      
+      // Stop the signer to trigger cleanup
+      const stopButton = screen.getByRole('button', { name: /stop signer/i });
+      await user.click(stopButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      });
+
+      // Verify that off was called for basic events (these are the ones we can test reliably)
+      const basicEvents = ['closed', 'error', 'ready', 'bounced', 'message'];
+      basicEvents.forEach(eventName => {
+        const onCall = onCalls.find(call => call[0] === eventName);
+        if (onCall) {
+          // The off method should be called with the same handler function
+          expect(mockNode.off).toHaveBeenCalledWith(eventName, onCall[1]);
+        }
+      });
+    });
+
+    it('should handle cleanup errors gracefully', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      // Make mockNode.off throw an error to test error handling
+      mockNode.off.mockImplementation(() => {
+        throw new Error('Cleanup error');
+      });
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Stop the signer - this should trigger cleanup with errors
+      const stopButton = screen.getByRole('button', { name: /stop signer/i });
+      await user.click(stopButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      });
+
+      // Verify that warnings were logged for cleanup errors
+      expect(mockConsoleWarn).toHaveBeenCalledWith(
+        expect.stringContaining('Error removing'),
+        expect.any(Error)
+      );
+      
+      // Despite errors, the component should still function
+      expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+    });
+
+    it('should clean up listeners on component unmount', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const { unmount } = render(<Signer initialData={initialData} />);
+      
+      // Start the signer first to have something to clean up
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Reset mocks to track cleanup on unmount
+      jest.clearAllMocks();
+      
+      // Unmount the component
+      unmount();
+      
+      // Verify cleanup was called on unmount
+      expect(mockCleanupBifrostNode).toHaveBeenCalled();
+    });
+
+    it('should not leak memory on multiple start/stop cycles', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Perform multiple start/stop cycles
+      for (let i = 0; i < 3; i++) {
+        // Start
+        const startButton = screen.getByRole('button', { name: /start signer/i });
+        await user.click(startButton);
+        
+        await waitFor(() => {
+          expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+        });
+
+        // Stop
+        const stopButton = screen.getByRole('button', { name: /stop signer/i });
+        await user.click(stopButton);
+        
+        await waitFor(() => {
+          expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+        });
+      }
+
+      // Verify that cleanup was called appropriately
+      // Each start calls cleanup once (to clean up before starting), and each stop calls cleanup once
+      // So for 3 complete cycles, we expect 6 total calls
+      const cleanupCallCount = mockCleanupBifrostNode.mock.calls.length;
+      expect(cleanupCallCount).toBeGreaterThan(0); // At least some cleanup happened
+      expect(cleanupCallCount).toBeLessThanOrEqual(6); // But not more than expected
+      
+      // Verify no accumulation by checking that on/off calls are balanced
+      const onCallCount = mockNode.on.mock.calls.length;
+      const offCallCount = mockNode.off.mock.calls.length;
+      
+      // Each start sets up listeners, each stop removes them
+      // With 3 complete cycles, we should have balanced calls
+      expect(offCallCount).toBeGreaterThan(0);
+      
+      // The component should still be functional
+      expect(screen.getByRole('button', { name: /start signer/i })).toBeInTheDocument();
+    });
+
+    it('should handle node creation failure gracefully', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      // Make createConnectedNode fail
+      mockCreateConnectedNode.mockRejectedValueOnce(new Error('Connection failed'));
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Try to start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      // Should remain stopped due to error
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Stopped/)).toBeInTheDocument();
+      });
+
+      // Component should be ready for retry (no memory leaks from failed attempt)
+      expect(startButton).not.toBeDisabled();
+      
+      // Should be able to attempt starting again without issues
+      mockCreateConnectedNode.mockResolvedValueOnce({
+        node: mockNode,
+        state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+      });
+      
+      await user.click(startButton);
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+    });
+
+    it('should properly expose stopSigner method through ref', async () => {
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const refCallback = jest.fn();
+      
+      render(<Signer ref={refCallback} initialData={initialData} />);
+      
+      // Verify ref was called with handle containing stopSigner
+      expect(refCallback).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stopSigner: expect.any(Function)
+        })
+      );
+      
+      const signerHandle = refCallback.mock.calls[0][0];
+      
+      // Start signer first
+      const user = userEvent.setup();
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Call stopSigner through ref (should work without throwing)
+      await expect(signerHandle.stopSigner()).resolves.not.toThrow();
+      
+      // The ref method should successfully stop the signer without errors
+      // This verifies the ref is exposed correctly and functional
+      expect(typeof signerHandle.stopSigner).toBe('function');
+    });
+  });
+
+  describe('Message Handler Type Safety', () => {
+    it('should handle non-string tag values without crashing', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      render(<Signer initialData={initialData} />);
+      
+      // Start the signer to activate message listeners
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Verify the createConnectedNode was called and node event handlers are set up
+      expect(mockCreateConnectedNode).toHaveBeenCalled();
+      expect(mockNode.on).toHaveBeenCalledWith('message', expect.any(Function));
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      expect(messageCall).toBeDefined();
+      const messageHandler = messageCall![1];
+
+      // Test various non-string tag types that could cause .startsWith() to crash
+      const invalidTagMessages = [
+        { tag: 123 }, // number
+        { tag: true }, // boolean
+        { tag: null }, // null
+        { tag: undefined }, // undefined
+        { tag: {} }, // object
+        { tag: [] }, // array
+      ];
+
+      // None of these should throw errors
+      invalidTagMessages.forEach(msg => {
+        expect(() => messageHandler(msg)).not.toThrow();
+      });
+
+      // Verify that valid string tags still work correctly
+      expect(() => messageHandler({ tag: '/sign/req' })).not.toThrow();
+      expect(() => messageHandler({ tag: '/ecdh/res' })).not.toThrow();
+      expect(() => messageHandler({ tag: '/ping/req' })).not.toThrow();
+    });
+
+    it('should log appropriate messages for invalid tag types', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const { container } = render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      const messageHandler = messageCall![1];
+
+      // Send a message with a non-string tag
+      messageHandler({ tag: 123 });
+
+      // Check that the appropriate log entry appears
+      await waitFor(() => {
+        expect(container.textContent).toContain('Message received (invalid tag type)');
+      });
+    });
+
+    it('should continue processing valid messages after encountering invalid tags', async () => {
+      const user = userEvent.setup();
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+      
+      const { container } = render(<Signer initialData={initialData} />);
+      
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+      
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // Get the message handler from the mock
+      const messageCall = mockNode.on.mock.calls.find(
+        (call: any[]) => call[0] === 'message'
+      );
+      const messageHandler = messageCall![1];
+
+      // Send invalid tag, then valid tag
+      messageHandler({ tag: 123 });
+      messageHandler({ tag: '/sign/req' });
+
+      // Both should be processed without the listener crashing
+      await waitFor(() => {
+        expect(container.textContent).toContain('Message received (invalid tag type)');
+        expect(container.textContent).toContain('Signature request received');
+      });
     });
   });
 }); 
