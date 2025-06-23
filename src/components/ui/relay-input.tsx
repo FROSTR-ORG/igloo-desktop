@@ -66,6 +66,7 @@ const RelayInput: React.FC<RelayInputProps> = ({
             isValid={isValidRelay}
             errorMessage={relayError}
             className="flex-1 w-full"
+            isRequired={false}
           />
           <div className="flex items-end">
             <Button

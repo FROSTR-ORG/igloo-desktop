@@ -8,7 +8,7 @@ interface InputWithValidationProps extends Omit<React.InputHTMLAttributes<HTMLIn
   onChange: (value: string) => void;
   isValid?: boolean;
   errorMessage?: string;
-  isRequired?: boolean;
+  isRequired: boolean;
 }
 
 const InputWithValidation: React.FC<InputWithValidationProps> = ({
@@ -19,6 +19,7 @@ const InputWithValidation: React.FC<InputWithValidationProps> = ({
   errorMessage,
   className,
   id,
+  isRequired,
   ...props
 }) => {
   const inputId = id || Math.random().toString(36).substr(2, 9);
@@ -29,6 +30,7 @@ const InputWithValidation: React.FC<InputWithValidationProps> = ({
       {label && (
         <label htmlFor={inputId} className="text-blue-200 text-sm font-medium flex">
           {label}
+          {isRequired && <span className="text-red-400 ml-1">*</span>}
         </label>
       )}
       <Input
