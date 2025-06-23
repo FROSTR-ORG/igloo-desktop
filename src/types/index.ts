@@ -126,6 +126,7 @@ export interface SignerProps {
   initialData?: {
     share: string;
     groupCredential: string;
+    name?: string;
   } | null;
 }
 

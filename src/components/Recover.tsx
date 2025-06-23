@@ -536,6 +536,7 @@ const Recover: React.FC<RecoverProps> = ({
                     errorMessage={sharesValidity[index]?.message}
                     className="flex-1 w-full"
                     disabled={isProcessing}
+                    isRequired={true}
                   />
                   <Button
                     type="button"
