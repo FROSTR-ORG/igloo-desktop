@@ -88,7 +88,18 @@ npm start
 
 # Build for your platform
 npm run dist
+
+# Build for Mac without code signing (avoids "damaged" error)
+npm run dist:mac-unsigned
 ```
+
+### macOS Code Signing Notes
+
+The app uses **ad-hoc signing** (`identity: "-"`) by default, which should prevent the "damaged" error on most macOS systems. If you encounter issues:
+
+1. **For development**: Use `npm run dist:mac-unsigned` to build completely unsigned
+2. **For distribution**: Consider getting an Apple Developer certificate for proper code signing
+3. **For users**: See the macOS Installation Troubleshooting section in README.md
 
 ## Output Files
 
