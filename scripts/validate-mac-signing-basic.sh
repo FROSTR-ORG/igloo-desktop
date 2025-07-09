@@ -42,10 +42,16 @@ fi
 # Check entitlements file
 echo ""
 echo "📄 Entitlements File:"
-if [[ -f "build/entitlements.mac.plist" ]]; then
+# Get the repository root directory (script is in scripts/ subdirectory)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+ENTITLEMENTS_FILE="$REPO_ROOT/build/entitlements.mac.plist"
+
+if [[ -f "$ENTITLEMENTS_FILE" ]]; then
     echo "✅ build/entitlements.mac.plist exists"
 else
     echo "❌ build/entitlements.mac.plist not found"
+    echo "   Expected location: $ENTITLEMENTS_FILE"
     echo "   This file should have been created automatically"
     exit 1
 fi
@@ -53,23 +59,19 @@ fi
 # Check package.json configuration
 echo ""
 echo "📦 Package.json Configuration:"
-if grep -q '"hardenedRuntime": true' package.json; then
+PACKAGE_JSON="$REPO_ROOT/package.json"
+
+if grep -q '"hardenedRuntime": true' "$PACKAGE_JSON"; then
     echo "✅ Hardened runtime enabled"
 else
     echo "❌ Hardened runtime not configured"
     exit 1
 fi
 
-if grep -q '"teamId"' package.json; then
-    TEAM_ID=$(grep '"teamId"' package.json | sed 's/.*"teamId": *"\([^"]*\)".*/\1/')
-    if [[ "$TEAM_ID" != "YOUR_ACTUAL_TEAM_ID" && "$TEAM_ID" != "YOUR_TEAM_ID" ]]; then
-        echo "✅ Team ID configured: $TEAM_ID"
-    else
-        echo "❌ Team ID not properly configured (still placeholder)"
-        exit 1
-    fi
+if grep -q '"notarize": true' "$PACKAGE_JSON"; then
+    echo "✅ Notarization enabled (uses environment variables)"
 else
-    echo "❌ Team ID not found in package.json"
+    echo "❌ Notarization not properly configured"
     exit 1
 fi
 
