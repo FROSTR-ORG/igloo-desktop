@@ -65,7 +65,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "gatekeeperAssess": false,
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "notarize": true
+      "afterSign": "scripts/notarize.js"
     },
     "win": {
       "target": [
@@ -114,6 +114,7 @@
     }
   },
   "devDependencies": {
+    "@electron/notarize": "^2.4.1",
     "@eslint/js": "^9.28.0",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^12.1.5",
