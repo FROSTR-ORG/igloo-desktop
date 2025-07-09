@@ -65,9 +65,7 @@
       "entitlementsInherit": "build/entitlements.mac.plist",
       "gatekeeperAssess": false,
       "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "notarize": {
-        "tool": "notarytool"
-      }
+      "notarize": true
     },
     "win": {
       "target": [
