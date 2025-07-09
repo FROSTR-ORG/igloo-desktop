@@ -74,6 +74,18 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
+      - name: Debug environment variables
+        run: |
+          echo "Checking environment variables for notarization..."
+          echo "APPLE_ID is set: $([[ -n "$APPLE_ID" ]] && echo "YES" || echo "NO")"
+          echo "APPLE_APP_SPECIFIC_PASSWORD is set: $([[ -n "$APPLE_APP_SPECIFIC_PASSWORD" ]] && echo "YES" || echo "NO")"
+          echo "APPLE_TEAM_ID is set: $([[ -n "$APPLE_TEAM_ID" ]] && echo "YES" || echo "NO")"
+          echo "CSC_LINK is set: $([[ -n "$CSC_LINK" ]] && echo "YES" || echo "NO")"
+          echo "CSC_KEY_PASSWORD is set: $([[ -n "$CSC_KEY_PASSWORD" ]] && echo "YES" || echo "NO")"
+          if [[ -n "$APPLE_TEAM_ID" ]]; then
+            echo "APPLE_TEAM_ID length: ${#APPLE_TEAM_ID}"
+          fi
+        
       - name: Build macOS
         run: npm run dist:mac
         
