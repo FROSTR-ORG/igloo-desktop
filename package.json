@@ -20,11 +20,14 @@
     "dist": "cross-env NODE_ENV=production npm run build && electron-builder",
     "dist:win": "cross-env NODE_ENV=production npm run build && electron-builder --win --publish never",
     "dist:mac": "cross-env NODE_ENV=production npm run build && electron-builder --mac --publish never",
+    "dist:mac-unsigned": "cross-env NODE_ENV=production CSC_IDENTITY_AUTO_DISCOVERY=false npm run build && electron-builder --mac --publish never",
     "dist:linux": "cross-env NODE_ENV=production npm run build && electron-builder --linux --publish never",
     "release": "cross-env NODE_ENV=production npm run build && electron-builder --publish always",
     "export-key": "./scripts/export-gpg-key.sh",
     "sign-release": "./scripts/sign-release.sh",
-    "create-release": "./scripts/create-release.sh"
+    "create-release": "./scripts/create-release.sh",
+    "validate-mac-signing": "./scripts/validate-mac-signing.sh",
+    "validate-mac-signing-basic": "./scripts/validate-mac-signing-basic.sh"
   },
   "build": {
     "appId": "com.igloo.app",
@@ -57,8 +60,12 @@
         }
       ],
       "icon": "src/assets/frostr-logo-transparent.png",
-      "identity": null,
-      "artifactName": "${productName}-${version}-${arch}.${ext}"
+      "hardenedRuntime": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
+      "gatekeeperAssess": false,
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
+      "notarize": true
     },
     "win": {
       "target": [
