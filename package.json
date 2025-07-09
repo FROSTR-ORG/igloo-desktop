@@ -32,6 +32,7 @@
   "build": {
     "appId": "com.igloo.app",
     "productName": "Igloo",
+    "afterSign": "scripts/notarize.js",
     "directories": {
       "output": "release"
     },
@@ -64,8 +65,7 @@
       "entitlements": "build/entitlements.mac.plist",
       "entitlementsInherit": "build/entitlements.mac.plist",
       "gatekeeperAssess": false,
-      "artifactName": "${productName}-${version}-${arch}.${ext}",
-      "afterSign": "scripts/notarize.js"
+      "artifactName": "${productName}-${version}-${arch}.${ext}"
     },
     "win": {
       "target": [
