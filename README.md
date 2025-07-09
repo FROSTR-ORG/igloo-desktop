@@ -65,15 +65,20 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
 
 Download the latest release for your platform from our [GitHub Releases](https://github.com/FROSTR-ORG/igloo/releases) page.
 
-All releases are GPG signed and include SHA256 checksums for verification. We strongly recommend verifying your download:
+All releases use **dual-layer security**:
+- **GPG signing**: All release artifacts are GPG signed with developer keys
+- **macOS code signing**: macOS apps are signed with Apple Developer ID and notarized
+- **SHA256 checksums**: Integrity verification for all platforms
+
+We strongly recommend verifying your download:
 1. See [VERIFICATION.md](VERIFICATION.md) for detailed verification instructions
-2. Import our signing key from the `keys` directory
-3. Verify both the signature and checksums before running the application
+2. Import our GPG signing key for release integrity verification
+3. Verify both GPG signatures and checksums before running the application
 
 Available formats:
-- Windows: Installer (.exe) and portable (.exe)
-- macOS: DMG (.dmg) and ZIP (.zip)
-- Linux: AppImage (.AppImage) and Debian package (.deb)
+- Windows: Installer (.exe) and portable (.exe) [GPG signed]
+- macOS: DMG (.dmg) and ZIP (.zip) [GPG signed + Apple code signed & notarized]
+- Linux: AppImage (.AppImage) and Debian package (.deb) [GPG signed]
 
 ### macOS Installation
 

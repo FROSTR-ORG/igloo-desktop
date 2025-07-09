@@ -56,38 +56,40 @@ fi
 echo ""
 echo "🌍 Environment Variables:"
 
-if [[ -n "$APPLE_ID" ]]; then
-    echo "✅ APPLE_ID: $APPLE_ID"
+if [[ -n "${APPLE_ID:-}" ]]; then
+    # Mask the Apple ID for privacy (show first 3 chars and domain)
+    MASKED_APPLE_ID=$(echo "${APPLE_ID}" | sed 's/\(.\{3\}\).*@/\1***@/')
+    echo "✅ APPLE_ID: $MASKED_APPLE_ID"
 else
     echo "❌ APPLE_ID not set"
 fi
 
-if [[ -n "$APPLE_TEAM_ID" ]]; then
-    echo "✅ APPLE_TEAM_ID: $APPLE_TEAM_ID"
+if [[ -n "${APPLE_TEAM_ID:-}" ]]; then
+    echo "✅ APPLE_TEAM_ID: ${APPLE_TEAM_ID}"
 else
     echo "❌ APPLE_TEAM_ID not set"
 fi
 
-if [[ -n "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+if [[ -n "${APPLE_APP_SPECIFIC_PASSWORD:-}" ]]; then
     echo "✅ APPLE_APP_SPECIFIC_PASSWORD: [SET]"
 else
     echo "❌ APPLE_APP_SPECIFIC_PASSWORD not set"
 fi
 
-if [[ -n "$CSC_LINK" ]]; then
+if [[ -n "${CSC_LINK:-}" ]]; then
     echo "✅ CSC_LINK: [SET]"
 else
     echo "❌ CSC_LINK not set"
 fi
 
-if [[ -n "$CSC_KEY_PASSWORD" ]]; then
+if [[ -n "${CSC_KEY_PASSWORD:-}" ]]; then
     echo "✅ CSC_KEY_PASSWORD: [SET]"
 else
     echo "❌ CSC_KEY_PASSWORD not set"
 fi
 
 # Check if all required variables are set
-if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" ]]; then
+if [[ -z "${APPLE_ID:-}" || -z "${APPLE_TEAM_ID:-}" || -z "${APPLE_APP_SPECIFIC_PASSWORD:-}" || -z "${CSC_LINK:-}" || -z "${CSC_KEY_PASSWORD:-}" ]]; then
     echo ""
     echo "❌ Some environment variables are missing"
     echo "   Set them in your shell or GitHub Secrets"
@@ -110,9 +112,9 @@ fi
 echo ""
 echo "🔐 Testing Notarization Authentication..."
 if xcrun notarytool store-credentials "$PROFILE_NAME" \
-    --apple-id "$APPLE_ID" \
-    --team-id "$APPLE_TEAM_ID" \
-    --password "$APPLE_APP_SPECIFIC_PASSWORD" 2>/dev/null; then
+    --apple-id "${APPLE_ID}" \
+    --team-id "${APPLE_TEAM_ID}" \
+    --password "${APPLE_APP_SPECIFIC_PASSWORD}" 2>/dev/null; then
     echo "✅ Notarization authentication successful"
     # Profile will be cleaned up automatically by trap
 else

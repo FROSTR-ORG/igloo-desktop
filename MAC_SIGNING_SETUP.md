@@ -1,6 +1,15 @@
 # macOS Code Signing and Notarization Setup
 
-This guide walks through setting up Apple Developer certificates and notarization for Igloo to eliminate the "app is damaged" error on macOS.
+This guide walks through setting up Apple Developer certificates and notarization for Igloo as part of our **dual-layer security architecture**.
+
+## Security Architecture Overview
+
+Igloo implements comprehensive release security through two complementary mechanisms:
+
+1. **GPG Signing (All Platforms)**: Developer-controlled signing for release integrity verification
+2. **macOS Code Signing & Notarization**: Apple-verified signing for macOS compatibility and security
+
+This setup specifically covers **macOS code signing** to eliminate the "app is damaged" error and ensure seamless installation on macOS.
 
 ## Prerequisites
 
@@ -135,4 +144,8 @@ xcrun notarytool history --apple-id your@email.com --team-id ABC123DEF4
 - Notarization: Free (included with Developer Program)
 - Code signing: Free (included with Developer Program)
 
-Once set up, all future releases will be automatically signed and notarized, eliminating the "damaged app" error for all macOS users. 
+Once set up, all future releases will be automatically:
+- **GPG signed** (for release integrity verification across all platforms)
+- **macOS code signed and notarized** (for seamless macOS installation)
+
+This dual-layer approach provides comprehensive security while ensuring the best user experience on macOS. 
