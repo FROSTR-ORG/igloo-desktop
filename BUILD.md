@@ -95,11 +95,13 @@ npm run dist:mac-unsigned
 
 ### macOS Code Signing Notes
 
-The app uses **ad-hoc signing** (`identity: "-"`) by default, which should prevent the "damaged" error on most macOS systems. If you encounter issues:
+⚠️ **IMPORTANT**: The app now requires proper Apple Developer ID code signing and notarization to prevent the "app is damaged" error on macOS.
 
-1. **For development**: Use `npm run dist:mac-unsigned` to build completely unsigned
-2. **For distribution**: Consider getting an Apple Developer certificate for proper code signing
-3. **For users**: See the macOS Installation Troubleshooting section in README.md
+1. **For production releases**: Follow the complete setup guide in [MAC_SIGNING_SETUP.md](MAC_SIGNING_SETUP.md)
+2. **For development**: Use `npm run dist:mac-unsigned` to build completely unsigned
+3. **For users**: Properly signed and notarized releases will work without any manual steps
+
+**Previous ad-hoc signing approach has been replaced** with proper Apple Developer ID signing to ensure compatibility with all macOS versions and Gatekeeper requirements.
 
 ## Output Files
 

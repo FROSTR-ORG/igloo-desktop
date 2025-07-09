@@ -75,30 +75,21 @@ Available formats:
 - macOS: DMG (.dmg) and ZIP (.zip)
 - Linux: AppImage (.AppImage) and Debian package (.deb)
 
-### macOS Installation Troubleshooting
+### macOS Installation
 
-If you see the error **"Igloo is damaged and can't be opened. You should move it to the Trash"** on macOS:
+Starting with version 0.1.2, Igloo is properly **code-signed and notarized** by Apple, which means:
 
-#### Quick Fix:
-1. **Don't move the app to Trash**
-2. Try to open the app once to trigger the security dialog
-3. Go to **System Settings → Privacy & Security**
-4. Scroll down to the **Security** section
-5. You should see: *"Igloo was blocked to protect your Mac"*
-6. Click **"Open Anyway"**
-7. Confirm by clicking **"Open"** in the dialog
-8. Enter your password if prompted
+✅ **No more "damaged app" errors**  
+✅ **No manual security overrides needed**  
+✅ **Smooth installation on all macOS versions**  
 
-#### Alternative Fix (Terminal):
-```bash
-# Remove quarantine attribute
-sudo xattr -rd com.apple.quarantine /Applications/Igloo.app
+Simply download the appropriate file for your Mac:
+- **Intel Macs**: `Igloo-x.y.z-x64.dmg`
+- **Apple Silicon Macs**: `Igloo-x.y.z-arm64.dmg`
 
-# Or for specific downloaded file
-sudo xattr -rd com.apple.quarantine ~/Downloads/Igloo-*.dmg
-```
+The app will open normally without any security warnings.
 
-This issue occurs because the app is not code-signed with an Apple Developer certificate. The app is safe to use - macOS is being cautious about unsigned applications.
+> **Note**: If you're using an older version (0.1.1 or earlier), those versions used ad-hoc signing and may still trigger security warnings. Please upgrade to the latest release for the best experience.
 
 ### Build from Source
 
