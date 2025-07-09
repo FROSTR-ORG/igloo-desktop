@@ -1,7 +1,20 @@
 #!/bin/bash
 # Script to validate macOS code signing setup
 
-set -e
+set -euo pipefail
+
+# Generate unique profile name for this run
+PROFILE_NAME="igloo-validation-$(date +%s)-$$"
+
+# Cleanup function
+cleanup() {
+    if [[ -n "${PROFILE_NAME:-}" ]]; then
+        xcrun notarytool delete-credentials "$PROFILE_NAME" 2>/dev/null || true
+    fi
+}
+
+# Ensure cleanup happens on script exit
+trap cleanup EXIT
 
 echo "🔍 Validating macOS Code Signing Setup..."
 echo ""
@@ -74,7 +87,7 @@ else
 fi
 
 # Check if all required variables are set
-if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" ]]; then
+if [[ -z "$APPLE_ID" || -z "$APPLE_TEAM_ID" || -z "$APPLE_APP_SPECIFIC_PASSWORD" || -z "$CSC_LINK" || -z "$CSC_KEY_PASSWORD" ]]; then
     echo ""
     echo "❌ Some environment variables are missing"
     echo "   Set them in your shell or GitHub Secrets"
@@ -96,13 +109,12 @@ fi
 # Test notarytool authentication
 echo ""
 echo "🔐 Testing Notarization Authentication..."
-if xcrun notarytool store-credentials "test-profile" \
+if xcrun notarytool store-credentials "$PROFILE_NAME" \
     --apple-id "$APPLE_ID" \
     --team-id "$APPLE_TEAM_ID" \
     --password "$APPLE_APP_SPECIFIC_PASSWORD" 2>/dev/null; then
     echo "✅ Notarization authentication successful"
-    # Clean up test profile
-    xcrun notarytool delete-credentials "test-profile" 2>/dev/null || true
+    # Profile will be cleaned up automatically by trap
 else
     echo "❌ Notarization authentication failed"
     echo "   Check your APPLE_ID, APPLE_TEAM_ID, and APPLE_APP_SPECIFIC_PASSWORD"
