@@ -69,15 +69,20 @@ base64 -i /path/to/your/certificate.p12 | pbcopy
 # Paste the output as CSC_LINK secret value
 ```
 
-## Step 5: Update package.json
+## Step 5: Verify package.json Configuration
 
-Replace `YOUR_TEAM_ID` in `package.json` with your actual Team ID:
+The `package.json` is already configured to use environment variables for notarization:
 
 ```json
-"notarize": {
-  "teamId": "ABC123DEF4"
-}
+"notarize": true
 ```
+
+When `notarize` is set to `true`, electron-builder automatically uses these environment variables:
+- `APPLE_TEAM_ID` - Your Team ID
+- `APPLE_ID` - Your Apple Developer account email
+- `APPLE_APP_SPECIFIC_PASSWORD` - Your app-specific password
+
+This approach is more secure and flexible than hardcoding values in the configuration.
 
 ## Step 6: Test Locally
 

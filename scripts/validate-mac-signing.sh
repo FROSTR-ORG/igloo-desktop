@@ -100,10 +100,16 @@ fi
 # Check entitlements file
 echo ""
 echo "📄 Entitlements File:"
-if [[ -f "build/entitlements.mac.plist" ]]; then
+# Get the repository root directory (script is in scripts/ subdirectory)
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+REPO_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+ENTITLEMENTS_FILE="$REPO_ROOT/build/entitlements.mac.plist"
+
+if [[ -f "$ENTITLEMENTS_FILE" ]]; then
     echo "✅ build/entitlements.mac.plist exists"
 else
     echo "❌ build/entitlements.mac.plist not found"
+    echo "   Expected location: $ENTITLEMENTS_FILE"
     echo "   This file should have been created automatically"
     exit 1
 fi
