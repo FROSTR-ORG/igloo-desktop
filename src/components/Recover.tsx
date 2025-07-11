@@ -1,8 +1,8 @@
 import React, { useState, useEffect, FormEvent, useRef, useCallback } from "react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { recoverSecretKeyFromCredentials, decodeShare, decodeGroup, validateShare, validateGroup } from "@frostr/igloo-core"
 import { InputWithValidation } from "@/components/ui/input-with-validation"
+import { Tooltip } from "@/components/ui/tooltip"
 import { clientShareManager } from "@/lib/clientShareManager"
 import { HelpCircle } from "lucide-react"
 
@@ -486,101 +486,109 @@ const Recover: React.FC<RecoverProps> = ({
   };
 
   return (
-    <Card className="bg-gray-900/30 border-blue-900/30 backdrop-blur-sm shadow-lg">
-      <CardHeader>
-        <div className="flex items-center">
-          <CardTitle className="text-xl text-blue-200">Recover NSEC</CardTitle>
-          <HelpCircle size={18} className="ml-2 text-blue-400" />
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-8">
-        <form onSubmit={handleSubmit}>
-          <div className="space-y-4">
-            <div className="bg-gray-800/50 p-4 rounded-lg">
-              <div className="text-sm text-blue-300 mb-2">Recovery Requirements:</div>
-              <div className="text-sm text-blue-200">
-                You need {currentThreshold} out of {currentTotalShares} shares to recover your NSEC
-              </div>
+    <div className="space-y-8">
+      <div className="flex items-center mb-6">
+        <h2 className="text-xl text-blue-200 font-semibold">Recover NSEC</h2>
+        <Tooltip 
+          trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+          position="right"
+          content={
+            <>
+              <p className="mb-2 font-semibold">NSEC Recovery:</p>
+              <p className="mb-2">You need to input the threshold number of shares to recover your Nostr private key (nsec). For example, if your keyset was created with a 2-of-3 setup, you need any 2 of the 3 shares.</p>
+              <p className="mb-2">One share has already been loaded from your current signer session and added to the form below.</p>
+              <p>Once you have enough valid shares, click "Recover NSEC" to reconstruct your private key.</p>
+            </>
+          }
+        />
+      </div>
+      
+      <form onSubmit={handleSubmit}>
+        <div className="space-y-4">
+          <div className="bg-gray-800/50 p-4 rounded-lg">
+            <div className="text-sm text-blue-300 mb-2">Recovery Requirements:</div>
+            <div className="text-sm text-blue-200">
+              You need {currentThreshold} out of {currentTotalShares} shares to recover your NSEC
             </div>
+          </div>
 
-            <InputWithValidation
-              label={
-                <div className="flex items-center">
-                  <span>Group Credential</span>
-                  {isGroupAutofilled && (
-                    <span className="ml-2 text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded-full animate-pulse">
-                      Auto-detected
-                    </span>
-                  )}
-                </div>
-              }
-              type="text"
-              placeholder="Enter bfgroup1... credential"
-              value={groupCredential}
-              onChange={handleGroupChange}
-              isValid={isGroupValid}
-              errorMessage={groupError}
-              isRequired={true}
-              className="w-full"
-            />
+          <InputWithValidation
+            label={
+              <div className="flex items-center">
+                <span>Group Credential</span>
+                {isGroupAutofilled && (
+                  <span className="ml-2 text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded-full animate-pulse">
+                    Auto-detected
+                  </span>
+                )}
+              </div>
+            }
+            type="text"
+            placeholder="Enter bfgroup1... credential"
+            value={groupCredential}
+            onChange={handleGroupChange}
+            isValid={isGroupValid}
+            errorMessage={groupError}
+            isRequired={true}
+            className="w-full"
+          />
 
-            <div className="space-y-3 w-full">
-              <div className="text-blue-200 text-sm font-medium">Share Credentials:</div>
-              {sharesInputs.map((share, index) => (
-                <div key={index} className="flex gap-2 w-full">
-                  <InputWithValidation
-                    placeholder={`Enter share ${index + 1} (bfshare1...)`}
-                    value={share}
-                    onChange={(value) => updateShareInput(index, value)}
-                    isValid={sharesValidity[index]?.isValid}
-                    errorMessage={sharesValidity[index]?.message}
-                    className="flex-1 w-full"
-                    disabled={isProcessing}
-                    isRequired={true}
-                  />
-                  <Button
-                    type="button"
-                    onClick={() => removeShareInput(index)}
-                    className="bg-red-900/30 hover:bg-red-800/50 text-red-300 px-2"
-                    disabled={isProcessing || sharesInputs.length <= 1}
-                  >
-                    ✕
-                  </Button>
-                </div>
-              ))}
-              {sharesInputs.length < currentThreshold && (
+          <div className="space-y-3 w-full">
+            <div className="text-blue-200 text-sm font-medium">Share Credentials:</div>
+            {sharesInputs.map((share, index) => (
+              <div key={index} className="flex gap-2 w-full">
+                <InputWithValidation
+                  placeholder={`Enter share ${index + 1} (bfshare1...)`}
+                  value={share}
+                  onChange={(value) => updateShareInput(index, value)}
+                  isValid={sharesValidity[index]?.isValid}
+                  errorMessage={sharesValidity[index]?.message}
+                  className="flex-1 w-full"
+                  disabled={isProcessing}
+                  isRequired={true}
+                />
                 <Button
                   type="button"
-                  onClick={addShareInput}
-                  className="w-full mt-2 bg-blue-600/30 hover:bg-blue-700/30"
-                  disabled={isProcessing}
+                  onClick={() => removeShareInput(index)}
+                  className="bg-red-900/30 hover:bg-red-800/50 text-red-300 px-2"
+                  disabled={isProcessing || sharesInputs.length <= 1}
                 >
-                  Add Share Input ({sharesInputs.length}/{currentThreshold})
+                  ✕
                 </Button>
-              )}
-            </div>
+              </div>
+            ))}
+            {sharesInputs.length < currentThreshold && (
+              <Button
+                type="button"
+                onClick={addShareInput}
+                className="w-full mt-2 bg-blue-600/30 hover:bg-blue-700/30"
+                disabled={isProcessing}
+              >
+                Add Share Input ({sharesInputs.length}/{currentThreshold})
+              </Button>
+            )}
           </div>
+        </div>
 
-          <div className="mt-6">
-            <Button 
-              type="submit"
-              className="w-full py-5 bg-green-600 hover:bg-green-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-              disabled={isProcessing || !sharesFormValid}
-            >
-              {isProcessing ? "Processing..." : "Recover NSEC"}
-            </Button>
-          </div>
-        </form>
+        <div className="mt-6">
+          <Button 
+            type="submit"
+            className="w-full py-5 bg-green-600 hover:bg-green-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={isProcessing || !sharesFormValid}
+          >
+            {isProcessing ? "Processing..." : "Recover NSEC"}
+          </Button>
+        </div>
+      </form>
 
-        {result.message && (
-          <div className={`mt-4 p-3 rounded-lg ${
-            result.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
-          }`}>
-            {result.message}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      {result.message && (
+        <div className={`mt-4 p-3 rounded-lg ${
+          result.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
+        }`}>
+          {result.message}
+        </div>
+      )}
+    </div>
   );
 };
 
