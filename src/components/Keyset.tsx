@@ -76,6 +76,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setShowSaveDialog({ show: false, shareIndex: null });
   };
 
+  const handleSaveCancel = () => {
+    setShowSaveDialog({ show: false, shareIndex: null });
+  };
+
   const markShareAsSaved = (shareIndex: number) => {
     setSavedShares(prev => ({
       ...prev,
@@ -398,6 +402,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
           <div className="w-full max-w-md mx-4">
             <SaveShare 
               onSave={handleSaveComplete}
+              onCancel={handleSaveCancel}
               shareToEncrypt={shareCredentials[showSaveDialog.shareIndex]}
             />
           </div>
