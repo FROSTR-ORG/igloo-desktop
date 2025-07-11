@@ -486,9 +486,9 @@ const Recover: React.FC<RecoverProps> = ({
   };
 
   return (
-    <div className="space-y-8">
-      <div className="flex items-center mb-6">
-        <h2 className="text-xl text-blue-200 font-semibold">Recover NSEC</h2>
+    <div className="space-y-6">
+      <div className="flex items-center mt-6">
+        <h2 className="text-blue-300 text-lg">Recover NSEC</h2>
         <Tooltip 
           trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
           position="right"
