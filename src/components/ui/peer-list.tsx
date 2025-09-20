@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
   createPeerManagerRobust,
   decodeGroup,
@@ -86,6 +86,16 @@ const PeerList: React.FC<PeerListProps> = ({
   const [policyPanelPeer, setPolicyPanelPeer] = useState<string | null>(null);
   const [policySavingPeers, setPolicySavingPeers] = useState<Set<string>>(new Set());
   const [policyPeerErrors, setPolicyPeerErrors] = useState<Map<string, string>>(new Map());
+
+  const wasSignerRunningRef = useRef(false);
+
+  useEffect(() => {
+    if (isSignerRunning && !wasSignerRunningRef.current && !isExpanded) {
+      setIsExpanded(true);
+    }
+
+    wasSignerRunningRef.current = isSignerRunning;
+  }, [isSignerRunning, isExpanded]);
 
   // Filter out self pubkey using the new comparePubkeys utility
   const filteredPeers = useMemo(() => {
