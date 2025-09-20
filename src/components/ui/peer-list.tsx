@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip } from '@/components/ui/tooltip';
-import { RefreshCw, ChevronDown, ChevronUp, RadioTower, Radio, SlidersHorizontal } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Radio, SlidersHorizontal, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { NodePolicySummary } from '@frostr/igloo-core';
 
@@ -703,8 +703,8 @@ const PeerList: React.FC<PeerListProps> = ({
       {/* Collapsible Content */}
       <div 
         className={cn(
-          "transition-all duration-300 ease-in-out overflow-hidden",
-          isExpanded ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+          "transition-all duration-300 ease-in-out",
+          isExpanded ? "max-h-[400px] opacity-100 overflow-visible" : "max-h-0 opacity-0 overflow-hidden"
         )}
       >
         <div className="bg-gray-900/30 rounded border border-gray-800/30 p-4 space-y-4">
@@ -833,9 +833,22 @@ const PeerList: React.FC<PeerListProps> = ({
                       </div>
 
                       {isPolicyOpen && (
-                        <div className="ml-6 mr-2 bg-gray-900/40 border border-gray-800/60 rounded p-3 text-xs text-gray-300">
+                        <div className="ml-6 mr-2 bg-gray-900/40 border border-gray-800/60 rounded p-3 text-xs text-gray-300 relative overflow-visible">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-medium text-gray-200">Policy controls</span>
+                            <Tooltip
+                              position="top"
+                              width="w-64"
+                              triggerClassName="cursor-help"
+                              focusable
+                              trigger={<HelpCircle className="h-3.5 w-3.5 text-blue-400" />}
+                              content={
+                                <div className="space-y-1 text-blue-100">
+                                  <p>Directional policies determine whether this peer can receive (inbound) or initiate (outbound) signing traffic with your node.</p>
+                                  <p className="text-blue-200/80">For smoother coordination keep outbound enabled only for the minimal set of online peers and disable it for peers you know are offline.</p>
+                                </div>
+                              }
+                            />
                             {policyLoading && (
                               <Badge variant="info" className="uppercase tracking-wide">Refreshing…</Badge>
                             )}
