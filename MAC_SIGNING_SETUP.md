@@ -71,18 +71,25 @@ base64 -i /path/to/your/certificate.p12 | pbcopy
 
 ## Step 5: Verify package.json Configuration
 
-The `package.json` is already configured to use environment variables for notarization:
+Electron Builder is already wired to notarize via the custom `afterSign` hook. The relevant portion of `package.json` looks like this:
 
 ```json
-"notarize": true
+{
+  "build": {
+    "afterSign": "scripts/notarize.js",
+    "mac": {
+      "notarize": false
+    }
+  }
+}
 ```
 
-When `notarize` is set to `true`, electron-builder automatically uses these environment variables:
-- `APPLE_TEAM_ID` - Your Team ID
-- `APPLE_ID` - Your Apple Developer account email
-- `APPLE_APP_SPECIFIC_PASSWORD` - Your app-specific password
+Keeping `mac.notarize` set to `false` is intentional—the `scripts/notarize.js` hook performs notarization only when the required environment variables are present. This lets local development builds skip notarization while CI builds (via `.github/workflows/release.yml`) automatically notarize once these secrets are configured:
+- `APPLE_TEAM_ID`
+- `APPLE_ID`
+- `APPLE_APP_SPECIFIC_PASSWORD`
 
-This approach is more secure and flexible than hardcoding values in the configuration.
+You can confirm the hook is active by running a signed build locally; the script logs whether each variable is detected and skips notarization if anything is missing.
 
 ## Step 6: Test Locally
 
