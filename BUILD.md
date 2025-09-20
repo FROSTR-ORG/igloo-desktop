@@ -66,17 +66,21 @@ Igloo uses a **dual-layer signing approach** for maximum security:
    ./scripts/release.sh 1.0.0
    ```
    This will:
-   - Update version in package.json
+   - Update version metadata in both `package.json` and `package-lock.json`
    - Create a commit with the version change
    - Create a **GPG-signed git tag**
-   - Build the application locally
 
-3. Verify the build:
+3. (Recommended) Build local artifacts for smoke-testing:
+   ```bash
+   npm run dist
+   ```
+
+4. Verify the build:
    ```bash
    ./scripts/verify.sh
    ```
 
-4. Push the release:
+5. Push the release:
    ```bash
    git push origin main
    git push origin v1.0.0
@@ -89,6 +93,8 @@ The GitHub Action will automatically:
 - Generate SHA256 checksums for all files
 - Create a GitHub release with verification files
 - Upload all binaries with dual-layer security
+
+> **Note**: The release workflow now runs an explicit `Validate Package Version` job that halts the pipeline if the pushed tag version differs from `package.json`. Always run the release script (step 2) before creating the tag manually to keep versions aligned.
 
 ## Testing Locally
 

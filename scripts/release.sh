@@ -20,8 +20,8 @@ fi
 # Update version in package.json
 npm version $VERSION --no-git-tag-version
 
-# Add package.json changes
-git add package.json
+# Stage version updates
+git add package.json package-lock.json
 
 # Create release commit
 git commit -m "Release $VERSION"

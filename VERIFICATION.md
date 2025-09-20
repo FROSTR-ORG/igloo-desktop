@@ -18,20 +18,20 @@ To verify a release:
 
 1. Import the public key:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/igloo-signing-key.asc | gpg --import
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/igloo-signing-key.asc | gpg --import
    ```
 
 2. Verify the checksums signature:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/SHA256SUMS.asc | gpg --verify
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS.asc | gpg --verify
    ```
 
 3. Verify file checksums:
    ```sh
-   curl -sL https://github.com/FROSTR-ORG/igloo-desktop/releases/download/VERSION/SHA256SUMS | shasum -a 256 -c
+   curl -sL https://github.com/FROSTR-ORG/igloo/releases/download/VERSION/SHA256SUMS | shasum -a 256 -c
    ```
 
-Replace `VERSION` with the version you're verifying (e.g., `v0.1.2`).
+Replace `VERSION` with the version you're verifying (e.g., `v0.1.3`).
 
 ### 2. macOS Code Signature Verification
 
@@ -93,7 +93,7 @@ You need to import the developer's public key using the steps above. The key is 
 
 **"Igloo is damaged and can't be opened"**
 
-This indicates a code signature issue. For releases v0.1.2+, this shouldn't occur as apps are properly signed and notarized. If you encounter this:
+This indicates a code signature issue. For releases v0.1.2 and later (including the current v0.1.3), this shouldn't occur as apps are properly signed and notarized. If you encounter this:
 1. Verify you downloaded from the official GitHub releases page
 2. Check the code signature: `codesign -dv /path/to/Igloo.app`
 3. Report the issue if the signature is invalid
@@ -104,7 +104,7 @@ This occurs with older releases (v0.1.1 and earlier) that used ad-hoc signing. U
 
 ## Security Notes
 
-- Always download release files directly from the [official GitHub releases page](https://github.com/FROSTR-ORG/igloo-desktop/releases)
+- Always download release files directly from the [official GitHub releases page](https://github.com/FROSTR-ORG/igloo/releases)
 - Cross-reference the signing key fingerprint through multiple sources
 - **For macOS users**: Both GPG and code signature verification provide complementary security
 - **For Windows/Linux users**: GPG verification is the primary security mechanism
