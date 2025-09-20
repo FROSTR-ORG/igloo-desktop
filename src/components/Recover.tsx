@@ -592,4 +592,4 @@ const Recover: React.FC<RecoverProps> = ({
   );
 };
 
-export default Recover; 
+export default Recover;
