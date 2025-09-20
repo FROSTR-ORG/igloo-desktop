@@ -131,7 +131,7 @@
     "concurrently": "^9.0.1",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
-    "electron": "^33.0.2",
+    "electron": "^38.1.2",
     "electron-builder": "^24.13.3",
     "eslint": "^9.28.0",
     "eslint-plugin-react": "^7.37.5",
@@ -150,6 +150,11 @@
     "typescript": "^5.6.3",
     "webpack": "^5.95.0",
     "webpack-cli": "^4.7.2"
+  },
+  "overrides": {
+    "@eslint/plugin-kit": "^0.3.4",
+    "form-data": "^4.0.4",
+    "tmp": "^0.2.4"
   },
   "dependencies": {
     "@cmdcode/buff": "^2.2.5",
