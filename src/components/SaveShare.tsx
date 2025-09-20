@@ -6,10 +6,11 @@ import { Button } from '@/components/ui/button';
 
 interface SaveShareProps {
   onSave?: (password: string, salt: string, encryptedShare: string) => void;
+  onCancel?: () => void;
   shareToEncrypt?: string;
 }
 
-const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
+const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt }) => {
   const [password, setPassword] = useState<string>('');
   const [isPasswordValid, setIsPasswordValid] = useState<boolean>(false);
   const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
@@ -132,13 +133,24 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, shareToEncrypt }) => {
           disabled={isSubmitting}
         />
         
-        <Button
-          type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-blue-100"
-          disabled={isSubmitting || !isPasswordValid || !isConfirmValid || !shareToEncrypt}
-        >
-          {isSubmitting ? "Saving..." : "Save Share"}
-        </Button>
+        <div className="flex space-x-3">
+          <Button
+            type="button"
+            onClick={onCancel}
+            variant="outline"
+            className="flex-1 bg-gray-700 hover:bg-gray-600 text-gray-100"
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+          <Button
+            type="submit"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-blue-100"
+            disabled={isSubmitting || !isPasswordValid || !isConfirmValid || !shareToEncrypt}
+          >
+            {isSubmitting ? "Saving..." : "Save Share"}
+          </Button>
+        </div>
       </form>
     </div>
   );
