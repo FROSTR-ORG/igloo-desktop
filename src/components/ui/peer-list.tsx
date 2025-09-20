@@ -1,19 +1,50 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { 
-  createPeerManagerRobust, 
-  decodeShare, 
+  createPeerManagerRobust,
   decodeGroup,
   normalizePubkey,
   comparePubkeys,
-  extractSelfPubkeyFromCredentials
+  extractSelfPubkeyFromCredentials,
+  getNodePolicies,
+  updateNodePolicy
 } from '@frostr/igloo-core';
 import type { BifrostNode } from '@frostr/bifrost';
 import { Button } from '@/components/ui/button';
 import { IconButton } from '@/components/ui/icon-button';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip } from '@/components/ui/tooltip';
-import { RefreshCw, ChevronDown, ChevronUp, RadioTower, Radio } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Radio, SlidersHorizontal, HelpCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { NodePolicySummary } from '@frostr/igloo-core';
+
+const toPolicyKey = (pubkey: string): string => {
+  if (!pubkey || typeof pubkey !== 'string') {
+    return '';
+  }
+
+  const normalized = normalizePubkey(pubkey);
+  if (typeof normalized === 'string' && normalized.length > 0) {
+    return normalized.toLowerCase();
+  }
+
+  return pubkey.toLowerCase();
+};
+
+const createDefaultPolicySummary = (pubkey: string): NodePolicySummary => ({
+  pubkey,
+  allowSend: true,
+  allowReceive: true,
+  status: 'unknown',
+  source: 'runtime'
+});
+
+const getPolicyToggleClasses = (isAllowed: boolean, canEdit: boolean) => cn(
+  'h-8 px-3 text-xs font-semibold tracking-wide uppercase font-mono border rounded-md transition-colors duration-200 focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-0 disabled:cursor-not-allowed disabled:border-gray-700 disabled:text-gray-500 disabled:bg-gray-800/20 disabled:opacity-60',
+  isAllowed
+    ? 'text-green-300 border-green-500/40 bg-green-900/10 hover:bg-green-900/20'
+    : 'text-red-300 border-red-500/40 bg-red-900/10 hover:bg-red-900/20',
+  !canEdit && 'opacity-80'
+);
 
 interface PeerStatus {
   pubkey: string;
@@ -49,6 +80,22 @@ const PeerList: React.FC<PeerListProps> = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [isInitialPingSweep, setIsInitialPingSweep] = useState(false);
+  const [policies, setPolicies] = useState<Map<string, NodePolicySummary>>(new Map());
+  const [policyError, setPolicyError] = useState<string | null>(null);
+  const [policyLoading, setPolicyLoading] = useState(false);
+  const [policyPanelPeer, setPolicyPanelPeer] = useState<string | null>(null);
+  const [policySavingPeers, setPolicySavingPeers] = useState<Set<string>>(new Set());
+  const [policyPeerErrors, setPolicyPeerErrors] = useState<Map<string, string>>(new Map());
+
+  const wasSignerRunningRef = useRef(false);
+
+  useEffect(() => {
+    if (isSignerRunning && !wasSignerRunningRef.current && !isExpanded) {
+      setIsExpanded(true);
+    }
+
+    wasSignerRunningRef.current = isSignerRunning;
+  }, [isSignerRunning, isExpanded]);
 
   // Filter out self pubkey using the new comparePubkeys utility
   const filteredPeers = useMemo(() => {
@@ -79,6 +126,35 @@ const PeerList: React.FC<PeerListProps> = ({
       avgPing: avgPing > 0 ? Math.round(avgPing) : null
     };
   }, [filteredPeers]);
+
+  const loadPolicies = useCallback(() => {
+    if (!node) return;
+
+    try {
+      setPolicyLoading(true);
+      const summaries = getNodePolicies(node);
+      const map = new Map<string, NodePolicySummary>();
+
+      summaries.forEach(summary => {
+        const key = toPolicyKey(summary.pubkey);
+        map.set(key, { ...summary, pubkey: key });
+      });
+
+      setPolicies(map);
+      setPolicyError(null);
+      setPolicyPeerErrors(new Map());
+    } catch (loadError) {
+      const message = loadError instanceof Error ? loadError.message : 'Failed to load policies';
+      setPolicyError(message);
+    } finally {
+      setPolicyLoading(false);
+    }
+  }, [node]);
+
+  const getPolicyForPeer = useCallback((pubkey: string): NodePolicySummary => {
+    const key = toPolicyKey(pubkey);
+    return policies.get(key) ?? createDefaultPolicySummary(key);
+  }, [policies]);
 
   // Setup ping event listeners for real-time status updates
   const setupPingEventListeners = useCallback(() => {
@@ -144,6 +220,20 @@ const PeerList: React.FC<PeerListProps> = ({
       }
     };
   }, [node]);
+
+  useEffect(() => {
+    if (!node || !isSignerRunning || disabled) {
+      setPolicies(new Map());
+      setPolicyError(null);
+      setPolicyPanelPeer(null);
+      setPolicySavingPeers(new Set());
+      setPolicyPeerErrors(new Map());
+      setPolicyLoading(false);
+      return;
+    }
+
+    loadPolicies();
+  }, [node, isSignerRunning, disabled, loadPolicies]);
 
   // Initialize peer manager and setup listeners
   useEffect(() => {
@@ -324,6 +414,70 @@ const PeerList: React.FC<PeerListProps> = ({
   }, [isSignerRunning, node, groupCredential, shareCredential, disabled, setupPingEventListeners]);
 
   // Ping individual peer
+  const handlePolicyPanelToggle = useCallback((peerPubkey: string) => {
+    const key = toPolicyKey(peerPubkey);
+    setPolicyPanelPeer(prev => (prev === key ? null : key));
+  }, []);
+
+  const handlePolicyToggle = useCallback(async (peerPubkey: string, field: 'send' | 'receive') => {
+    if (!node || !isSignerRunning || disabled) return;
+
+    const key = toPolicyKey(peerPubkey);
+
+    if (policySavingPeers.has(key)) return;
+
+    const currentPolicy = getPolicyForPeer(peerPubkey);
+    const nextAllowSend = field === 'send' ? !currentPolicy.allowSend : currentPolicy.allowSend;
+    const nextAllowReceive = field === 'receive' ? !currentPolicy.allowReceive : currentPolicy.allowReceive;
+
+    setPolicySavingPeers(prev => {
+      const updated = new Set(prev);
+      updated.add(key);
+      return updated;
+    });
+
+    setPolicyPeerErrors(prev => {
+      const updated = new Map(prev);
+      updated.delete(key);
+      return updated;
+    });
+
+    try {
+      const updatedSummary = updateNodePolicy(node, {
+        pubkey: key,
+        allowSend: nextAllowSend,
+        allowReceive: nextAllowReceive,
+        source: 'runtime'
+      });
+
+      if (!updatedSummary) {
+        throw new Error('Policy update failed to apply');
+      }
+
+      const normalizedKey = toPolicyKey(updatedSummary.pubkey);
+
+      setPolicies(prev => {
+        const updated = new Map(prev);
+        updated.set(normalizedKey, { ...updatedSummary, pubkey: normalizedKey });
+        return updated;
+      });
+      setPolicyError(null);
+    } catch (policyUpdateError) {
+      const message = policyUpdateError instanceof Error ? policyUpdateError.message : 'Failed to update policy';
+      setPolicyPeerErrors(prev => {
+        const updated = new Map(prev);
+        updated.set(key, message);
+        return updated;
+      });
+    } finally {
+      setPolicySavingPeers(prev => {
+        const updated = new Set(prev);
+        updated.delete(key);
+        return updated;
+      });
+    }
+  }, [node, isSignerRunning, disabled, policySavingPeers, getPolicyForPeer]);
+
   const handlePingPeer = useCallback(async (peerPubkey: string) => {
     if (!node || !isSignerRunning) return;
 
@@ -461,10 +615,11 @@ const PeerList: React.FC<PeerListProps> = ({
       
       // Then ping all known peers for immediate status update
       await pingAllPeers();
+      loadPolicies();
     } finally {
       setIsRefreshing(false);
     }
-  }, [node, isSignerRunning, pingAllPeers]);
+  }, [node, isSignerRunning, pingAllPeers, loadPolicies]);
 
   const handleToggle = () => {
     setIsExpanded(prev => !prev);
@@ -558,8 +713,8 @@ const PeerList: React.FC<PeerListProps> = ({
       {/* Collapsible Content */}
       <div 
         className={cn(
-          "transition-all duration-300 ease-in-out overflow-hidden",
-          isExpanded ? "max-h-[400px] opacity-100" : "max-h-0 opacity-0"
+          "transition-all duration-300 ease-in-out",
+          isExpanded ? "max-h-[400px] opacity-100 overflow-visible" : "max-h-0 opacity-0 overflow-hidden"
         )}
       >
         <div className="bg-gray-900/30 rounded border border-gray-800/30 p-4 space-y-4">
@@ -602,59 +757,155 @@ const PeerList: React.FC<PeerListProps> = ({
             <div className="space-y-3">
               {/* Peer list */}
               <div className="space-y-2 max-h-[250px] overflow-y-auto scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-gray-900/30">
+                {policyError && (
+                  <div className="bg-red-900/20 border border-red-900/40 text-red-300 text-xs rounded px-3 py-2">
+                    Unable to load peer policies: {policyError}
+                  </div>
+                )}
                 {filteredPeers.map((peer) => {
                   const normalizedPubkey = normalizePubkey(peer.pubkey);
+                  const policyKey = toPolicyKey(peer.pubkey);
                   const isPinging = pingingPeers.has(normalizedPubkey);
+                  const policySummary = getPolicyForPeer(peer.pubkey);
+                  const isPolicyOpen = policyPanelPeer === policyKey;
+                  const isPolicySaving = policySavingPeers.has(policyKey);
+                  const peerPolicyError = policyPeerErrors.get(policyKey);
+                  const canEditPolicies = isSignerRunning && !disabled;
+                  const policyButtonDisabled = disabled;
+                  const outboundLabel = policySummary.allowSend ? 'allow' : 'block';
+                  const inboundLabel = policySummary.allowReceive ? 'allow' : 'block';
                   
                   return (
-                    <div key={peer.pubkey} className="flex items-center justify-between bg-gray-800/30 p-3 rounded border border-gray-700/30">
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <Tooltip
-                          trigger={
-                            <div className={cn(
-                              "w-3 h-3 rounded-full flex-shrink-0",
-                              peer.online ? 'bg-green-500' : 'bg-red-500'
-                            )}></div>
-                          }
-                          content={
-                            peer.online 
-                              ? `Online${peer.lastSeen ? ` - Last seen: ${peer.lastSeen.toLocaleTimeString()}` : ''}` 
-                              : `Offline - Timeouts are normal in P2P networks where peers may not be reachable directly`
-                          }
-                          position="top"
-                        />
-                        
-                        <div className="flex-1 min-w-0">
-                          <div className="text-blue-300 text-sm font-mono truncate">
-                            {peer.pubkey.slice(0, 16)}...{peer.pubkey.slice(-8)}
-                          </div>
-                          <div className="flex items-center gap-2 text-xs text-gray-400">
-                            <span>Status: {peer.online ? 'Online' : 'Offline'}</span>
+                    <div key={peer.pubkey} className="space-y-2">
+                      <div className="flex items-center justify-between bg-gray-800/30 p-3 rounded border border-gray-700/30">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <Tooltip
+                            trigger={
+                              <div className={cn(
+                                "w-3 h-3 rounded-full flex-shrink-0",
+                                peer.online ? 'bg-green-500' : 'bg-red-500'
+                              )}></div>
+                            }
+                            content={
+                              peer.online 
+                                ? `Online${peer.lastSeen ? ` - Last seen: ${peer.lastSeen.toLocaleTimeString()}` : ''}` 
+                                : `Offline - Timeouts are normal in P2P networks where peers may not be reachable directly`
+                            }
+                            position="top"
+                          />
+                          
+                          <div className="flex-1 min-w-0">
+                            <div className="text-blue-300 text-sm font-mono truncate">
+                              {peer.pubkey.slice(0, 16)}...{peer.pubkey.slice(-8)}
+                            </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-400 whitespace-nowrap overflow-x-auto">
+                            <span className="whitespace-nowrap">Status: {peer.online ? 'Online' : 'Offline'}</span>
                             {peer.latency && (
-                              <span>• Ping: {peer.latency}ms</span>
+                              <span className="whitespace-nowrap">• Ping: {peer.latency}ms</span>
                             )}
                             {peer.lastSeen && (
-                              <span>• Last seen: {peer.lastSeen.toLocaleTimeString()}</span>
+                              <span className="whitespace-nowrap">• Last seen: {peer.lastSeen.toLocaleTimeString()}</span>
                             )}
                             {!peer.online && peer.lastPingAttempt && (
-                              <span>• Last attempt: {peer.lastPingAttempt.toLocaleTimeString()}</span>
+                              <span className="whitespace-nowrap">• Last attempt: {peer.lastPingAttempt.toLocaleTimeString()}</span>
                             )}
+                            <span className="whitespace-nowrap">• Policy: out {outboundLabel}, in {inboundLabel}</span>
+                          </div>
                           </div>
                         </div>
+
+                        <div className="flex items-center gap-2 ml-2">
+                          <IconButton
+                            variant="outline"
+                            size="sm"
+                            icon={<SlidersHorizontal className={cn("h-3 w-3", isPolicyOpen && 'text-blue-300')} />}
+                            onClick={() => handlePolicyPanelToggle(peer.pubkey)}
+                            tooltip={canEditPolicies ? 'Configure peer policy' : 'View peer policy'}
+                            disabled={policyButtonDisabled}
+                            className={cn(
+                              "transition-all duration-200",
+                              isPolicyOpen && "bg-blue-500/20 border-blue-500/40"
+                            )}
+                          />
+                          <IconButton
+                            variant="default"
+                            size="sm"
+                            icon={<Radio className="h-3 w-3" />}
+                            onClick={() => handlePingPeer(peer.pubkey)}
+                            tooltip="Ping this peer"
+                            disabled={!isSignerRunning || disabled || isPinging}
+                            className={cn(
+                              "transition-all duration-200",
+                              isPinging && "animate-pulse"
+                            )}
+                          />
+                        </div>
                       </div>
-                      
-                      <IconButton
-                        variant="default"
-                        size="sm"
-                        icon={<Radio className="h-3 w-3" />}
-                        onClick={() => handlePingPeer(peer.pubkey)}
-                        tooltip="Ping this peer"
-                        disabled={!isSignerRunning || disabled || isPinging}
-                        className={cn(
-                          "ml-2 transition-all duration-200",
-                          isPinging && "animate-pulse"
-                        )}
-                      />
+
+                      {isPolicyOpen && (
+                        <div className="ml-6 mr-2 bg-gray-900/40 border border-gray-800/60 rounded p-3 text-xs text-gray-300 relative overflow-visible">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-medium text-gray-200">Policy controls</span>
+                            <Tooltip
+                              position="top"
+                              width="w-64"
+                              triggerClassName="cursor-help"
+                              focusable
+                              trigger={<HelpCircle className="h-3.5 w-3.5 text-blue-400" />}
+                              content={
+                                <div className="space-y-1 text-blue-100">
+                                  <p>Directional policies determine whether this peer can receive (inbound) or initiate (outbound) signing traffic with your node.</p>
+                                  <p className="text-blue-200/80">For smoother coordination keep outbound enabled only for the minimal set of online peers and disable it for peers you know are offline.</p>
+                                </div>
+                              }
+                            />
+                            {policyLoading && (
+                              <Badge variant="info" className="uppercase tracking-wide">Refreshing…</Badge>
+                            )}
+                            {isPolicySaving && (
+                              <Badge variant="info" className="uppercase tracking-wide">Saving…</Badge>
+                            )}
+                            {policySummary.source === 'config' && (
+                              <Badge variant="orange" className="uppercase tracking-wide">From config</Badge>
+                            )}
+                          </div>
+                          <div className="mt-3 flex flex-wrap items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className={getPolicyToggleClasses(policySummary.allowSend, canEditPolicies)}
+                              onClick={() => handlePolicyToggle(peer.pubkey, 'send')}
+                              disabled={!canEditPolicies || isPolicySaving}
+                            >
+                              {`Outbound ${outboundLabel}`}
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className={getPolicyToggleClasses(policySummary.allowReceive, canEditPolicies)}
+                              onClick={() => handlePolicyToggle(peer.pubkey, 'receive')}
+                              disabled={!canEditPolicies || isPolicySaving}
+                            >
+                              {`Inbound ${inboundLabel}`}
+                            </Button>
+                          </div>
+                          {!canEditPolicies && (
+                            <div className="mt-2">
+                              <Badge variant="warning" className="uppercase tracking-wide">Start signer to edit policies</Badge>
+                            </div>
+                          )}
+                          <div className="mt-2 text-[11px] text-gray-500">
+                            Outbound controls requests you initiate; inbound gates requests arriving from this peer.
+                          </div>
+                          {peerPolicyError && (
+                            <div className="mt-2 text-red-400">
+                              {peerPolicyError}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
