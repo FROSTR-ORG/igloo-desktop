@@ -25,9 +25,11 @@ This note captures the code changes that introduced versioned share files and st
 - `Keyset.tsx` sets `version: CURRENT_SHARE_VERSION` whenever a share is persisted.
 
 ### Loading Shares (renderer)
-- `LoadShare.tsx` inspects the share version:
-  - `version >= CURRENT_SHARE_VERSION` ⇒ use `PBKDF2_ITERATIONS_DEFAULT` (600 000).
-  - Missing or lower version ⇒ use `PBKDF2_ITERATIONS_LEGACY` (32).
+- `LoadShare.tsx` inspects the share version via an explicit mapping:
+  - Legacy (no `version` field) ⇒ `PBKDF2_ITERATIONS_LEGACY` (32).
+  - `version === 1` ⇒ `PBKDF2_ITERATIONS_V1` (600 000).
+  - `version === CURRENT_SHARE_VERSION` (currently 1) ⇒ `PBKDF2_ITERATIONS_DEFAULT`.
+  Future versions must be added to this mapping explicitly—do **not** revert to `version >= CURRENT_SHARE_VERSION` checks.
 
 ### Documentation
 - Updated `llm/context/keyset-creation-flow.md` to describe the new versioned KDF behavior.

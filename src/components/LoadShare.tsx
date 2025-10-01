@@ -4,6 +4,7 @@ import {
   decrypt_payload,
   PBKDF2_ITERATIONS_DEFAULT,
   PBKDF2_ITERATIONS_LEGACY,
+  PBKDF2_ITERATIONS_V1,
   CURRENT_SHARE_VERSION
 } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
@@ -50,9 +51,16 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
     
     try {
       // Determine iteration count based on share version (fallback for legacy data)
-      const targetIterations = share.version && share.version >= CURRENT_SHARE_VERSION
-        ? PBKDF2_ITERATIONS_DEFAULT
-        : PBKDF2_ITERATIONS_LEGACY;
+      const targetIterations = (() => {
+        switch (share.version) {
+          case 1:
+            return PBKDF2_ITERATIONS_V1;
+          case CURRENT_SHARE_VERSION:
+            return PBKDF2_ITERATIONS_DEFAULT;
+          default:
+            return PBKDF2_ITERATIONS_LEGACY;
+        }
+      })();
 
       // Derive key from password and stored salt
       const secret = derive_secret(password, share.salt, targetIterations);
