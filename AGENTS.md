@@ -1,16 +1,37 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-The Electron main process lives in `src/main.ts`; the renderer React entry is `src/renderer.tsx`. Components sit in `src/components`, shared utilities in `src/lib`, and domain types in `src/types`. Tests mirror runtime modules under `src/__tests__` with `integration/`, `performance/`, and `__mocks__/`. Packaged assets stay in `src/assets`; `public/` holds the static shell. Build and signing helpers live in `build/` and `scripts/`. Generated bundles land in `dist/`, while installers and notarized artifacts are written to `release/`.
+- Electron main process lives in `src/main.ts`; the React renderer boots from `src/renderer.tsx`.
+- UI components stay under `src/components/`; shared helpers go in `src/lib/`; cross-cutting types belong to `src/types/`.
+- Tests mirror runtime code inside `src/__tests__/`, with `integration/`, `performance/`, and `__mocks__/` folders matching the feature they cover.
+- Packaged assets ship from `src/assets/` and the public HTML shell sits in `public/`; production bundles land in `dist/` and signed artifacts in `release/`.
 
 ## Build, Test, and Development Commands
-Install dependencies once with `npm install`. `npm run dev` starts webpack watch plus Electron; `npm start` performs a fresh build before launch. `npm run build` compiles production assets to `dist/`; `npm run watch` keeps TypeScript transpiling. `npm test` and `npm run test:watch` drive Jest suites. Lint locally with `npm run lint` (auto-fix) or `npm run lint:check`. Packaging commands include `npm run dist` or platform-specific variants like `npm run dist:mac`, `npm run dist:win`, and `npm run dist:linux`.
+- `npm run dev` runs the webpack watcher and starts Electron for live reloading during feature work.
+- `npm start` performs a clean build before launching the packaged desktop app.
+- `npm run build` emits production bundles into `dist/` for distribution and signing.
+- `npm test` executes the Jest suite once; use `npm run test:watch` while iterating locally.
+- `npm run lint` auto-fixes ESLint issues; `npm run lint:check` keeps CI read-only.
 
 ## Coding Style & Naming Conventions
-Write TypeScript everywhere under `src/` and prefer functional React components. Keep two-space indentation, camelCase for functions, PascalCase for components, and kebab-case for files under `components/`. Import third-party modules before local ones and use the `@/` alias for internal paths. Tailwind utility classes belong in JSX; avoid inline styles unless conditional. Run `npm run lint` before commits—ESLint enforces `typescript-eslint`, React, and Hooks rules, so address warnings instead of suppressing them.
+- All runtime code is TypeScript with two-space indentation and required semicolons.
+- Favor functional React components; name components with PascalCase and helper functions with camelCase.
+- Filenames in `src/components/` use kebab-case `button-group.tsx` style.
+- Import third-party packages before internal modules; use the `@/` alias for local paths (e.g., `@/components/share-list`).
+- Style JSX with Tailwind utility classes; reserve inline styles for dynamic values only.
 
 ## Testing Guidelines
-Place unit specs beside their feature folder inside `src/__tests__/<area>` and name files `<subject>.test.tsx`. Testing Library powers renderer tests; share mocks through `__mocks__` and register globals in `src/__tests__/setup.ts`. Cover new IPC handlers with direct unit tests plus at least one integration case in `integration/`. Use `npm test -- --runInBand` when debugging Electron flakiness, and keep performance baselines in `performance/` with reproducible metrics noted in the test description.
+- Jest with Testing Library drives renderer specs; place new tests beside features as `<subject>.test.tsx`.
+- Register global mocks through `src/__tests__/setup.ts` and reuse fixtures from `src/__tests__/__mocks__/`.
+- Cover new IPC handlers with unit tests and at least one scenario under `src/__tests__/integration/`.
+- Run `npm test -- --runInBand` when debugging Electron flakiness to serialize the suite.
 
 ## Commit & Pull Request Guidelines
-Commits follow short imperative subjects ("Adjust share export dialog") with optional indented bullet details pointing to touched files, as seen in recent history. Reference issues in the body (`Refs #123`) and note user-facing changes or release impacts. Pull requests should include: summary, screenshots or recordings for UI work, explicit test plan (`npm test`, `npm run lint`), platform build notes when `dist:*` scripts change, and updated release notes when installer behavior shifts.
+- Write imperative commit subjects (e.g., “Add share unlock modal”) and include bullet details plus issue refs such as `Refs #123`.
+- Document PR changes clearly, attach screenshots or recordings for UI updates, and list test commands run (`npm test`, `npm run lint`).
+- Note installer or release impacts whenever a change touches `dist:*` scripts or packaging configs.
+
+## Security & Configuration Tips
+- Keep secrets in environment variables or OS keychains; never commit them to the repo.
+- Store signing certificates with restricted access and rotate credentials when contributors change.
+- Document new configuration toggles in `README.md` or the relevant script under `build/` or `scripts/`.
