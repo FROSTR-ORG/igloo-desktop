@@ -4,7 +4,7 @@ import { sha256 } from '@noble/hashes/sha256'
 import { pbkdf2 } from '@noble/hashes/pbkdf2'
 
 export const PBKDF2_ITERATIONS_LEGACY = 32;
-export const PBKDF2_ITERATIONS_V1 = 100_000;
+export const PBKDF2_ITERATIONS_V1 = 600_000;
 export const PBKDF2_ITERATIONS_DEFAULT = PBKDF2_ITERATIONS_V1;
 const PBKDF2_KEY_LENGTH = 32;
 export const CURRENT_SHARE_VERSION = 1;
