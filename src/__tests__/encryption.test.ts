@@ -6,7 +6,9 @@ setupBuffMock();
 import { 
   derive_secret,
   encrypt_payload,
-  decrypt_payload
+  decrypt_payload,
+  PBKDF2_ITERATIONS_DEFAULT,
+  PBKDF2_ITERATIONS_LEGACY
 } from '../lib/encryption';
 
 // Mock implementations need to be before variable declarations
@@ -65,7 +67,7 @@ describe('Encryption Functions', () => {
         expect.anything(),         // Password bytes (could be Buffer or Uint8Array)
         expect.anything(),         // Salt bytes (could be Buffer or Uint8Array)
         expect.objectContaining({  // Options
-          c: 32,                   // Iterations
+          c: PBKDF2_ITERATIONS_DEFAULT, // Iterations
           dkLen: 32                // Output length
         })
       );
@@ -122,6 +124,20 @@ describe('Encryption Functions', () => {
       // But the password bytes (second parameter) should be different
       // Note: We can't directly compare the Uint8Arrays since they come from our mock,
       // but in a real implementation they would be different
+    });
+
+    it('should allow overriding iteration count', () => {
+      const { pbkdf2 } = jest.requireMock('@noble/hashes/pbkdf2');
+      pbkdf2.mockClear();
+
+      derive_secret('password', 'salt', PBKDF2_ITERATIONS_LEGACY);
+
+      expect(pbkdf2).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ c: PBKDF2_ITERATIONS_LEGACY })
+      );
     });
   });
   

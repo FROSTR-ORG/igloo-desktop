@@ -17,7 +17,7 @@ Igloo Desktop builds a keyset in-memory, lets the user fan out each share, and o
 
 ## Persisting Shares (`SaveShare.tsx`, `clientShareManager`, `ShareManager`)
 1. Choosing **Save** opens the `SaveShare` modal. The user must enter and confirm a password of at least eight characters.
-2. `SaveShare` generates a 16-byte random salt, then derives a 32-byte secret with `derive_secret(password, salt)` which wraps PBKDF2-SHA256 (`c: 32`, `dkLen: 32`).
+2. `SaveShare` generates a 16-byte random salt, then derives a 32-byte secret with `derive_secret(password, salt)` which wraps PBKDF2-SHA256 (`c: 100000`, `dkLen: 32`) and stores a version marker.
 3. The share is encrypted with AES-GCM (`encrypt_payload`) and the salt and encrypted blob are returned to `Keyset`.
 4. `Keyset` builds an `IglooShare` object:
    ```json

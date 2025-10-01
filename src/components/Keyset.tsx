@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
+import { CURRENT_SHARE_VERSION } from '@/lib/encryption';
 import { CheckCircle2, QrCode, Loader2, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
@@ -62,6 +63,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       share: encryptedShare,
       salt,
       groupCredential,
+      version: CURRENT_SHARE_VERSION,
       savedAt: new Date().toISOString()
     };
 
