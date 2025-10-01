@@ -5,7 +5,7 @@ This note captures the code changes that introduced versioned share files and st
 ## Goals
 
 1. Tag newly-saved shares with an explicit format version so future migrations are possible.
-2. Raise the PBKDF2 iteration count used for encryption to 100 000 without breaking previously saved files (which used 32 iterations).
+2. Raise the PBKDF2 iteration count used for encryption to 600 000 without breaking previously saved files (which used 32 iterations).
 3. Ensure the renderer, Electron main process, and tests understand the new schema.
 
 ## Key Changes
@@ -13,7 +13,7 @@ This note captures the code changes that introduced versioned share files and st
 ### Encryption Constants (`src/lib/encryption.ts`)
 - Added exported constants:
   - `PBKDF2_ITERATIONS_LEGACY = 32`
-  - `PBKDF2_ITERATIONS_V1 = 100_000`
+  - `PBKDF2_ITERATIONS_V1 = 600_000`
   - `PBKDF2_ITERATIONS_DEFAULT` (alias to the v1 value)
   - `CURRENT_SHARE_VERSION = 1`
 - `derive_secret` now accepts an optional `iterations` argument (defaulting to `PBKDF2_ITERATIONS_DEFAULT`).
@@ -26,7 +26,7 @@ This note captures the code changes that introduced versioned share files and st
 
 ### Loading Shares (renderer)
 - `LoadShare.tsx` inspects the share version:
-  - `version >= CURRENT_SHARE_VERSION` ⇒ use `PBKDF2_ITERATIONS_DEFAULT` (100 000).
+  - `version >= CURRENT_SHARE_VERSION` ⇒ use `PBKDF2_ITERATIONS_DEFAULT` (600 000).
   - Missing or lower version ⇒ use `PBKDF2_ITERATIONS_LEGACY` (32).
 
 ### Documentation
