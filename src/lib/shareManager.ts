@@ -11,9 +11,13 @@ interface IglooShare {
   id: string;
   name: string;
   share: string;
+  salt: string;
   groupCredential: string;
-  createdAt: string;
+  version?: number;
+  createdAt?: string;
   lastUsed?: string;
+  savedAt?: string;
+  metadata?: Record<string, unknown>;
 }
 
 /**
