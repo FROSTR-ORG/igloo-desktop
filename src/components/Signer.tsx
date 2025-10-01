@@ -2,12 +2,13 @@ import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, us
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Tooltip } from "@/components/ui/tooltip"
-import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
+import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode, extractSelfPubkeyFromCredentials } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import PeerList from "@/components/ui/peer-list"
+import { createSignerKeepAlive, type SignerKeepAliveHandle } from '@/lib/signer-keepalive';
 import type {
   SignerHandle,
   SignerProps
@@ -76,7 +77,7 @@ const getShareInfo = (groupCredential: string, shareCredential: string, shareNam
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -105,6 +106,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const nodeRef = useRef<BifrostNode | null>(null);
   // Track cleanup functions for event listeners to prevent memory leaks
   const cleanupListenersRef = useRef<(() => void)[]>([]);
+  const keepAliveRef = useRef<SignerKeepAliveHandle | null>(null);
 
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
@@ -271,7 +273,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   }, [addLog]);
 
   const setupLegacyEventListeners = useCallback((node: BifrostNode) => {
-    const nodeAny = node as any;
     const cleanupFunctions: (() => void)[] = [];
 
     // Legacy direct event listeners for backward compatibility
@@ -289,18 +290,23 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       // Note: Ping events are handled by the main message handler - no duplicates needed
     ];
 
+    const emitter = node as unknown as {
+      on: (event: string, handler: (...args: unknown[]) => void) => void;
+      off: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
+
     legacyEvents.forEach(({ event, type, message }) => {
       try {
         const handler = (msg: unknown) => addLog(type, message, msg);
-        nodeAny.on(event, handler);
+        emitter.on(event, handler);
         cleanupFunctions.push(() => {
           try {
-            nodeAny.off(event, handler);
-          } catch (e) {
+            emitter.off(event, handler);
+          } catch {
             // Silently ignore cleanup errors for legacy events
           }
         });
-      } catch (e) {
+      } catch {
         // Silently ignore if event doesn't exist
       }
     });
@@ -327,8 +333,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           node.off('/ecdh/sender/ret', ecdhSenderRetHandler);
           node.off('/ecdh/sender/err', ecdhSenderErrHandler);
           node.off('/ecdh/handler/rej', ecdhHandlerRejHandler);
-        } catch (e) {
-          console.warn('Error removing ECDH event listeners:', e);
+        } catch (error) {
+          console.warn('Error removing ECDH event listeners:', error);
         }
       });
 
@@ -352,8 +358,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           node.off('/sign/sender/ret', signSenderRetHandler);
           node.off('/sign/sender/err', signSenderErrHandler);
           node.off('/sign/handler/rej', signHandlerRejHandler);
-        } catch (e) {
-          console.warn('Error removing signature event listeners:', e);
+        } catch (error) {
+          console.warn('Error removing signature event listeners:', error);
         }
       });
 
@@ -387,8 +393,20 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     cleanupListenersRef.current = [];
   }, []);
 
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) {
+      try {
+        keepAliveRef.current.stop();
+      } catch (error) {
+        console.warn('Error stopping keep-alive manager:', error);
+      }
+      keepAliveRef.current = null;
+    }
+  }, []);
+
   // Clean node cleanup using igloo-core
   const cleanupNode = useCallback(() => {
+    stopKeepAlive();
     if (nodeRef.current) {
       // First clean up our event listeners
       cleanupEventListeners();
@@ -415,7 +433,20 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         nodeRef.current = null;
       }
     }
-  }, [cleanupEventListeners]);
+  }, [cleanupEventListeners, stopKeepAlive]);
+
+  const applyNodeListeners = useCallback((node: BifrostNode) => {
+    const cleanupBasic = setupBasicEventListeners(node);
+    const cleanupMessage = setupMessageEventListener(node);
+    const cleanupLegacy = setupLegacyEventListeners(node);
+    cleanupListenersRef.current.push(cleanupBasic, cleanupMessage, cleanupLegacy);
+  }, [setupBasicEventListeners, setupMessageEventListener, setupLegacyEventListeners]);
+
+  const registerNode = useCallback((node: BifrostNode) => {
+    cleanupEventListeners();
+    nodeRef.current = node;
+    applyNodeListeners(node);
+  }, [applyNodeListeners, cleanupEventListeners]);
 
   // Add effect to cleanup on unmount
   useEffect(() => {
@@ -423,8 +454,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     return () => {
       if (nodeRef.current) {
         addLog('info', 'Signer stopped due to page navigation');
-        cleanupNode();
       }
+      cleanupNode();
     };
   }, [addLog, cleanupNode]); // Include dependencies
 
@@ -501,7 +532,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             }
             return value;
           }, 2);
-        } catch (fallbackError) {
+        } catch {
           // Final fallback - show error message
           return `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`;
         }
@@ -607,6 +638,16 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       setIsConnecting(true);
       addLog('info', 'Creating and connecting node...');
 
+      const selfPubkeyResult = extractSelfPubkeyFromCredentials(
+        groupCredential,
+        signerSecret,
+        {
+          normalize: true,
+          suppressWarnings: true
+        }
+      );
+      const selfPubkey = selfPubkeyResult.pubkey;
+
       // Use the improved createConnectedNode API which returns enhanced state info
       const result = await createConnectedNode({
         group: groupCredential,
@@ -614,12 +655,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         relays: relayUrls
       });
 
-      nodeRef.current = result.node;
-
-      // Set up all event listeners using our extracted functions
-      const cleanupBasic = setupBasicEventListeners(result.node);
-      const cleanupMessage = setupMessageEventListener(result.node);
-      const cleanupLegacy = setupLegacyEventListeners(result.node);
+      registerNode(result.node);
 
       // Use the enhanced state info from createConnectedNode
       if (result.state.isReady) {
@@ -631,10 +667,48 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         // Keep connecting state until ready
       }
 
-      // Add cleanup functions to cleanupListenersRef
-      cleanupListenersRef.current.push(cleanupBasic);
-      cleanupListenersRef.current.push(cleanupMessage);
-      cleanupListenersRef.current.push(cleanupLegacy);
+      if (selfPubkey) {
+        const keepAlive = createSignerKeepAlive({
+          node: result.node,
+          groupCredential,
+          shareCredential: signerSecret,
+          relays: relayUrls,
+          selfPubkey,
+          logger: (level, message, context) => {
+            if (level === 'debug') return;
+            const logType = level === 'error' ? 'error' : 'bifrost';
+            addLog(logType, `Keep-alive: ${message}`, context);
+          }
+        });
+
+        keepAlive.onReplace(({ next, previous }) => {
+          addLog('bifrost', 'Keep-alive replaced signer node', {
+            relays: relayUrls,
+            previousPubkey: previous.pubkey
+          });
+
+          registerNode(next);
+          setIsSignerRunning(true);
+          setIsConnecting(false);
+
+          if (previous && previous !== next) {
+            try {
+              cleanupBifrostNode(previous);
+            } catch (cleanupError) {
+              addLog('bifrost', 'Failed to cleanup replaced node', {
+                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+              });
+            }
+          }
+        });
+
+        keepAliveRef.current = keepAlive;
+        keepAlive.start();
+      } else {
+        addLog('bifrost', 'Keep-alive disabled: unable to derive self pubkey', {
+          warnings: selfPubkeyResult.warnings
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
