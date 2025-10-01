@@ -15,7 +15,7 @@ interface KeepAliveOptions {
 }
 
 const DEFAULT_OPTIONS: KeepAliveOptions = {
-  heartbeatMs: 15_000,
+  heartbeatMs: 30_000,
   timeoutMs: 5_000,
   staleMs: 30_000,
   maxBackoffMs: 30_000,
@@ -256,7 +256,7 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
       lastActivityTs = Date.now();
     } catch (error) {
       consecutiveFailures += 1;
-      logger('warn', 'Heartbeat failed', { error: error instanceof Error ? error.message : String(error), failures: consecutiveFailures });
+      logger('debug', 'Heartbeat failed', { error: error instanceof Error ? error.message : String(error), failures: consecutiveFailures });
     }
 
     if (inactive || consecutiveFailures >= 2) {

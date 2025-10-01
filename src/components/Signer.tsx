@@ -675,9 +675,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           relays: relayUrls,
           selfPubkey,
           logger: (level, message, context) => {
-            if (level === 'debug') return;
-            const logType = level === 'error' ? 'error' : 'bifrost';
-            addLog(logType, `Keep-alive: ${message}`, context);
+            if (level === 'warn' || level === 'error') {
+              const logType = level === 'error' ? 'error' : 'bifrost';
+              addLog(logType, `Keep-alive: ${message}`, context);
+            }
           }
         });
 
