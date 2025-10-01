@@ -51,61 +51,44 @@ Proposed approach (layered, least-invasive first)
 Implementation sketch (new helper)
 - File: src/lib/signer-keepalive.ts
 - API:
-  - createKeepAlive(node, creds, options): returns { start(), stop(), onReplace(cb) }.
-  - Options: { heartbeatMs=15000, timeoutMs=5000, staleMs=30000, maxBackoffMs=30000 }.
+  - `export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveHandle`
+  - `KeepAliveConfig` fields: `node`, `groupCredential`, `shareCredential`, `relays`, `selfPubkey`, optional `logger?: (level: 'debug' | 'info' | 'warn' | 'error', message: string, context?: Record<string, unknown>) => void`, optional `options?: { heartbeatMs?: number; timeoutMs?: number; staleMs?: number; maxBackoffMs?: number }`.
+  - Defaults: `heartbeatMs` = 30_000, `timeoutMs` = 5_000, `staleMs` = 30_000, `maxBackoffMs` = 30_000.
 - Behavior:
   - Attach listeners to node: `message` (update lastSeen), `ready` (mark ready), `closed`/client `close` (trigger heal).
   - Heartbeat loop: `node.req.ping(selfPubkey)`; if 2x fail or elapsed > staleMs: try update() → connect() → recreate().
-  - Expose onReplace(cb) to let Signer swap `nodeRef.current` and rewire UI listeners.
+  - Expose `onReplace(cb)` with payload `{ next: BifrostNode; previous: BifrostNode }` so the Signer can swap `nodeRef.current` and re-map listeners.
 
 Code snippet (illustrative)
 ```ts
-// src/lib/signer-keepalive.ts
-import { createConnectedNode } from '@frostr/igloo-core';
-import type { BifrostNode } from '@frostr/bifrost';
+// src/components/Signer.tsx (excerpt)
+import { createSignerKeepAlive } from '@/lib/signer-keepalive';
 
-export function createKeepAlive(
-  node: BifrostNode,
-  creds: { group: string; share: string; relays: string[]; selfPubkey: string },
-  opt = { heartbeatMs: 15000, timeoutMs: 5000, staleMs: 30000, maxBackoffMs: 30000 }
-) {
-  let current = node; let timer: any; let lastSeen = Date.now();
-  let failures = 0; let stopped = false; let onReplace: ((n: BifrostNode)=>void)|null = null;
+const keepAlive = createSignerKeepAlive({
+  node: result.node,
+  groupCredential,
+  shareCredential: signerSecret,
+  relays: relayUrls,
+  selfPubkey,
+  logger: (level, message, context) => {
+    if (level === 'warn' || level === 'error') {
+      addLog(level === 'error' ? 'error' : 'bifrost', `Keep-alive: ${message}`, context);
+    }
+  },
+  options: {
+    heartbeatMs: 30_000,
+    timeoutMs: 5_000,
+    staleMs: 30_000,
+    maxBackoffMs: 30_000,
+  },
+});
 
-  const bridgeClose = () => { (current as any)?.client?.on?.('close', () => current.emit?.('closed', current)); };
-  const onMsg = () => { lastSeen = Date.now(); failures = 0; };
+keepAlive.onReplace(({ next, previous }) => {
+  registerNode(next);
+  cleanupBifrostNode(previous);
+});
 
-  async function heal() {
-    if (stopped) return;
-    try { await (current as any).client.update((current as any).client.filter); return; } catch {}
-    try { await (current as any).client.connect(); return; } catch {}
-    try {
-      const { node: fresh } = await createConnectedNode({ ...creds });
-      current = fresh; bridgeClose(); onReplace?.(fresh); lastSeen = Date.now(); failures = 0; return;
-    } catch {}
-  }
-
-  async function tick() {
-    if (stopped) return;
-    const stale = Date.now() - lastSeen > opt.staleMs;
-    try {
-      const res = await Promise.race([
-        (current as any).req.ping(creds.selfPubkey),
-        new Promise((_, r) => setTimeout(() => r(new Error('timeout')), opt.timeoutMs))
-      ]);
-      if ((res as any)?.ok) { failures = 0; lastSeen = Date.now(); }
-      else { failures++; }
-    } catch { failures++; }
-    if (stale || failures >= 2) await heal();
-    timer = setTimeout(tick, opt.heartbeatMs);
-  }
-
-  function start() {
-    stopped = false; bridgeClose(); current.on('message', onMsg); tick();
-  }
-  function stop() { stopped = true; clearTimeout(timer); current.off?.('message', onMsg); }
-  return { start, stop, onReplace: (cb: (n: BifrostNode)=>void) => { onReplace = cb; } };
-}
+keepAlive.start();
 ```
 
 Wiring in Signer.tsx (minimal)
@@ -133,4 +116,3 @@ Follow‑ups (nice to have)
 
 Scope of change
 - Files in this repo only; no dependency forks. The helper is small, isolated, and reversible.
-

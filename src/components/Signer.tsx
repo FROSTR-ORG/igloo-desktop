@@ -107,6 +107,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   // Track cleanup functions for event listeners to prevent memory leaks
   const cleanupListenersRef = useRef<(() => void)[]>([]);
   const keepAliveRef = useRef<SignerKeepAliveHandle | null>(null);
+  const isSignerRunningRef = useRef(false);
+
+  const updateSignerRunning = useCallback((running: boolean) => {
+    isSignerRunningRef.current = running;
+    setIsSignerRunning(running);
+  }, []);
 
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
@@ -179,13 +185,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const setupBasicEventListeners = useCallback((node: BifrostNode) => {
     const closedHandler = () => {
       addLog('bifrost', 'Bifrost node is closed');
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     };
 
     const errorHandler = (error: unknown) => {
       addLog('error', 'Node error', error);
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     };
 
@@ -196,7 +202,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         data;
       addLog('ready', 'Node is ready', logData);
       setIsConnecting(false);
-      setIsSignerRunning(true);
+      updateSignerRunning(true);
     };
 
     const bouncedHandler = (reason: string, msg: unknown) =>
@@ -219,7 +225,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         console.warn('Error removing basic event listeners:', error);
       }
     };
-  }, [addLog, setIsSignerRunning, setIsConnecting]);
+  }, [addLog, updateSignerRunning, setIsConnecting]);
 
   const setupMessageEventListener = useCallback((node: BifrostNode) => {
     const messageHandler = (msg: unknown) => {
@@ -661,7 +667,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       if (result.state.isReady) {
         addLog('info', 'Node connected and ready');
         setIsConnecting(false);
-        setIsSignerRunning(true);
+        updateSignerRunning(true);
       } else {
         addLog('warning', 'Node created but not yet ready, waiting...');
         // Keep connecting state until ready
@@ -683,13 +689,16 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         });
 
         keepAlive.onReplace(({ next, previous }) => {
+          if (!isSignerRunningRef.current) {
+            return;
+          }
           addLog('bifrost', 'Keep-alive replaced signer node', {
             relays: relayUrls,
             previousPubkey: previous.pubkey
           });
 
           registerNode(next);
-          setIsSignerRunning(true);
+          updateSignerRunning(true);
           setIsConnecting(false);
 
           if (previous && previous !== next) {
@@ -714,7 +723,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
       cleanupNode();
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     }
   };
@@ -723,7 +732,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     try {
       cleanupNode();
       addLog('info', 'Signer stopped');
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

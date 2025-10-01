@@ -79,11 +79,12 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
 
   let currentNode = config.node;
   let timer: ReturnType<typeof setTimeout> | null = null;
-  let stopped = false;
+  let isRunning = false;
   let consecutiveFailures = 0;
   let lastActivityTs = Date.now();
   let replaceCallback: ((payload: ReplacedNodePayload) => void) | null = null;
   let closeBridge: CloseBridge | null = null;
+  let tickInProgress = false;
 
   const messageListener = () => {
     lastActivityTs = Date.now();
@@ -94,17 +95,29 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     if (!closeBridge) return;
 
     const { client, handler } = closeBridge;
-    try {
-      if (typeof client.off === 'function') {
+    let detached = false;
+
+    if (typeof client.off === 'function') {
+      try {
         client.off('close', handler);
-      } else if (typeof client.removeListener === 'function') {
-        client.removeListener('close', handler);
+        detached = true;
+      } catch (error) {
+        logger('debug', 'Failed to detach close listener via off', { error: error instanceof Error ? error.message : String(error) });
       }
-    } catch (error) {
-      logger('debug', 'Failed to detach close bridge', { error: error instanceof Error ? error.message : String(error) });
     }
 
-    closeBridge = null;
+    if (!detached && typeof client.removeListener === 'function') {
+      try {
+        client.removeListener('close', handler);
+        detached = true;
+      } catch (error) {
+        logger('debug', 'Failed to detach close listener via removeListener', { error: error instanceof Error ? error.message : String(error) });
+      }
+    }
+
+    if (detached) {
+      closeBridge = null;
+    }
   };
 
   const attachCloseBridge = (node: BifrostNode) => {
@@ -198,7 +211,7 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     const backoffSequence = [0, 1000, 2000, 5000, 10_000];
 
     for (const delay of backoffSequence) {
-      if (stopped) return;
+      if (!isRunning) return;
       if (delay) {
         await sleep(Math.min(delay, resolvedOptions.maxBackoffMs));
       }
@@ -234,12 +247,14 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
   };
 
   const tick = async () => {
-    if (stopped) {
+    if (!isRunning || tickInProgress) {
       return;
     }
 
+    tickInProgress = true;
     const now = Date.now();
     const inactive = now - lastActivityTs > resolvedOptions.staleMs;
+    let needHeal = inactive;
 
     try {
       const pingPromise = currentNode.req.ping(selfPubkey);
@@ -257,30 +272,41 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     } catch (error) {
       consecutiveFailures += 1;
       logger('debug', 'Heartbeat failed', { error: error instanceof Error ? error.message : String(error), failures: consecutiveFailures });
-    }
-
-    if (inactive || consecutiveFailures >= 2) {
-      await heal(inactive ? 'inactivity' : 'heartbeat failures');
-    }
-
-    if (!stopped) {
-      timer = setTimeout(() => {
-        void tick();
-      }, resolvedOptions.heartbeatMs);
+      needHeal = true;
+    } finally {
+      const shouldHeal = needHeal || consecutiveFailures >= 2;
+      if (shouldHeal) {
+        const reason = inactive && needHeal && consecutiveFailures < 2 ? 'inactivity' : 'heartbeat failures';
+        await heal(reason);
+      }
+      tickInProgress = false;
+      if (isRunning) {
+        timer = setTimeout(() => {
+          void tick();
+        }, resolvedOptions.heartbeatMs);
+      }
     }
   };
 
   const start = () => {
-    if (stopped) {
-      logger('debug', 'Keep-alive already stopped, skipping start');
+    if (isRunning) {
+      logger('debug', 'Keep-alive already running');
       return;
+    }
+    isRunning = true;
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
     }
     watchNode(currentNode);
     void tick();
   };
 
   const stop = () => {
-    stopped = true;
+    if (!isRunning) {
+      return;
+    }
+    isRunning = false;
     if (timer) {
       clearTimeout(timer);
       timer = null;
