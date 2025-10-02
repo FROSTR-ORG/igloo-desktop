@@ -3,13 +3,20 @@ import { gcm }    from '@noble/ciphers/aes'
 import { sha256 } from '@noble/hashes/sha256'
 import { pbkdf2 } from '@noble/hashes/pbkdf2'
 
+export const PBKDF2_ITERATIONS_LEGACY = 32;
+export const PBKDF2_ITERATIONS_V1 = 600_000;
+export const PBKDF2_ITERATIONS_DEFAULT = PBKDF2_ITERATIONS_V1;
+const PBKDF2_KEY_LENGTH = 32;
+export const CURRENT_SHARE_VERSION = 1;
+
 export function derive_secret (
   password  : string,
-  rand_salt : string
+  rand_salt : string,
+  iterations = PBKDF2_ITERATIONS_DEFAULT
 ) {
   const pass_bytes = Buff.str(password).digest
   const salt_bytes = Buff.hex(rand_salt, 32)
-  const options    = { c: 32, dkLen: 32 }
+  const options    = { c: iterations, dkLen: PBKDF2_KEY_LENGTH }
   const secret     = pbkdf2(sha256, pass_bytes, salt_bytes, options)
   return new Buff(secret).hex
 }
