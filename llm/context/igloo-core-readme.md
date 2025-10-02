@@ -635,6 +635,8 @@ if (!await canReceiveFromPeer(node, 'npub1example...')) {
 }
 ```
 
+> Desktop Igloo persists policy overrides alongside each share. Share files written with version 1 now include a `policy` object recording the defaults (`allowSend`, `allowReceive`) plus optional peer-specific overrides keyed by normalized pubkeys. Legacy share files (missing a `policy` field or marked with a version less than 1) should be treated as allowing inbound and outbound traffic for every peer until the signer upgrades and saves the file.
+
 ## Validation
 
 The library provides validation for all credential types and formats.
