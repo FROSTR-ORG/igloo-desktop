@@ -12,6 +12,7 @@ import { Tooltip } from "@/components/ui/tooltip"
 import { PageLayout } from "@/components/ui/page-layout"
 import { AppHeader } from "@/components/ui/app-header"
 import { ContentCard } from "@/components/ui/content-card"
+import type { IglooShare } from '@/lib/clientShareManager';
 
 interface KeysetData {
   groupCredential: string;
@@ -20,9 +21,9 @@ interface KeysetData {
 }
 
 interface SignerData {
-  share: string;
+  decryptedShare: string;
   groupCredential: string;
-  name?: string;
+  shareRecord: IglooShare;
   threshold?: number;
   totalShares?: number;
 }
@@ -53,8 +54,12 @@ const App: React.FC = () => {
     setShowingCreate(false);
   };
 
-  const handleShareLoaded = (share: string, groupCredential: string, shareName: string) => {
-    setSignerData({ share, groupCredential, name: shareName });
+  const handleShareLoaded = ({ decryptedShare, groupCredential, shareRecord }: {
+    decryptedShare: string;
+    groupCredential: string;
+    shareRecord: IglooShare;
+  }) => {
+    setSignerData({ decryptedShare, groupCredential, shareRecord });
     // Ensure we're on the signer tab when a share is loaded
     const signerTab = document.querySelector('[data-state="active"][value="signer"]');
     if (!signerTab) {
@@ -202,7 +207,7 @@ const App: React.FC = () => {
             
             <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
               <Recover 
-                initialShare={signerData?.share} 
+                initialShare={signerData?.decryptedShare} 
                 initialGroupCredential={signerData?.groupCredential}
                 defaultThreshold={signerData?.threshold}
                 defaultTotalShares={signerData?.totalShares}

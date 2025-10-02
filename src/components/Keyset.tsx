@@ -64,7 +64,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       salt,
       groupCredential,
       version: CURRENT_SHARE_VERSION,
-      savedAt: new Date().toISOString()
+      savedAt: new Date().toISOString(),
+      policy: {
+        defaults: {
+          allowSend: true,
+          allowReceive: true
+        },
+        updatedAt: new Date().toISOString()
+      }
     };
 
     // Save the share

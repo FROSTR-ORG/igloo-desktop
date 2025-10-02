@@ -29,6 +29,18 @@ export interface IglooShareMetadata {
   [key: string]: string | number | boolean | null | undefined;
 }
 
+export interface SharePolicyEntry {
+  allowSend: boolean;
+  allowReceive: boolean;
+  updatedAt?: string;
+}
+
+export interface SharePolicy {
+  defaults: SharePolicyEntry;
+  peers?: Record<string, SharePolicyEntry>;
+  updatedAt?: string;
+}
+
 export interface IglooShare {
   id: string;
   name: string;
@@ -39,6 +51,7 @@ export interface IglooShare {
   savedAt?: string;
   shareCredential?: string;
   metadata?: IglooShareMetadata;
+  policy?: SharePolicy;
 }
 
 // Bifrost types (from @frostr/bifrost)
@@ -123,12 +136,24 @@ export interface SignerHandle {
   stopSigner: () => Promise<void>;
 }
 
+export interface SignerInitialData {
+  decryptedShare: string;
+  groupCredential: string;
+  shareRecord?: IglooShare;
+  threshold?: number;
+  totalShares?: number;
+  /**
+   * @deprecated Backward-compatible alias for decryptedShare
+   */
+  share?: string;
+  /**
+   * @deprecated Backward-compatible alias for shareRecord.name
+   */
+  name?: string;
+}
+
 export interface SignerProps {
-  initialData?: {
-    share: string;
-    groupCredential: string;
-    name?: string;
-  } | null;
+  initialData?: SignerInitialData | null;
 }
 
 // Keyset types

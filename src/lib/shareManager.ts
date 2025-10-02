@@ -18,6 +18,18 @@ interface IglooShare {
   lastUsed?: string;
   savedAt?: string;
   metadata?: Record<string, unknown>;
+  policy?: {
+    defaults: {
+      allowSend: boolean;
+      allowReceive: boolean;
+    };
+    peers?: Record<string, {
+      allowSend: boolean;
+      allowReceive: boolean;
+      updatedAt?: string;
+    }>;
+    updatedAt?: string;
+  };
 }
 
 /**

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
+import type { SharePolicy } from '@/types';
 import { decodeGroup, decodeShare } from '@frostr/igloo-core';
 import { FolderOpen, Trash2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,8 +10,15 @@ import { Tooltip } from '@/components/ui/tooltip';
 import LoadShare from './LoadShare';
 import ConfirmModal from '@/components/ui/ConfirmModal';
 
+interface LoadedSharePayload {
+  decryptedShare: string;
+  groupCredential: string;
+  shareRecord: IglooShare;
+  policy?: SharePolicy;
+}
+
 interface ShareListProps {
-  onShareLoaded?: (share: string, groupCredential: string, shareName: string) => void;
+  onShareLoaded?: (payload: LoadedSharePayload) => void;
   onNewKeyset?: () => void;
 }
 
@@ -91,7 +99,12 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
 
   const handleLoadComplete = (decryptedShare: string, groupCredential: string) => {
     if (onShareLoaded && loadingShare) {
-      onShareLoaded(decryptedShare, groupCredential, loadingShare.name);
+      onShareLoaded({
+        decryptedShare,
+        groupCredential,
+        shareRecord: loadingShare,
+        policy: loadingShare.policy
+      });
     }
     setLoadingShare(null);
   };
