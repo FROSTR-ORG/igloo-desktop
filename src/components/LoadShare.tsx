@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { 
-  derive_secret, 
+  derive_secret_async, 
   decrypt_payload,
   PBKDF2_ITERATIONS_DEFAULT,
   PBKDF2_ITERATIONS_LEGACY,
@@ -9,6 +9,8 @@ import {
 } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
+import type { SharePolicy } from '@/types';
 
 interface LoadShareProps {
   share: {
@@ -18,6 +20,7 @@ interface LoadShareProps {
     salt: string;
     groupCredential: string;
     version?: number;
+    policy?: SharePolicy;
   };
   onLoad?: (decryptedShare: string, groupCredential: string) => void;
   onCancel?: () => void;
@@ -63,7 +66,9 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       })();
 
       // Derive key from password and stored salt
-      const secret = derive_secret(password, share.salt, targetIterations);
+      await new Promise<void>(resolve => setTimeout(resolve, 0));
+
+      const secret = await derive_secret_async(password, share.salt, targetIterations);
       
       // Decrypt the share
       const decryptedShare = decrypt_payload(secret, share.encryptedShare);
@@ -92,7 +97,13 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
   };
 
   return (
-    <div className="bg-gray-900 border border-blue-900/50 rounded-lg p-6 shadow-xl backdrop-blur-sm">
+    <div className="relative bg-gray-900 border border-blue-900/50 rounded-lg p-6 shadow-xl backdrop-blur-sm">
+      {isSubmitting && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-gray-950/70 backdrop-blur-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-300" />
+          <span className="text-sm font-medium text-blue-200">Decrypting share…</span>
+        </div>
+      )}
       <h2 className="text-xl font-semibold text-blue-300 mb-4">
         Load Share {share.name && <span className="text-blue-400">({share.name})</span>}
       </h2>
