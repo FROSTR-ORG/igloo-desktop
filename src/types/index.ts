@@ -35,6 +35,7 @@ export interface IglooShare {
   share: string;
   salt: string;
   groupCredential: string;
+  version?: number;
   savedAt?: string;
   shareCredential?: string;
   metadata?: IglooShareMetadata;
