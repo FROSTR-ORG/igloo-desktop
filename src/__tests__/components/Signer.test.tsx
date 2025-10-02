@@ -11,6 +11,8 @@ jest.mock('@frostr/igloo-core', () => ({
   validateGroup: jest.fn(),
   decodeShare: jest.fn(),
   decodeGroup: jest.fn(),
+  setNodePolicies: jest.fn().mockResolvedValue([]),
+  normalizePubkey: jest.fn((value: string) => value?.toLowerCase?.() ?? value),
 }));
 
 // Get references to the mocked functions with proper typing

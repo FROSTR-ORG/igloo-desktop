@@ -61,6 +61,7 @@ interface PeerListProps {
   isSignerRunning: boolean;
   disabled?: boolean;
   className?: string;
+  onPolicyChange?: (update: { pubkey: string; allowSend: boolean; allowReceive: boolean }) => Promise<void> | void;
 }
 
 const PeerList: React.FC<PeerListProps> = ({
@@ -69,7 +70,8 @@ const PeerList: React.FC<PeerListProps> = ({
   shareCredential,
   isSignerRunning,
   disabled = false,
-  className
+  className,
+  onPolicyChange
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [peers, setPeers] = useState<PeerStatus[]>([]);
@@ -427,6 +429,8 @@ const PeerList: React.FC<PeerListProps> = ({
     if (policySavingPeers.has(key)) return;
 
     const currentPolicy = getPolicyForPeer(peerPubkey);
+    const previousAllowSend = currentPolicy.allowSend;
+    const previousAllowReceive = currentPolicy.allowReceive;
     const nextAllowSend = field === 'send' ? !currentPolicy.allowSend : currentPolicy.allowSend;
     const nextAllowReceive = field === 'receive' ? !currentPolicy.allowReceive : currentPolicy.allowReceive;
 
@@ -462,8 +466,39 @@ const PeerList: React.FC<PeerListProps> = ({
         return updated;
       });
       setPolicyError(null);
+
+      if (onPolicyChange) {
+        await onPolicyChange({
+          pubkey: normalizedKey,
+          allowSend: updatedSummary.allowSend,
+          allowReceive: updatedSummary.allowReceive
+        });
+      }
     } catch (policyUpdateError) {
       const message = policyUpdateError instanceof Error ? policyUpdateError.message : 'Failed to update policy';
+
+      if (node) {
+        try {
+          const rollbackSummary = updateNodePolicy(node, {
+            pubkey: key,
+            allowSend: previousAllowSend,
+            allowReceive: previousAllowReceive,
+            source: 'runtime'
+          });
+
+          if (rollbackSummary) {
+            const rollbackKey = toPolicyKey(rollbackSummary.pubkey);
+            setPolicies(prev => {
+              const updated = new Map(prev);
+              updated.set(rollbackKey, { ...rollbackSummary, pubkey: rollbackKey });
+              return updated;
+            });
+          }
+        } catch (rollbackError) {
+          console.error('[PeerList] Failed to rollback policy after error', rollbackError);
+        }
+      }
+
       setPolicyPeerErrors(prev => {
         const updated = new Map(prev);
         updated.set(key, message);
@@ -476,7 +511,7 @@ const PeerList: React.FC<PeerListProps> = ({
         return updated;
       });
     }
-  }, [node, isSignerRunning, disabled, policySavingPeers, getPolicyForPeer]);
+  }, [node, isSignerRunning, disabled, policySavingPeers, getPolicyForPeer, onPolicyChange]);
 
   const handlePingPeer = useCallback(async (peerPubkey: string) => {
     if (!node || !isSignerRunning) return;
