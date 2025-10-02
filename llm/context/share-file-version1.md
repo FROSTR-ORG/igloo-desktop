@@ -42,7 +42,7 @@ Additional properties MAY be present for forward compatibility.
       "allowReceive": true
     },
     "peers": {
-      "npub1example...": {
+      "88a71d3e9f3ac066793a717fe1d329e77107de3bfae3d878014949daf07895c7": {
         "allowSend": true,
         "allowReceive": false,
         "updatedAt": "2025-10-02T08:15:30.000Z"
