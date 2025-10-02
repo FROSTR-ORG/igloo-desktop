@@ -151,7 +151,7 @@ Shares are stored as encrypted JSON in `<appData>/igloo/shares/`:
 }
 ```
 
-Encryption: PBKDF2 with 100,000 iterations, user-provided password, random salt.
+Encryption: PBKDF2 with 600,000 iterations (v1 shares), user-provided password, random salt. Legacy shares (no version field) use 32 iterations.
 
 ## Testing Strategy
 
