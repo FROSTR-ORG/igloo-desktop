@@ -29,6 +29,7 @@ interface SignerData {
 
 const App: React.FC = () => {
   const [showingCreate, setShowingCreate] = useState(false);
+  const [showingRecover, setShowingRecover] = useState(false);
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
@@ -69,6 +70,7 @@ const App: React.FC = () => {
     await signerRef.current?.stopSigner().catch(console.error);
     setSignerData(null);
     setShowingCreate(false);
+    setShowingRecover(false);
   };
 
   const handleTabChange = async (value: string) => {
@@ -83,6 +85,10 @@ const App: React.FC = () => {
     setKeysetData(null);
     setShowingNewKeyset(false);
     setShowingCreate(false);
+  };
+
+  const handleRecoverBack = () => {
+    setShowingRecover(false);
   };
 
   // Show new keyset view
@@ -112,6 +118,43 @@ const App: React.FC = () => {
             shareCredentials={keysetData.shareCredentials}
             onFinish={handleFinish}
           />
+        </ContentCard>
+      </PageLayout>
+    );
+  }
+
+  // Show standalone recovery view
+  if (showingRecover) {
+    return (
+      <PageLayout>
+        <AppHeader />
+
+        <ContentCard
+          title="Recover NSEC"
+          headerRight={
+            <div className="flex items-center gap-2">
+              <Tooltip
+                trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
+                content={
+                  <>
+                    <p className="mb-2 font-semibold">Standalone Recovery:</p>
+                    <p className="mb-2">This flow allows you to recover your nsec without loading a saved share first.</p>
+                    <p className="mb-2">Start by pasting your group credential (bfgroup...), which will determine how many shares you need.</p>
+                    <p>Then paste the required number of share credentials to reconstruct your private key.</p>
+                  </>
+                }
+              />
+              <Button
+                variant="ghost"
+                onClick={handleRecoverBack}
+                className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+              >
+                Back
+              </Button>
+            </div>
+          }
+        >
+          <Recover mode="standalone" />
         </ContentCard>
       </PageLayout>
     );
@@ -185,7 +228,7 @@ const App: React.FC = () => {
               <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
               <div className="flex items-center gap-2">
                 {hasShares && (
-                  <Tooltip 
+                  <Tooltip
                     trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer mr-2" />}
                     content={
                       <>
@@ -198,6 +241,12 @@ const App: React.FC = () => {
                     }
                   />
                 )}
+                <Button
+                  onClick={() => setShowingRecover(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-purple-100 transition-colors"
+                >
+                  Recover
+                </Button>
                 <Button
                   onClick={() => setShowingCreate(true)}
                   className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"

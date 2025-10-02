@@ -44,7 +44,7 @@ Igloo Desktop builds a keyset in-memory, lets the user fan out each share, and o
 ## Replicating the Flow in a CLI
 1. Collect keyset parameters (name, total, threshold, nsec) and validate uniqueness against `${appData}/igloo/shares/*.json` using the same naming convention.
 2. Convert `nsec` to hex and call `generateKeysetWithSecret` (or equivalent in the CLI environment) to obtain `groupCredential` and `shareCredentials`.
-3. For each share, prompt the user to set a password, derive the secret with PBKDF2-SHA256 (c=32, dkLen=32) using a random 16-byte salt, and encrypt with AES-GCM identical to `encrypt_payload`.
+3. For each share, prompt the user to set a password, derive the secret with PBKDF2-SHA256 (c=600000, dkLen=32) using a random 16-byte salt, and encrypt with AES-GCM identical to `encrypt_payload`.
 4. Persist one JSON file per share under `appData/igloo/shares/`, matching the `id` and `name` patterns so the desktop and CLI apps interoperate.
 5. Optionally, emit the plaintext share once (for copying or QR generation) and then wipe it from memory after saving.
 6. Provide a `finish` action that forgets the in-memory keyset to mirror Igloo Desktop’s ephemeral handling.
