@@ -246,7 +246,7 @@ describe('AddShare', () => {
     fireEvent.change(confirmInput, { target: { value: 'password123' } });
 
     // Click save
-    const saveButton = screen.getByRole('button', { name: /save share/i });
+    const saveButton = screen.getByRole('button', { name: /^add$/i });
     fireEvent.click(saveButton);
 
     await waitFor(() => {
@@ -283,7 +283,7 @@ describe('AddShare', () => {
       expect(screen.getByText(/passwords do not match/i)).toBeInTheDocument();
     });
 
-    const saveButton = screen.getByRole('button', { name: /save share/i });
+    const saveButton = screen.getByRole('button', { name: /^add$/i });
     expect(saveButton).toBeDisabled();
   });
 
