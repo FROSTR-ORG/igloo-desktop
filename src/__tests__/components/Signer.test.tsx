@@ -16,42 +16,6 @@ jest.mock('@/lib/signer-keepalive', () => {
   };
 });
 
-// Mock igloo-core module
-jest.mock('@frostr/igloo-core', () => {
-  const normalizePubkey = jest.fn((value?: string) => {
-    if (typeof value !== 'string') {
-      return value;
-    }
-
-    if ((value.startsWith('02') || value.startsWith('03')) && value.length === 66) {
-      return value.slice(2);
-    }
-
-    return value;
-  });
-
-  const comparePubkeys = jest.fn((a?: string, b?: string) => normalizePubkey(a) === normalizePubkey(b));
-
-  return {
-    createConnectedNode: jest.fn(),
-    cleanupBifrostNode: jest.fn(),
-    createPeerManagerRobust: jest.fn(async () => ({
-      cleanup: jest.fn(),
-    })),
-    validateShare: jest.fn(),
-    validateGroup: jest.fn(),
-    decodeShare: jest.fn(),
-    decodeGroup: jest.fn(),
-    setNodePolicies: jest.fn().mockResolvedValue([]),
-    normalizePubkey,
-    comparePubkeys,
-    extractSelfPubkeyFromCredentials: jest.fn(() => ({
-      pubkey: 'mock-pubkey',
-      warnings: [],
-    })),
-  };
-});
-
 // Get references to the mocked functions with proper typing
 import { 
   createConnectedNode,
