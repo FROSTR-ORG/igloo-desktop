@@ -543,10 +543,10 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
                 {isProcessing ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    Saving…
+                    Adding…
                   </>
                 ) : (
-                  'Save Share'
+                  'Add'
                 )}
               </Button>
             </div>
