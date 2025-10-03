@@ -16,6 +16,12 @@ interface AddShareProps {
 
 type Step = 'group' | 'share' | 'save';
 
+const normalizeShareIdentifier = (input: string): string =>
+  input
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, '_');
+
 const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
   const [currentStep, setCurrentStep] = useState<Step>('group');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -42,14 +48,20 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [isConfirmValid, setIsConfirmValid] = useState(false);
   const [confirmError, setConfirmError] = useState<string | undefined>(undefined);
-  const [existingNames, setExistingNames] = useState<string[]>([]);
+  const [existingNameKeys, setExistingNameKeys] = useState<string[]>([]);
 
   useEffect(() => {
     const loadExistingNames = async () => {
       const shares = await clientShareManager.getShares();
       if (shares) {
-        const names = shares.map(share => share.name);
-        setExistingNames(names);
+        const normalizedNames = Array.from(
+          new Set(
+            shares
+              .map(share => normalizeShareIdentifier(share.name))
+              .filter(name => name.length > 0)
+          )
+        );
+        setExistingNameKeys(normalizedNames);
       }
     };
     loadExistingNames();
@@ -143,7 +155,9 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       return;
     }
 
-    if (existingNames.includes(value)) {
+    const normalizedValue = normalizeShareIdentifier(value);
+
+    if (existingNameKeys.includes(normalizedValue)) {
       setIsNameValid(false);
       setNameError('A share with this name already exists');
       return;
@@ -226,7 +240,7 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       const encryptedShare = encrypt_payload(secret, shareCredential);
 
       // Generate ID in format matching Create flow: name_share_index
-      const shareId = `${shareName.toLowerCase().replace(/\s+/g, '_')}`;
+      const shareId = normalizeShareIdentifier(shareName);
 
       const newShare: IglooShare = {
         id: shareId,
