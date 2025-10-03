@@ -101,6 +101,14 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
   const handleGroupChange = (value: string) => {
     setGroupCredential(value);
 
+    // Reset share-related state when group changes to prevent
+    // a share validated for one group from being used with another
+    setShareCredential('');
+    setIsShareValid(false);
+    setShareError(undefined);
+    setDecodedShare(null);
+    setShareName('');
+
     if (!value.trim()) {
       setIsGroupValid(false);
       setGroupError('Group credential is required');
