@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import type { DecodedGroup, DecodedShare, IglooShare } from '@/types';
+import { secp256k1 } from '@noble/curves/secp256k1';
 
 interface AddShareProps {
   onComplete: () => void;
@@ -21,6 +22,59 @@ const normalizeShareIdentifier = (input: string): string =>
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '_');
+
+/**
+ * Validates that a share cryptographically belongs to a group by verifying
+ * the public nonces in the group's commit match the private nonces in the share.
+ *
+ * In FROST protocol: binder_pn = binder_sn * G and hidden_pn = hidden_sn * G
+ * where G is the secp256k1 generator point.
+ */
+const validateShareBelongsToGroup = (
+  decodedShare: DecodedShare,
+  decodedGroup: DecodedGroup
+): { isValid: boolean; error?: string } => {
+  try {
+    // Find the commit with matching index
+    const matchingCommit = decodedGroup.commits.find(c => c.idx === decodedShare.idx);
+
+    if (!matchingCommit) {
+      return {
+        isValid: false,
+        error: `Share index ${decodedShare.idx} does not exist in this group (valid indices: ${decodedGroup.commits.map(c => c.idx).join(', ')})`
+      };
+    }
+
+    // Verify binder nonce: binder_pn should equal binder_sn * G
+    const expectedBinderPn = secp256k1.ProjectivePoint.BASE.multiply(BigInt('0x' + decodedShare.binder_sn));
+    const actualBinderPn = secp256k1.ProjectivePoint.fromHex(matchingCommit.binder_pn);
+
+    if (!expectedBinderPn.equals(actualBinderPn)) {
+      return {
+        isValid: false,
+        error: 'Share does not cryptographically belong to this group (binder nonce mismatch)'
+      };
+    }
+
+    // Verify hidden nonce: hidden_pn should equal hidden_sn * G
+    const expectedHiddenPn = secp256k1.ProjectivePoint.BASE.multiply(BigInt('0x' + decodedShare.hidden_sn));
+    const actualHiddenPn = secp256k1.ProjectivePoint.fromHex(matchingCommit.hidden_pn);
+
+    if (!expectedHiddenPn.equals(actualHiddenPn)) {
+      return {
+        isValid: false,
+        error: 'Share does not cryptographically belong to this group (hidden nonce mismatch)'
+      };
+    }
+
+    return { isValid: true };
+  } catch (error) {
+    return {
+      isValid: false,
+      error: `Cryptographic validation failed: ${error instanceof Error ? error.message : String(error)}`
+    };
+  }
+};
 
 const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
   const [currentStep, setCurrentStep] = useState<Step>('group');
@@ -158,19 +212,18 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       const decoded = decodeShare(value);
       setDecodedShare(decoded);
 
-      // Verify share belongs to the group
+      // Verify share cryptographically belongs to the group
       if (decodedGroup) {
-        const shareIndex = decoded.idx;
-        const validIndices = decodedGroup.commits.map(c => c.idx);
+        const cryptoValidation = validateShareBelongsToGroup(decoded, decodedGroup);
 
-        if (!validIndices.includes(shareIndex)) {
+        if (!cryptoValidation.isValid) {
           setIsShareValid(false);
-          setShareError(`Share index ${shareIndex} does not belong to this group (valid indices: ${validIndices.join(', ')})`);
+          setShareError(cryptoValidation.error || 'Share does not belong to this group');
           return;
         }
 
         // Auto-populate share name based on index
-        const suggestedName = `share ${shareIndex}`;
+        const suggestedName = `share ${decoded.idx}`;
         if (!shareName) {
           setShareName(suggestedName);
           evaluateShareName(suggestedName);
