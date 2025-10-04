@@ -5,6 +5,7 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
+import { CURRENT_SHARE_VERSION } from '@/lib/encryption';
 import { CheckCircle2, QrCode, Loader2, HelpCircle, ChevronDown, ChevronRight } from 'lucide-react';
 import ConfirmModal from './ui/ConfirmModal';
 import { QRCodeSVG } from 'qrcode.react';
@@ -54,7 +55,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     if (showSaveDialog.shareIndex === null) return;
 
     const decodedShare = decodedShares[showSaveDialog.shareIndex];
-    
+
     // Create a share object to save
     const share = {
       id: `${name}_share_${decodedShare?.idx || showSaveDialog.shareIndex + 1}`,
@@ -62,7 +63,18 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       share: encryptedShare,
       salt,
       groupCredential,
-      savedAt: new Date().toISOString()
+      version: CURRENT_SHARE_VERSION,
+      savedAt: new Date().toISOString(),
+      metadata: {
+        binder_sn: decodedShare?.binder_sn,
+      },
+      policy: {
+        defaults: {
+          allowSend: true,
+          allowReceive: true
+        },
+        updatedAt: new Date().toISOString()
+      }
     };
 
     // Save the share

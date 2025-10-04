@@ -11,9 +11,25 @@ interface IglooShare {
   id: string;
   name: string;
   share: string;
+  salt: string;
   groupCredential: string;
-  createdAt: string;
+  version?: number;
+  createdAt?: string;
   lastUsed?: string;
+  savedAt?: string;
+  metadata?: Record<string, unknown>;
+  policy?: {
+    defaults: {
+      allowSend: boolean;
+      allowReceive: boolean;
+    };
+    peers?: Record<string, {
+      allowSend: boolean;
+      allowReceive: boolean;
+      updatedAt?: string;
+    }>;
+    updatedAt?: string;
+  };
 }
 
 /**

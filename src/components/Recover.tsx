@@ -11,6 +11,7 @@ interface RecoverProps {
   initialGroupCredential?: string;
   defaultThreshold?: number;
   defaultTotalShares?: number;
+  mode?: "standalone" | "preloaded";
 }
 
 // Enable debugging for troubleshooting group auto-population issues
@@ -153,12 +154,14 @@ const processAndSetGroupCredential = (
   }
 };
 
-const Recover: React.FC<RecoverProps> = ({ 
+const Recover: React.FC<RecoverProps> = ({
   initialShare,
   initialGroupCredential,
   defaultThreshold = 2,
-  defaultTotalShares = 3
+  defaultTotalShares = 3,
+  mode = "preloaded"
 }) => {
+  const isStandalone = mode === "standalone";
   // State for t of n shares
   const [sharesInputs, setSharesInputs] = useState<string[]>([initialShare || ""]);
   const [sharesValidity, setSharesValidity] = useState<{ isValid: boolean; message?: string }[]>([{ isValid: false }]);
@@ -209,46 +212,56 @@ const Recover: React.FC<RecoverProps> = ({
 
   // Add useEffect to check for initialShare changes and extract from it
   useEffect(() => {
+    // Skip auto-population in standalone mode
+    if (isStandalone) {
+      return;
+    }
+
     if (initialShare) {
       // Update the share input UI
       setSharesInputs([initialShare]);
       const validation = validateShare(initialShare);
       setSharesValidity([validation]);
-      
+
       // Use the utility function to find matching group
       const populateGroup = async () => {
         const matchingGroup = await findMatchingGroup(initialShare);
-        
+
         if (matchingGroup) {
           processGroupCredential(matchingGroup, true);
         }
       };
-      
+
       populateGroup();
     }
-    
+
     // Handle initialGroupCredential if provided
     if (initialGroupCredential) {
       processGroupCredential(initialGroupCredential, false);
     }
-  }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares, processGroupCredential]);
+  }, [initialShare, initialGroupCredential, defaultThreshold, defaultTotalShares, processGroupCredential, isStandalone]);
 
   // Add useEffect to check for stored shares on component mount
   useEffect(() => {
+    // Skip auto-detection in standalone mode
+    if (isStandalone) {
+      return;
+    }
+
     const autoDetectGroupFromStorage = async () => {
       // If we already have shares or group, no need to auto-detect
       if (sharesInputs.some(s => s.trim()) || groupCredential.trim()) {
         return;
       }
-      
+
       try {
         // Try to find a recent share with group information
         const shares = await clientShareManager.getShares();
-        
+
         if (DEBUG_AUTO_POPULATE) {
           console.log("Checking for stored shares on mount:", Array.isArray(shares) ? shares.length : 0);
         }
-        
+
         if (shares && Array.isArray(shares) && shares.length > 0) {
           // Sort by savedAt date if available
           const sortedShares = [...shares].sort((a, b) => {
@@ -257,18 +270,18 @@ const Recover: React.FC<RecoverProps> = ({
             }
             return 0;
           });
-          
+
           // Find the most recent share with both group and share
-          const firstValidShare = sortedShares.find(s => 
-            s.shareCredential && s.shareCredential.trim() && 
+          const firstValidShare = sortedShares.find(s =>
+            s.shareCredential && s.shareCredential.trim() &&
             s.groupCredential && s.groupCredential.trim()
           );
-          
+
           if (firstValidShare) {
             if (DEBUG_AUTO_POPULATE) {
               console.log("Found recent share with group on mount:", firstValidShare.id);
             }
-            
+
             // Set the share
             if (firstValidShare.shareCredential) {
               const shareValidation = validateShare(firstValidShare.shareCredential);
@@ -277,7 +290,7 @@ const Recover: React.FC<RecoverProps> = ({
                 setSharesValidity([shareValidation]);
               }
             }
-            
+
             // Set the group
             if (firstValidShare.groupCredential) {
               const groupValidation = validateGroup(firstValidShare.groupCredential);
@@ -293,9 +306,9 @@ const Recover: React.FC<RecoverProps> = ({
         }
       }
     };
-    
+
     autoDetectGroupFromStorage();
-  }, [defaultThreshold, defaultTotalShares, groupCredential, sharesInputs, processGroupCredential]);
+  }, [defaultThreshold, defaultTotalShares, groupCredential, sharesInputs, processGroupCredential, isStandalone]);
 
   // Handle adding more share inputs
   const addShareInput = () => {
@@ -347,8 +360,8 @@ const Recover: React.FC<RecoverProps> = ({
           return;
         }
         
-        // Auto-populate group if not already set
-        if (!groupCredential.trim()) {
+        // Auto-populate group if not already set (skip in standalone mode)
+        if (!isStandalone && !groupCredential.trim()) {
           // Use the utility function for group lookup
           findMatchingGroup(value).then(matchingGroup => {
             if (matchingGroup) {
@@ -487,30 +500,46 @@ const Recover: React.FC<RecoverProps> = ({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center mt-6">
-        <h2 className="text-blue-300 text-lg">Recover NSEC</h2>
-        <Tooltip 
-          trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
-          position="right"
-          content={
-            <>
-              <p className="mb-2 font-semibold">NSEC Recovery:</p>
-              <p className="mb-2">You need to input the threshold number of shares to recover your Nostr private key (nsec). For example, if your keyset was created with a 2-of-3 setup, you need any 2 of the 3 shares.</p>
-              <p className="mb-2">One share has already been loaded from your current signer session and added to the form below.</p>
-              <p>Once you have enough valid shares, click "Recover NSEC" to reconstruct your private key.</p>
-            </>
-          }
-        />
-      </div>
+      {!isStandalone && (
+        <div className="flex items-center mt-6">
+          <h2 className="text-blue-300 text-lg">Recover NSEC</h2>
+          <Tooltip
+            trigger={<HelpCircle size={18} className="ml-2 text-blue-400 cursor-pointer" />}
+            position="right"
+            content={
+              <>
+                <p className="mb-2 font-semibold">NSEC Recovery:</p>
+                <p className="mb-2">You need to input the threshold number of shares to recover your Nostr private key (nsec). For example, if your keyset was created with a 2-of-3 setup, you need any 2 of the 3 shares.</p>
+                <p className="mb-2">One share has already been loaded from your current signer session and added to the form below.</p>
+                <p>Once you have enough valid shares, click &quot;Recover NSEC&quot; to reconstruct your private key.</p>
+              </>
+            }
+          />
+        </div>
+      )}
+
+      {isStandalone && (
+        <div className="bg-blue-900/20 border border-blue-700/30 rounded-lg p-4 mb-4">
+          <h3 className="text-blue-300 font-medium mb-2">How to Recover</h3>
+          <ol className="list-decimal list-inside space-y-1 text-sm text-blue-200">
+            <li>Paste your group credential (bfgroup...) below</li>
+            <li>The threshold will be automatically detected from your group</li>
+            <li>Enter the required number of share credentials</li>
+            <li>Click &quot;Recover NSEC&quot; to reconstruct your private key</li>
+          </ol>
+        </div>
+      )}
       
       <form onSubmit={handleSubmit}>
         <div className="space-y-4">
-          <div className="bg-gray-800/50 p-4 rounded-lg">
-            <div className="text-sm text-blue-300 mb-2">Recovery Requirements:</div>
-            <div className="text-sm text-blue-200">
-              You need {currentThreshold} out of {currentTotalShares} shares to recover your NSEC
+          {(!isStandalone || isGroupValid) && (
+            <div className="bg-gray-800/50 p-4 rounded-lg">
+              <div className="text-sm text-blue-300 mb-2">Recovery Requirements:</div>
+              <div className="text-sm text-blue-200">
+                You need {currentThreshold} out of {currentTotalShares} shares to recover your NSEC
+              </div>
             </div>
-          </div>
+          )}
 
           <InputWithValidation
             label={
@@ -533,41 +562,43 @@ const Recover: React.FC<RecoverProps> = ({
             className="w-full"
           />
 
-          <div className="space-y-3 w-full">
-            <div className="text-blue-200 text-sm font-medium">Share Credentials:</div>
-            {sharesInputs.map((share, index) => (
-              <div key={index} className="flex gap-2 w-full">
-                <InputWithValidation
-                  placeholder={`Enter share ${index + 1} (bfshare1...)`}
-                  value={share}
-                  onChange={(value) => updateShareInput(index, value)}
-                  isValid={sharesValidity[index]?.isValid}
-                  errorMessage={sharesValidity[index]?.message}
-                  className="flex-1 w-full"
-                  disabled={isProcessing}
-                  isRequired={true}
-                />
+          {(!isStandalone || isGroupValid) && (
+            <div className="space-y-3 w-full">
+              <div className="text-blue-200 text-sm font-medium">Share Credentials:</div>
+              {sharesInputs.map((share, index) => (
+                <div key={index} className="flex gap-2 w-full">
+                  <InputWithValidation
+                    placeholder={`Enter share ${index + 1} (bfshare1...)`}
+                    value={share}
+                    onChange={(value) => updateShareInput(index, value)}
+                    isValid={sharesValidity[index]?.isValid}
+                    errorMessage={sharesValidity[index]?.message}
+                    className="flex-1 w-full"
+                    disabled={isProcessing}
+                    isRequired={true}
+                  />
+                  <Button
+                    type="button"
+                    onClick={() => removeShareInput(index)}
+                    className="bg-red-900/30 hover:bg-red-800/50 text-red-300 px-2"
+                    disabled={isProcessing || sharesInputs.length <= 1}
+                  >
+                    ✕
+                  </Button>
+                </div>
+              ))}
+              {sharesInputs.length < currentThreshold && (
                 <Button
                   type="button"
-                  onClick={() => removeShareInput(index)}
-                  className="bg-red-900/30 hover:bg-red-800/50 text-red-300 px-2"
-                  disabled={isProcessing || sharesInputs.length <= 1}
+                  onClick={addShareInput}
+                  className="w-full mt-2 bg-blue-600/30 hover:bg-blue-700/30"
+                  disabled={isProcessing}
                 >
-                  ✕
+                  Add Share Input ({sharesInputs.length}/{currentThreshold})
                 </Button>
-              </div>
-            ))}
-            {sharesInputs.length < currentThreshold && (
-              <Button
-                type="button"
-                onClick={addShareInput}
-                className="w-full mt-2 bg-blue-600/30 hover:bg-blue-700/30"
-                disabled={isProcessing}
-              >
-                Add Share Input ({sharesInputs.length}/{currentThreshold})
-              </Button>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="mt-6">

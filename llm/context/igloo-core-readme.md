@@ -314,17 +314,20 @@ try {
 }
 ```
 
-#### `sendEcho(groupCredential, shareCredential, options?)` 
+#### `sendEcho(groupCredential, shareCredential, challenge, options?)` 
 
 Send an echo signal to notify other devices that a share has been imported.
 
 ```typescript
 import { sendEcho } from '@frostr/igloo-core';
+import { randomBytes } from 'crypto';
 
 try {
+  const challenge = randomBytes(32).toString('hex'); // 32-byte (64 hex char) challenge
   const sent = await sendEcho(
     groupCredential,
     shareCredential,
+    challenge,
     {
       relays: ['wss://relay.damus.io'],
       timeout: 10000
@@ -336,6 +339,7 @@ try {
 }
 ```
 
+`challenge` must be an even-length hexadecimal string (32 bytes / 64 hex characters recommended).
 #### `startListeningForAllEchoes(groupCredential, shareCredentials, callback, options?)`
 
 Starts listening for echo events on all shares in a keyset.
@@ -1000,7 +1004,7 @@ export function setupNodeEvents(node: BifrostNode, config: NodeEventConfig): voi
 // Echo functions
 export function awaitShareEcho(groupCredential: string, shareCredential: string, options?: EchoOptions): Promise<boolean>
 export function startListeningForAllEchoes(groupCredential: string, shareCredentials: string[], callback: EchoReceivedCallback, options?: EchoOptions): EchoListener
-export function sendEcho(groupCredential: string, shareCredential: string, options?: EchoOptions): Promise<boolean>
+export function sendEcho(groupCredential: string, shareCredential: string, challenge: string, options?: EchoOptions): Promise<boolean>
 export const DEFAULT_ECHO_RELAYS: string[]
 
 // Nostr functions

@@ -3,6 +3,8 @@ Frostr keyset manager and remote signer for secure distributed key management.
 
 Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key management protocol for nostr, using the powers of FROST (Flexible Round-Optimized Schnorr Threshold signatures).
 
+Igloo focuses on splitting your nsec into shares and operating as the remote signer in that workflow. It does not initiate signing requests itself; pair it with other FROSTR clients—like Frost2x, the NIP-07 browser extension, or igloo-server for NIP-46—to kick off signing sessions. Explore the full companion app list at [frostr.org/apps](https://frostr.org/apps).
+
 ## Table of Contents
 - [Features](#features)
   - [Core Functionality](#core-functionality)
@@ -43,21 +45,6 @@ Igloo is part of the FROSTR ecosystem - a k-of-n remote signing and key manageme
 - **🛡️ Input Validation**: Comprehensive validation for shares, keys, relays, and hex inputs
 - **🔄 Node Lifecycle**: Robust connection management and cleanup procedures
 - **🔐 End-to-End Encryption**: Secure communication between signing nodes over nostr
-
-### Developer Experience
-- **🧪 Comprehensive Testing**: Desktop-specific test suite covering workflows and integration
-- **📦 Modern Build Pipeline**: Automated releases with GPG signing and checksums
-- **📚 Clear Documentation**: Detailed FAQ and user guides
-- **🔧 Development Tools**: Hot reload and debugging support
-
-## Recent Improvements
-
-- **🎯 Architecture Migration**: Moved all core cryptographic logic to `@frostr/igloo-core` library
-- **🔧 Enhanced Reliability**: Fixed race conditions in node connection and cleanup
-- **📦 Simplified Codebase**: Desktop app now focuses on UI/UX while core logic is centralized
-- **🧪 Improved Testing**: New desktop-specific test suite covering Electron integration and workflows
-- **⚡ Better Performance**: Cleaner APIs and more efficient node lifecycle management
-- **📉 Reduced Complexity**: Eliminated ~400+ lines of duplicated logic
 
 ## Installation
 
@@ -151,14 +138,6 @@ Recover: Use threshold of shares in keyset to recover nsec.
 
 Igloo implements the FROSTR protocol, which uses Shamir Secret Sharing to break up your nsec into "shares" and a hyper-optimized version of FROST to coordinate signing of messages.
 
-### Architecture
-
-Igloo uses a **hybrid architecture** for maximum reliability and maintainability:
-
-- **🖥️ Desktop App (Igloo)**: Focuses on user interface, file management, and Electron-specific features
-- **📚 Core Library (@frostr/igloo-core)**: Handles all cryptographic operations, validation, and node management
-- **🔗 Shared Logic**: Ensures consistency across all FROSTR applications (desktop, web, mobile)
-
 ### Workflow
 
 The workflow is simple:
@@ -229,7 +208,6 @@ You should rotate your shares if:
 - Your npub doesn't change - maintain your existing nostr identity
 - Your signatures remain unchanged - nobody knows you're using multi-sig
 - End-to-end encrypted communication between signing nodes
-
 
 
 

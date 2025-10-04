@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { bytesToHex } from '@noble/hashes/utils';
-import { derive_secret, encrypt_payload } from '@/lib/encryption';
+import { derive_secret_async, encrypt_payload } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
+import { Loader2 } from 'lucide-react';
 
 interface SaveShareProps {
   onSave?: (password: string, salt: string, encryptedShare: string) => void;
@@ -74,13 +75,15 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt 
     }
     
     setIsSubmitting(true);
+    // Allow the UI to render the loading state before doing CPU-heavy work
+    await new Promise<void>(resolve => setTimeout(resolve, 0));
     
     try {
       // Generate a random salt
       const salt = generateSalt();
       
-      // Derive encryption key from password and salt
-      const secret = derive_secret(password, salt);
+      // Derive encryption key from password and salt (async to avoid blocking UI)
+      const secret = await derive_secret_async(password, salt);
       
       // Encrypt the share
       const encryptedShare = encrypt_payload(secret, shareToEncrypt);
@@ -103,7 +106,13 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt 
   };
 
   return (
-    <div className="bg-gray-900 border border-blue-900/50 rounded-lg p-6 shadow-xl backdrop-blur-sm">
+    <div className="relative bg-gray-900 border border-blue-900/50 rounded-lg p-6 shadow-xl backdrop-blur-sm">
+      {isSubmitting && (
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-lg bg-gray-950/70 backdrop-blur-sm">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-300" />
+          <span className="text-sm font-medium text-blue-200">Encrypting share…</span>
+        </div>
+      )}
       <h2 className="text-xl font-semibold text-blue-300 mb-4">Save Share</h2>
       
       <form onSubmit={handleSubmit} className="space-y-4">
@@ -147,8 +156,16 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt 
             type="submit"
             className="flex-1 bg-blue-600 hover:bg-blue-700 text-blue-100"
             disabled={isSubmitting || !isPasswordValid || !isConfirmValid || !shareToEncrypt}
+            aria-busy={isSubmitting}
           >
-            {isSubmitting ? "Saving..." : "Save Share"}
+            {isSubmitting ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                Saving…
+              </span>
+            ) : (
+              "Save Share"
+            )}
           </Button>
         </div>
       </form>
