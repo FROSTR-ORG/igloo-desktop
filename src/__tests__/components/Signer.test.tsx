@@ -3,17 +3,18 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Signer from '../../components/Signer';
 
-// Mock igloo-core module
-jest.mock('@frostr/igloo-core', () => ({
-  createConnectedNode: jest.fn(),
-  cleanupBifrostNode: jest.fn(),
-  validateShare: jest.fn(),
-  validateGroup: jest.fn(),
-  decodeShare: jest.fn(),
-  decodeGroup: jest.fn(),
-  setNodePolicies: jest.fn().mockResolvedValue([]),
-  normalizePubkey: jest.fn((value: string) => value?.toLowerCase?.() ?? value),
-}));
+// Mock signer keepalive to avoid timers and side effects in tests
+jest.mock('@/lib/signer-keepalive', () => {
+  const handle = {
+    start: jest.fn(),
+    stop: jest.fn(),
+    onReplace: jest.fn(),
+  };
+
+  return {
+    createSignerKeepAlive: jest.fn(() => handle),
+  };
+});
 
 // Get references to the mocked functions with proper typing
 import { 
@@ -23,6 +24,7 @@ import {
   validateGroup,
   decodeShare,
   decodeGroup,
+  extractSelfPubkeyFromCredentials,
 } from '@frostr/igloo-core';
 
 const mockCreateConnectedNode = createConnectedNode as jest.MockedFunction<typeof createConnectedNode>;
@@ -32,6 +34,7 @@ const mockValidateShare = validateShare as jest.MockedFunction<typeof validateSh
 const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGroup>;
 const mockDecodeShare = decodeShare as jest.MockedFunction<typeof decodeShare>;
 const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
+const mockExtractSelfPubkeyFromCredentials = extractSelfPubkeyFromCredentials as jest.MockedFunction<typeof extractSelfPubkeyFromCredentials>;
 
 describe('Signer Component UI Tests', () => {
   const mockNode = {
@@ -65,6 +68,7 @@ describe('Signer Component UI Tests', () => {
       node: mockNode, // Type should be inferred from proper mock setup
       state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
     });
+    mockExtractSelfPubkeyFromCredentials.mockReturnValue({ pubkey: 'mock-pubkey', warnings: [] });
   });
 
   describe('Component Rendering and UI Elements', () => {

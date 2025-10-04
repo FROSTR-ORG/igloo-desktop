@@ -55,7 +55,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     if (showSaveDialog.shareIndex === null) return;
 
     const decodedShare = decodedShares[showSaveDialog.shareIndex];
-    
+
     // Create a share object to save
     const share = {
       id: `${name}_share_${decodedShare?.idx || showSaveDialog.shareIndex + 1}`,
@@ -65,6 +65,9 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       groupCredential,
       version: CURRENT_SHARE_VERSION,
       savedAt: new Date().toISOString(),
+      metadata: {
+        binder_sn: decodedShare?.binder_sn,
+      },
       policy: {
         defaults: {
           allowSend: true,
