@@ -293,7 +293,7 @@ const App: React.FC = () => {
                   className="bg-green-600 hover:bg-green-700 text-green-100 transition-colors"
                 >
                   <Upload className="w-4 h-4 mr-2" />
-                  Add Share
+                  Add
                 </Button>
                 <Button
                   onClick={() => setShowingRecover(true)}
