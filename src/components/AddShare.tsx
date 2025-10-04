@@ -219,6 +219,7 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
         if (!cryptoValidation.isValid) {
           setIsShareValid(false);
           setShareError(cryptoValidation.error || 'Share does not belong to this group');
+          setDecodedShare(null);
           return;
         }
 
