@@ -5,6 +5,10 @@ import { TextEncoder, TextDecoder } from 'util';
 global.TextEncoder = TextEncoder;
 global.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 
+// Provide a mock for the ESM-only @cmdcode/buff package used in encryption helpers
+import { setupBuffMock } from './__mocks__/buff.mock';
+setupBuffMock();
+
 // Mock Electron globally for all tests
 global.window = Object.create(window);
 const mockIpcRenderer = {
@@ -29,22 +33,49 @@ jest.mock('electron', () => ({
 }));
 
 // Mock igloo-core module
-jest.mock('@frostr/igloo-core', () => ({
-  generateKeysetWithSecret: jest.fn(),
-  validateShare: jest.fn(),
-  validateGroup: jest.fn(),
-  decodeShare: jest.fn(),
-  decodeGroup: jest.fn(),
-  validateRelay: jest.fn(),
-  createConnectedNode: jest.fn(),
-  recoverSecretKeyFromCredentials: jest.fn(),
-  startListeningForAllEchoes: jest.fn(),
-  cleanupBifrostNode: jest.fn(),
-  isNodeReady: jest.fn(),
-  generateNostrKeyPair: jest.fn(),
-  nsecToHex: jest.fn(),
-  validateNsec: jest.fn(),
-}));
+jest.mock('@frostr/igloo-core', () => {
+  const normalizePubkey = jest.fn((value?: string) => {
+    if (typeof value !== 'string') {
+      return value;
+    }
+
+    if ((value.startsWith('02') || value.startsWith('03')) && value.length === 66) {
+      return value.slice(2);
+    }
+
+    return value;
+  });
+
+  const comparePubkeys = jest.fn((a?: string, b?: string) => normalizePubkey(a) === normalizePubkey(b));
+
+  return {
+    generateKeysetWithSecret: jest.fn(),
+    validateShare: jest.fn(),
+    validateGroup: jest.fn(),
+    decodeShare: jest.fn(),
+    decodeGroup: jest.fn(),
+    validateRelay: jest.fn(),
+    createConnectedNode: jest.fn(),
+    createPeerManagerRobust: jest.fn(async () => ({
+      cleanup: jest.fn(),
+    })),
+    recoverSecretKeyFromCredentials: jest.fn(),
+    startListeningForAllEchoes: jest.fn(),
+    sendEcho: jest.fn().mockResolvedValue(true),
+    DEFAULT_ECHO_RELAYS: ['wss://relay.damus.io', 'wss://relay.primal.net'],
+    cleanupBifrostNode: jest.fn(),
+    isNodeReady: jest.fn(),
+    generateNostrKeyPair: jest.fn(),
+    nsecToHex: jest.fn(),
+    validateNsec: jest.fn(),
+    normalizePubkey,
+    comparePubkeys,
+    extractSelfPubkeyFromCredentials: jest.fn(() => ({
+      pubkey: 'mock-pubkey',
+      warnings: [],
+    })),
+  };
+});
 
 // Suppress console logs during tests unless needed
 const originalConsoleLog = console.log;
