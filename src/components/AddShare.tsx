@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { validateGroup, decodeGroup, validateShare, decodeShare } from '@frostr/igloo-core';
+import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho, DEFAULT_ECHO_RELAYS } from '@frostr/igloo-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { derive_secret_async, encrypt_payload, CURRENT_SHARE_VERSION } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
@@ -22,6 +22,16 @@ const normalizeShareIdentifier = (input: string): string =>
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '_');
+
+const buildEchoRelayList = (groupRelays?: string[]): string[] => {
+  const sanitizedGroupRelays = Array.isArray(groupRelays)
+    ? groupRelays.filter(relay => typeof relay === 'string' && relay.trim().length > 0)
+    : [];
+
+  // Always include defaults so the local device can observe its own echo even if the group
+  // specifies custom relays. Use a Set to preserve order while avoiding duplicates.
+  return Array.from(new Set([...sanitizedGroupRelays, ...DEFAULT_ECHO_RELAYS]));
+};
 
 /**
  * Validates that a share cryptographically belongs to a group by verifying
@@ -372,6 +382,25 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       const success = await clientShareManager.saveShare(newShare);
 
       if (success) {
+        try {
+          // Generate random 32-byte challenge (64 hex characters) for the echo handshake
+          const challengeBytes = new Uint8Array(32);
+          crypto.getRandomValues(challengeBytes);
+          const challenge = bytesToHex(challengeBytes);
+
+          const relays = buildEchoRelayList(decodedGroup?.relays);
+
+          await sendEcho(groupCredential, shareCredential, challenge, {
+            relays,
+            timeout: 10000,
+          });
+
+          console.log('Echo sent successfully');
+        } catch (echoError) {
+          console.error('Failed to send echo after saving share:', echoError);
+          // Don't block save flow, just log the error
+        }
+
         onComplete();
       } else {
         setPasswordError('Failed to save share to disk');
