@@ -61,6 +61,8 @@ jest.mock('@frostr/igloo-core', () => {
     })),
     recoverSecretKeyFromCredentials: jest.fn(),
     startListeningForAllEchoes: jest.fn(),
+    sendEcho: jest.fn().mockResolvedValue(true),
+    DEFAULT_ECHO_RELAYS: ['wss://relay.damus.io', 'wss://relay.primal.net'],
     cleanupBifrostNode: jest.fn(),
     isNodeReady: jest.fn(),
     generateNostrKeyPair: jest.fn(),

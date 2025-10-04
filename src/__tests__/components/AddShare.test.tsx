@@ -11,9 +11,10 @@ import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import AddShare from '@/components/AddShare';
-import { validateGroup, decodeGroup, validateShare, decodeShare } from '@frostr/igloo-core';
+import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho, DEFAULT_ECHO_RELAYS } from '@frostr/igloo-core';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { derive_secret_async, encrypt_payload } from '@/lib/encryption';
+import { secp256k1 } from '@noble/curves/secp256k1';
 
 const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGroup>;
 const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
@@ -23,26 +24,46 @@ const mockGetShares = clientShareManager.getShares as jest.MockedFunction<typeof
 const mockSaveShare = clientShareManager.saveShare as jest.MockedFunction<typeof clientShareManager.saveShare>;
 const mockDeriveSecretAsync = derive_secret_async as jest.MockedFunction<typeof derive_secret_async>;
 const mockEncryptPayload = encrypt_payload as jest.MockedFunction<typeof encrypt_payload>;
+const mockSendEcho = sendEcho as jest.MockedFunction<typeof sendEcho>;
 
 describe('AddShare', () => {
   const mockOnComplete = jest.fn();
   const mockOnCancel = jest.fn();
 
+  const toScalarHex = (seed: number) => seed.toString(16).padStart(64, '0');
+
+  const shareCryptoFixtures = [0, 1, 2].map(index => {
+    const binderScalar = toScalarHex(index + 1);
+    const hiddenScalar = toScalarHex(index + 11);
+
+    return {
+      index,
+      binderScalar,
+      hiddenScalar,
+      binderPn: secp256k1.ProjectivePoint.BASE.multiply(BigInt('0x' + binderScalar)).toHex(),
+      hiddenPn: secp256k1.ProjectivePoint.BASE.multiply(BigInt('0x' + hiddenScalar)).toHex(),
+    };
+  });
+
   const mockDecodedGroup = {
     threshold: 2,
     group_pk: 'mock-group-pk',
-    commits: [
-      { idx: 0, pubkey: 'pubkey0', hidden_pn: 'hidden0', binder_pn: 'binder0' },
-      { idx: 1, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
-      { idx: 2, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' },
-    ],
+    relays: ['wss://relay.custom.io'],
+    commits: shareCryptoFixtures.map(fixture => ({
+      idx: fixture.index,
+      pubkey: `pubkey${fixture.index}`,
+      hidden_pn: fixture.hiddenPn,
+      binder_pn: fixture.binderPn,
+    })),
   };
 
+  const shareFixture = shareCryptoFixtures.find(fixture => fixture.index === 1)!;
+
   const mockDecodedShare = {
-    binder_sn: 'abc12345678',
-    hidden_sn: 'hidden-sn',
-    idx: 1,
-    seckey: 'seckey',
+    binder_sn: shareFixture.binderScalar,
+    hidden_sn: shareFixture.hiddenScalar,
+    idx: shareFixture.index,
+    seckey: 'f'.repeat(64),
   };
 
   beforeEach(() => {
@@ -52,6 +73,7 @@ describe('AddShare', () => {
     // Mock encryption functions
     mockDeriveSecretAsync.mockResolvedValue('mock-secret');
     mockEncryptPayload.mockReturnValue('mock-encrypted');
+    mockSendEcho.mockResolvedValue(true);
   });
 
   it('renders step 1 (group credential input) initially', () => {
@@ -183,7 +205,7 @@ describe('AddShare', () => {
     fireEvent.change(shareInput, { target: { value: 'bfshare1test' } });
 
     await waitFor(() => {
-      expect(screen.getByText(/share index 99 does not belong to this group/i)).toBeInTheDocument();
+      expect(screen.getByText(/share index 99 does not exist in this group/i)).toBeInTheDocument();
     });
   });
 
@@ -252,6 +274,21 @@ describe('AddShare', () => {
     await waitFor(() => {
       expect(mockSaveShare).toHaveBeenCalled();
       expect(mockOnComplete).toHaveBeenCalled();
+    });
+
+    const expectedRelays = Array.from(new Set([...(mockDecodedGroup.relays ?? []), ...DEFAULT_ECHO_RELAYS]));
+
+    await waitFor(() => {
+      expect(mockSendEcho).toHaveBeenCalledTimes(1);
+      expect(mockSendEcho).toHaveBeenCalledWith(
+        'bfgroup1test',
+        'bfshare1test',
+        expect.stringMatching(/^[0-9a-f]{64}$/i),
+        expect.objectContaining({
+          relays: expectedRelays,
+          timeout: 10000,
+        })
+      );
     });
   });
 
