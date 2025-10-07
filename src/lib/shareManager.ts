@@ -1,10 +1,6 @@
-// Import electron and node modules
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const electron = require('electron');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const fsModule = require('fs');
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const pathModule = require('path');
+import { app } from 'electron';
+import fs from 'fs';
+import path from 'path';
 
 // Local type definition to avoid ES module imports
 interface IglooShare {
@@ -40,8 +36,8 @@ class ShareManager {
 
   constructor() {
     // Get the standardized application data directory
-    const appDataPath = electron.app.getPath('appData');
-    this.sharesPath = pathModule.join(appDataPath, 'igloo', 'shares');
+    const appDataPath = app.getPath('appData');
+    this.sharesPath = path.join(appDataPath, 'igloo', 'shares');
     
     // Ensure the shares directory exists
     this.ensureSharesDirectory();
@@ -53,22 +49,22 @@ class ShareManager {
    * @returns The full file path
    */
   getSharePath(shareId: string): string {
-    return pathModule.join(this.sharesPath, `${shareId}.json`);
+    return path.join(this.sharesPath, `${shareId}.json`);
   }
 
   /**
    * Create the shares directory if it doesn't exist
    */
   private ensureSharesDirectory(): void {
-    const iglooDir = pathModule.join(electron.app.getPath('appData'), 'igloo');
+    const iglooDir = path.join(app.getPath('appData'), 'igloo');
     
     try {
-      if (!fsModule.existsSync(iglooDir)) {
-        fsModule.mkdirSync(iglooDir);
+      if (!fs.existsSync(iglooDir)) {
+        fs.mkdirSync(iglooDir);
       }
       
-      if (!fsModule.existsSync(this.sharesPath)) {
-        fsModule.mkdirSync(this.sharesPath);
+      if (!fs.existsSync(this.sharesPath)) {
+        fs.mkdirSync(this.sharesPath);
       }
     } catch (error) {
       console.error('Failed to create shares directory:', error);
@@ -82,12 +78,12 @@ class ShareManager {
   getShares(): IglooShare[] | false {
     try {
       // Check if the directory exists
-      if (!fsModule.existsSync(this.sharesPath)) {
+      if (!fs.existsSync(this.sharesPath)) {
         return false;
       }
 
       // Get all files in the shares directory
-      const files = fsModule.readdirSync(this.sharesPath)
+      const files = fs.readdirSync(this.sharesPath)
         .filter((file: string) => file.endsWith('.json'));
 
       // If no share files found
@@ -99,8 +95,8 @@ class ShareManager {
       const shares: IglooShare[] = [];
       
       for (const file of files) {
-        const filePath = pathModule.join(this.sharesPath, file);
-        const fileContent = fsModule.readFileSync(filePath, 'utf8');
+        const filePath = path.join(this.sharesPath, file);
+        const fileContent = fs.readFileSync(filePath, 'utf8');
         
         try {
           const share = JSON.parse(fileContent) as IglooShare;
@@ -130,8 +126,8 @@ class ShareManager {
         return false;
       }
 
-      const filePath = pathModule.join(this.sharesPath, `${share.id}.json`);
-      fsModule.writeFileSync(filePath, JSON.stringify(share, null, 2));
+      const filePath = path.join(this.sharesPath, `${share.id}.json`);
+      fs.writeFileSync(filePath, JSON.stringify(share, null, 2));
       return true;
     } catch (error) {
       console.error('Failed to save share:', error);
@@ -146,13 +142,13 @@ class ShareManager {
    */
   deleteShare(shareId: string): boolean {
     try {
-      const filePath = pathModule.join(this.sharesPath, `${shareId}.json`);
+      const filePath = path.join(this.sharesPath, `${shareId}.json`);
       
-      if (!fsModule.existsSync(filePath)) {
+      if (!fs.existsSync(filePath)) {
         return false;
       }
       
-      fsModule.unlinkSync(filePath);
+      fs.unlinkSync(filePath);
       return true;
     } catch (error) {
       console.error('Failed to delete share:', error);
@@ -170,5 +166,4 @@ function getAllShares(): IglooShare[] | false {
   return shareManager.getShares();
 }
 
-// Export the ShareManager class and helper functions
-module.exports = { ShareManager, getAllShares }; 
+export { ShareManager, getAllShares };
