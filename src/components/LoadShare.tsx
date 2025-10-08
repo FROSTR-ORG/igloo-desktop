@@ -54,16 +54,20 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
     
     try {
       // Determine iteration count based on share version (fallback for legacy data)
-      const targetIterations = (() => {
-        switch (share.version) {
-          case 1:
-            return PBKDF2_ITERATIONS_V1;
-          case CURRENT_SHARE_VERSION:
-            return PBKDF2_ITERATIONS_DEFAULT;
-          default:
-            return PBKDF2_ITERATIONS_LEGACY;
-        }
-      })();
+      let targetIterations: number;
+
+      if (share.version == null) {
+        targetIterations = PBKDF2_ITERATIONS_LEGACY;
+      } else if (share.version === 1) {
+        targetIterations = PBKDF2_ITERATIONS_V1;
+      } else if (share.version === CURRENT_SHARE_VERSION) {
+        targetIterations = PBKDF2_ITERATIONS_DEFAULT;
+      } else {
+        setIsPasswordValid(false);
+        setPasswordError(`Unsupported share version ${share.version}. Please upgrade Igloo Desktop to open this share.`);
+        setIsSubmitting(false);
+        return;
+      }
 
       // Derive key from password and stored salt
       await new Promise<void>(resolve => setTimeout(resolve, 0));
