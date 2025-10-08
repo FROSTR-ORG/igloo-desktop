@@ -1241,3 +1241,4 @@ We welcome contributions to `@frostr/igloo-core`! Please see our [GitHub reposit
 ## License
 
 MIT 
+
