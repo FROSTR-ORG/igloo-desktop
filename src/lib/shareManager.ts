@@ -33,14 +33,17 @@ interface IglooShare {
  */
 class ShareManager {
   private sharesPath: string;
+  private ready: Promise<void>;
+
+  private static readonly SHARE_ID_PATTERN = /^[A-Za-z0-9._-]+$/;
 
   constructor() {
     // Get the standardized application data directory
     const appDataPath = app.getPath('appData');
-    this.sharesPath = path.join(appDataPath, 'igloo', 'shares');
-    
-    // Ensure the shares directory exists
-    this.ensureSharesDirectory();
+    this.sharesPath = path.resolve(appDataPath, 'igloo', 'shares');
+
+    // Ensure the shares directory exists asynchronously
+    this.ready = this.ensureSharesDirectory();
   }
 
   /**
@@ -49,42 +52,69 @@ class ShareManager {
    * @returns The full file path
    */
   getSharePath(shareId: string): string {
-    return path.join(this.sharesPath, `${shareId}.json`);
+    return this.resolveSharePath(shareId);
   }
 
   /**
    * Create the shares directory if it doesn't exist
    */
-  private ensureSharesDirectory(): void {
-    const iglooDir = path.join(app.getPath('appData'), 'igloo');
-    
+  private async ensureSharesDirectory(): Promise<void> {
     try {
-      if (!fs.existsSync(iglooDir)) {
-        fs.mkdirSync(iglooDir);
-      }
-      
-      if (!fs.existsSync(this.sharesPath)) {
-        fs.mkdirSync(this.sharesPath);
-      }
+      await fs.promises.mkdir(this.sharesPath, { recursive: true });
     } catch (error) {
       console.error('Failed to create shares directory:', error);
+      throw error;
     }
+  }
+
+  private async ensureReady(): Promise<void> {
+    await this.ready;
+  }
+
+  private sanitizeShareId(shareId: string): string {
+    if (typeof shareId !== 'string') {
+      throw new Error('Share ID must be a string');
+    }
+
+    const trimmed = shareId.trim();
+
+    if (!trimmed || !ShareManager.SHARE_ID_PATTERN.test(trimmed)) {
+      throw new Error('Invalid share ID format');
+    }
+
+    return trimmed;
+  }
+
+  private resolveSharePath(shareId: string): string {
+    const sanitized = this.sanitizeShareId(shareId);
+    const basePath = path.resolve(this.sharesPath);
+    const resolved = path.resolve(basePath, `${sanitized}.json`);
+    const relative = path.relative(basePath, resolved);
+
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      throw new Error('Share ID resolves outside of the shares directory');
+    }
+
+    return resolved;
   }
 
   /**
    * Retrieves all shares from the standardized location
    * @returns An array of shares or false if none found or an error occurs
    */
-  getShares(): IglooShare[] | false {
+  async getShares(): Promise<IglooShare[] | false> {
     try {
-      // Check if the directory exists
-      if (!fs.existsSync(this.sharesPath)) {
+      await this.ensureReady();
+
+      try {
+        await fs.promises.access(this.sharesPath, fs.constants.R_OK);
+      } catch {
         return false;
       }
 
       // Get all files in the shares directory
-      const files = fs.readdirSync(this.sharesPath)
-        .filter((file: string) => file.endsWith('.json'));
+      const files = (await fs.promises.readdir(this.sharesPath))
+        .filter(file => file.endsWith('.json'));
 
       // If no share files found
       if (files.length === 0) {
@@ -93,19 +123,20 @@ class ShareManager {
 
       // Read and parse each share file
       const shares: IglooShare[] = [];
-      
-      for (const file of files) {
-        const filePath = path.join(this.sharesPath, file);
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        
-        try {
-          const share = JSON.parse(fileContent) as IglooShare;
-          shares.push(share);
-        } catch (parseError) {
-          console.error(`Failed to parse share ${file}:`, parseError);
-          // Continue with other shares even if one fails
-        }
-      }
+
+      await Promise.all(
+        files.map(async file => {
+          const filePath = path.resolve(this.sharesPath, file);
+
+          try {
+            const fileContent = await fs.promises.readFile(filePath, 'utf8');
+            const share = JSON.parse(fileContent) as IglooShare;
+            shares.push(share);
+          } catch (error) {
+            console.error(`Failed to read share ${file}:`, error);
+          }
+        })
+      );
 
       return shares.length > 0 ? shares : false;
     } catch (error) {
@@ -119,15 +150,17 @@ class ShareManager {
    * @param share The share to save
    * @returns True if successful, false otherwise
    */
-  saveShare(share: IglooShare): boolean {
+  async saveShare(share: IglooShare): Promise<boolean> {
     try {
       if (!share.id) {
         console.error('Share must have an ID');
         return false;
       }
 
-      const filePath = path.join(this.sharesPath, `${share.id}.json`);
-      fs.writeFileSync(filePath, JSON.stringify(share, null, 2));
+      await this.ensureReady();
+
+      const filePath = this.resolveSharePath(share.id);
+      await fs.promises.writeFile(filePath, JSON.stringify(share, null, 2));
       return true;
     } catch (error) {
       console.error('Failed to save share:', error);
@@ -140,15 +173,21 @@ class ShareManager {
    * @param shareId The ID of the share to delete
    * @returns True if successful, false otherwise
    */
-  deleteShare(shareId: string): boolean {
+  async deleteShare(shareId: string): Promise<boolean> {
     try {
-      const filePath = path.join(this.sharesPath, `${shareId}.json`);
-      
-      if (!fs.existsSync(filePath)) {
-        return false;
+      await this.ensureReady();
+
+      const filePath = this.resolveSharePath(shareId);
+
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (unlinkError: unknown) {
+        if ((unlinkError as NodeJS.ErrnoException).code === 'ENOENT') {
+          return false;
+        }
+        throw unlinkError;
       }
-      
-      fs.unlinkSync(filePath);
+
       return true;
     } catch (error) {
       console.error('Failed to delete share:', error);
@@ -161,7 +200,7 @@ class ShareManager {
  * Helper function to get all shares
  * @returns An array of shares or false if none found
  */
-function getAllShares(): IglooShare[] | false {
+async function getAllShares(): Promise<IglooShare[] | false> {
   const shareManager = new ShareManager();
   return shareManager.getShares();
 }
