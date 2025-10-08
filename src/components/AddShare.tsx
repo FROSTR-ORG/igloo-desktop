@@ -28,9 +28,9 @@ const buildEchoRelayList = (groupRelays?: string[]): string[] => {
     ? groupRelays.filter(relay => typeof relay === 'string' && relay.trim().length > 0)
     : [];
 
-  // Always include defaults so the local device can observe its own echo even if the group
-  // specifies custom relays. Use a Set to preserve order while avoiding duplicates.
-  return Array.from(new Set([...sanitizedGroupRelays, ...DEFAULT_ECHO_RELAYS]));
+  // Always include defaults first so we prioritise tested relays, then append any custom ones
+  // while avoiding duplicates.
+  return Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...sanitizedGroupRelays]));
 };
 
 /**
