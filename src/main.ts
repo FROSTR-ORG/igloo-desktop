@@ -98,6 +98,8 @@ const startEchoMonitor = (
 ): EchoListener => {
   const handledShares = new Set<string>();
   const listenerRecords: ListenerRecord[] = [];
+  
+  let disposed = false;
 
   let groupRelays: string[] = [];
 
@@ -233,6 +235,10 @@ const startEchoMonitor = (
     relays: string[],
     allowFallback: boolean
   ) => {
+    if (disposed) {
+      return;
+    }
+
     let record: ListenerRecord | null = null;
 
     try {
@@ -241,7 +247,19 @@ const startEchoMonitor = (
       );
 
       record = createRecord(shareCredential, shareIndex, relays);
+
+      if (disposed) {
+        cleanupRecord(record);
+        return;
+      }
+
       await connectNode(record.node);
+
+      if (disposed) {
+        cleanupRecord(record);
+        return;
+      }
+
       console.info(
         `[EchoBridge] Echo listener ready for share index ${shareIndex} on relays: ${relays.join(', ')}`
       );
@@ -256,7 +274,7 @@ const startEchoMonitor = (
           ? (error as { details?: { error?: unknown } }).details?.error ?? error
           : error;
 
-      if (allowFallback) {
+      if (allowFallback && !disposed) {
         console.warn(
           `[EchoBridge] Primary relay set failed for share index ${shareIndex}. Falling back to defaults.`,
           underlying
@@ -284,6 +302,7 @@ const startEchoMonitor = (
 
   return {
     cleanup: () => {
+      disposed = true;
       listenerRecords.splice(0).forEach(record => {
         cleanupRecord(record);
       });
