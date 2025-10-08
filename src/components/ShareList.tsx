@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import type { SharePolicy } from '@/types';
 import { decodeGroup, decodeShare } from '@frostr/igloo-core';
@@ -71,7 +71,7 @@ const extractPubkeyFromShare = (share: IglooShare): string | null => {
     }
     
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
