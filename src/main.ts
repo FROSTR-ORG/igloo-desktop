@@ -10,40 +10,54 @@ import {
   closeNode,
   DEFAULT_ECHO_RELAYS,
 } from '@frostr/igloo-core';
+import type { BifrostNode } from '@frostr/igloo-core';
 import { SimplePool } from 'nostr-tools';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-const activeEchoListeners = new Map();
+type EchoListener = { cleanup: () => void };
+
+const activeEchoListeners = new Map<string, EchoListener>();
+
+type SubscribeManyFn = (...args: unknown[]) => unknown;
+type SimplePoolPrototype = typeof SimplePool.prototype & {
+  __iglooFilterNormalizePatched?: boolean;
+  subscribeMany?: SubscribeManyFn;
+};
 
 try {
-  const poolProto: any = SimplePool?.prototype;
+  const poolProto = SimplePool?.prototype as SimplePoolPrototype | undefined;
   if (poolProto && !poolProto.__iglooFilterNormalizePatched) {
-    const originalSubscribeMany = poolProto.subscribeMany;
+    const originalSubscribeMany = poolProto.subscribeMany as SubscribeManyFn | undefined;
     if (typeof originalSubscribeMany === 'function') {
-      poolProto.subscribeMany = function patchedSubscribeMany(this: any, relays: any, filters: any, params: any) {
+      const patchedSubscribeMany: SubscribeManyFn = function patchedSubscribeMany(this: SimplePoolPrototype, relays: unknown, filters: unknown, params: unknown) {
         let normalizedFilters = filters;
 
         if (Array.isArray(filters)) {
           if (filters.length === 1) {
             const first = filters[0];
-            if (Array.isArray(first)) {
-              normalizedFilters = first;
-            } else if (first && typeof first === 'object') {
-              normalizedFilters = first;
-            }
+            normalizedFilters = Array.isArray(first) ? first : filters;
           } else {
-            normalizedFilters = filters.map(item => (
-              Array.isArray(item) && item.length === 1 && item[0] && typeof item[0] === 'object'
-                ? item[0]
-                : item
-            ));
+            normalizedFilters = filters.reduce<unknown[]>((acc, item) => {
+              if (Array.isArray(item)) {
+                if (item.length > 1) {
+                  acc.push(...item);
+                } else {
+                  acc.push(item);
+                }
+              } else {
+                acc.push(item);
+              }
+              return acc;
+            }, []);
           }
         }
 
         return originalSubscribeMany.call(this, relays, normalizedFilters, params);
       };
+
+      poolProto.subscribeMany = patchedSubscribeMany as typeof poolProto.subscribeMany;
 
       Object.defineProperty(poolProto, '__iglooFilterNormalizePatched', {
         value: true,
@@ -57,6 +71,8 @@ try {
   console.warn('[EchoBridge] Failed to normalize nostr subscribe filters:', error);
 }
 
+const SHOULD_THROW_ON_MISSING_LISTENER = process.env.SHOULD_THROW_ON_MISSING_LISTENER === 'true';
+
 const sanitizeRelayList = (relays?: unknown): string[] => {
   if (!Array.isArray(relays)) {
     return [];
@@ -68,16 +84,20 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
     .filter(relay => relay.length > 0);
 };
 
+type EventHandler = (...args: unknown[]) => void;
+
+type ListenerRecord = {
+  node: BifrostNode;
+  handlers: Array<{ event: string; handler: EventHandler }>;
+};
+
 const startEchoMonitor = (
   groupCredential: string,
   shareCredentials: string[],
   onEcho: (shareIndex: number, shareCredential: string) => void
-) => {
+): EchoListener => {
   const handledShares = new Set<string>();
-  const listenerRecords: Array<{
-    node: unknown;
-    handlers: Array<{ event: string; handler: (...args: unknown[]) => void }>;
-  }> = [];
+  const listenerRecords: ListenerRecord[] = [];
 
   let groupRelays: string[] = [];
 
@@ -100,21 +120,44 @@ const startEchoMonitor = (
   const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
   const hasCustomRelays = extraRelays.length > 0;
 
-  const attachListener = (node: any, event: string, handler: (...args: unknown[]) => void) => {
-    if (typeof node?.on === 'function') {
-      node.on(event, handler);
+  type EventfulNode = {
+    on?: (event: string, handler: EventHandler) => unknown;
+    off?: (event: string, handler: EventHandler) => unknown;
+    removeListener?: (event: string, handler: EventHandler) => unknown;
+  };
+
+  const attachListener = (node: BifrostNode, event: string, handler: EventHandler) => {
+    const emitter = node as unknown as EventfulNode;
+    if (typeof emitter.on === 'function') {
+      emitter.on(event, handler);
+      return;
+    }
+    const nodeType = 'BifrostNode';
+    const handlerName = handler.name || 'anonymous';
+    console.warn(`[EchoBridge] attachListener: Missing 'on' method on ${nodeType} for event '${event}' and handler '${handlerName}'`);
+    if (SHOULD_THROW_ON_MISSING_LISTENER) {
+      throw new Error(`Critical: Missing 'on' method on ${nodeType} for event '${event}'`);
     }
   };
 
-  const detachListener = (node: any, event: string, handler: (...args: unknown[]) => void) => {
-    if (typeof node?.off === 'function') {
-      node.off(event, handler);
-    } else if (typeof node?.removeListener === 'function') {
-      node.removeListener(event, handler);
+  const detachListener = (node: BifrostNode, event: string, handler: EventHandler) => {
+    const emitter = node as unknown as EventfulNode;
+    if (typeof emitter.off === 'function') {
+      emitter.off(event, handler);
+      return;
+    } else if (typeof emitter.removeListener === 'function') {
+      emitter.removeListener(event, handler);
+      return;
+    }
+    const nodeType = 'BifrostNode';
+    const handlerName = handler.name || 'anonymous';
+    console.warn(`[EchoBridge] detachListener: Missing 'off' and 'removeListener' methods on ${nodeType} for event '${event}' and handler '${handlerName}'`);
+    if (SHOULD_THROW_ON_MISSING_LISTENER) {
+      throw new Error(`Critical: Missing listener detachment methods on ${nodeType} for event '${event}'`);
     }
   };
 
-  const cleanupRecord = (record: { node: any; handlers: Array<{ event: string; handler: (...args: unknown[]) => void }> }) => {
+  const cleanupRecord = (record: ListenerRecord) => {
     const { node, handlers } = record;
     handlers.forEach(({ event, handler }) => {
       detachListener(node, event, handler);
@@ -141,21 +184,21 @@ const startEchoMonitor = (
     shareCredential: string,
     shareIndex: number,
     relays: string[]
-  ): { node: any; handlers: Array<{ event: string; handler: (...args: unknown[]) => void }> } => {
+  ): ListenerRecord => {
     const node = createBifrostNode(
       { group: groupCredential, share: shareCredential, relays },
       { enableLogging: false }
     );
 
-    const handlers: Array<{ event: string; handler: (...args: unknown[]) => void }> = [];
+    const handlers: Array<{ event: string; handler: EventHandler }> = [];
 
-    const register = (event: string, handler: (...args: unknown[]) => void) => {
+    const register = (event: string, handler: EventHandler) => {
       handlers.push({ event, handler });
       attachListener(node, event, handler);
     };
 
-    const messageHandler = (payload: any) => {
-      const tag = payload?.tag;
+    const messageHandler = (payload: unknown) => {
+      const tag = (payload as { tag?: unknown })?.tag;
       if (tag === '/echo/req' || tag === '/echo/res' || tag === '/echo/handler/req') {
         notifyEcho(shareIndex, shareCredential);
       }
@@ -190,7 +233,7 @@ const startEchoMonitor = (
     relays: string[],
     allowFallback: boolean
   ) => {
-    let record: { node: any; handlers: Array<{ event: string; handler: (...args: unknown[]) => void }> } | null = null;
+    let record: ListenerRecord | null = null;
 
     try {
       console.debug(
@@ -203,12 +246,15 @@ const startEchoMonitor = (
         `[EchoBridge] Echo listener ready for share index ${shareIndex} on relays: ${relays.join(', ')}`
       );
       listenerRecords.push(record);
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (record) {
         cleanupRecord(record);
       }
 
-      const underlying = error?.details?.error ?? error;
+      const underlying =
+        typeof error === 'object' && error !== null && 'details' in error
+          ? (error as { details?: { error?: unknown } }).details?.error ?? error
+          : error;
 
       if (allowFallback) {
         console.warn(
@@ -282,27 +328,34 @@ app.whenReady().then(() => {
     return getAllShares();
   });
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ipcMain.handle('save-share', async (_: any, share: any) => {
+  ipcMain.handle('save-share', async (_event: IpcMainInvokeEvent, share: Parameters<ShareManager['saveShare']>[0]) => {
     return shareManager.saveShare(share);
   });
   
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ipcMain.handle('delete-share', async (_: any, shareId: string) => {
+  ipcMain.handle('delete-share', async (_event: IpcMainInvokeEvent, shareId: string) => {
     return shareManager.deleteShare(shareId);
   });
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  ipcMain.handle('open-share-location', async (_: any, shareId: string) => {
+  ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: string) => {
     const filePath = shareManager.getSharePath(shareId);
     await shell.showItemInFolder(filePath);
   });
 
-  ipcMain.handle('echo-start', async (event: IpcMainInvokeEvent, args: any) => {
+  type EchoStartArgs = {
+    listenerId?: unknown;
+    groupCredential?: unknown;
+    shareCredentials?: unknown;
+  };
+
+  ipcMain.handle('echo-start', async (event: IpcMainInvokeEvent, args: EchoStartArgs) => {
     const { listenerId, groupCredential, shareCredentials } = args ?? {};
 
     if (typeof listenerId !== 'string' || listenerId.trim().length === 0) {
       return { ok: false, reason: 'invalid-listener-id' };
+    }
+
+    if (typeof groupCredential !== 'string' || groupCredential.trim().length === 0) {
+      return { ok: false, reason: 'invalid-group' };
     }
 
     if (activeEchoListeners.has(listenerId)) {
@@ -312,10 +365,10 @@ app.whenReady().then(() => {
     }
 
     const normalizedShares = Array.isArray(shareCredentials)
-      ? shareCredentials
-          .filter((credential: unknown): credential is string => typeof credential === 'string')
+      ? (shareCredentials
+          .filter((credential): credential is string => typeof credential === 'string')
           .map(credential => credential.trim())
-          .filter(credential => credential.length > 0)
+          .filter(credential => credential.length > 0))
       : [];
 
     if (normalizedShares.length === 0) {
@@ -345,7 +398,9 @@ app.whenReady().then(() => {
     return { ok: true };
   });
 
-  ipcMain.handle('echo-stop', async (_event: IpcMainInvokeEvent, args: any) => {
+  type EchoStopArgs = { listenerId?: unknown };
+
+  ipcMain.handle('echo-stop', async (_event: IpcMainInvokeEvent, args: EchoStopArgs) => {
     const { listenerId } = args ?? {};
 
     if (typeof listenerId !== 'string' || listenerId.trim().length === 0) {
