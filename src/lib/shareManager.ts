@@ -78,11 +78,20 @@ class ShareManager {
 
     const trimmed = shareId.trim();
 
-    if (!trimmed || !ShareManager.SHARE_ID_PATTERN.test(trimmed)) {
+    if (!trimmed) {
+      throw new Error('Share ID must be a non-empty string');
+    }
+
+    const normalized = trimmed
+      .replace(/[^A-Za-z0-9._-]+/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '');
+
+    if (!normalized || !ShareManager.SHARE_ID_PATTERN.test(normalized)) {
       throw new Error('Invalid share ID format');
     }
 
-    return trimmed;
+    return normalized;
   }
 
   private resolveSharePath(shareId: string): string {
