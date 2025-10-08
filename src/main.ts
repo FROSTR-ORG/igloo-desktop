@@ -356,8 +356,14 @@ app.whenReady().then(() => {
   });
 
   ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: string) => {
-    const filePath = shareManager.getSharePath(shareId);
-    await shell.showItemInFolder(filePath);
+    try {
+      const filePath = shareManager.getSharePath(shareId);
+      await shell.showItemInFolder(filePath);
+      return { ok: true };
+    } catch (error) {
+      console.error('Failed to open share location:', error);
+      return { ok: false };
+    }
   });
 
   type EchoStartArgs = {
