@@ -82,6 +82,10 @@ class ShareManager {
       throw new Error('Share ID must be a non-empty string');
     }
 
+    if (/^[.]/.test(trimmed) || /[\\/]/.test(trimmed)) {
+      throw new Error('Invalid share ID format');
+    }
+
     const normalized = trimmed
       .replace(/[^A-Za-z0-9._-]+/g, '_')
       .replace(/_+/g, '_')
