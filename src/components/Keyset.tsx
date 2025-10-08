@@ -2,7 +2,8 @@ import React, {useEffect, useState, useRef, useCallback} from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip } from "@/components/ui/tooltip";
-import { decodeGroup, decodeShare, startListeningForAllEchoes } from "@frostr/igloo-core";
+import { decodeGroup, decodeShare } from "@frostr/igloo-core";
+import { ipcRenderer } from 'electron';
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CURRENT_SHARE_VERSION } from '@/lib/encryption';
@@ -36,8 +37,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     message: 'Waiting for share to be scanned...'
   });
   
-  // Ref to store the cleanup function for echo listeners
-  const echoListenersCleanup = useRef<(() => void) | null>(null);
+  const handledEchoSharesRef = useRef<Set<number>>(new Set());
+  const echoListenerIdRef = useRef<string | null>(null);
 
   const handleCopy = async (text: string) => {
     try {
@@ -178,29 +179,57 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setDecodedShares(shares);
   }, [groupCredential, shareCredentials]);
 
-  // Start listening for echoes on all shares when component mounts
   useEffect(() => {
-    if (decodedGroup && shareCredentials.length > 0) {
-      const echoListener = startListeningForAllEchoes(
-        groupCredential,
-        shareCredentials,
-        handleEchoReceived, // Pass the memoized callback
-        {
-          relays: decodedGroup?.relays || ["wss://relay.damus.io", "wss://relay.primal.net"]
-        }
-      );
-      
-      echoListenersCleanup.current = echoListener.cleanup;
+    handledEchoSharesRef.current.clear();
+  }, [groupCredential, shareCredentials]);
+
+  // Start listening for echoes on all shares via the main-process bridge
+  useEffect(() => {
+    if (!decodedGroup || shareCredentials.length === 0) {
+      if (echoListenerIdRef.current) {
+        const listenerId = echoListenerIdRef.current;
+        void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+          /* noop */
+        });
+        echoListenerIdRef.current = null;
+      }
+      return undefined;
     }
 
-    // Cleanup on unmount or when dependencies change
-    return () => {
-      if (echoListenersCleanup.current) {
-        echoListenersCleanup.current();
-        echoListenersCleanup.current = null;
+    const listenerId = `keyset-${groupCredential}`;
+    echoListenerIdRef.current = listenerId;
+
+    const handleIpcEcho = (_event: unknown, payload: { listenerId: string; shareIndex: number }) => {
+      if (!payload || payload.listenerId !== listenerId) {
+        return;
+      }
+
+      if (!handledEchoSharesRef.current.has(payload.shareIndex)) {
+        handledEchoSharesRef.current.add(payload.shareIndex);
+        handleEchoReceived(payload.shareIndex);
       }
     };
-  }, [groupCredential, shareCredentials, decodedGroup, handleEchoReceived]); // Added handleEchoReceived to dependencies
+
+    ipcRenderer.on('echo-received', handleIpcEcho as never);
+
+    void ipcRenderer
+      .invoke('echo-start', {
+        listenerId,
+        groupCredential,
+        shareCredentials,
+      })
+      .catch(error => {
+        console.error('Failed to start echo listener bridge:', error);
+      });
+
+    return () => {
+      ipcRenderer.removeListener('echo-received', handleIpcEcho as never);
+      void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+        /* noop */
+      });
+      echoListenerIdRef.current = null;
+    };
+  }, [groupCredential, shareCredentials, decodedGroup, handleEchoReceived]);
 
   const formatShare = (share: string) => {
     if (share.length < 36) return share;

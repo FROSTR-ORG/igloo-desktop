@@ -276,7 +276,7 @@ describe('AddShare', () => {
       expect(mockOnComplete).toHaveBeenCalled();
     });
 
-    const expectedRelays = Array.from(new Set([...(mockDecodedGroup.relays ?? []), ...DEFAULT_ECHO_RELAYS]));
+    const expectedRelays = Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...(mockDecodedGroup.relays ?? [])]));
 
     await waitFor(() => {
       expect(mockSendEcho).toHaveBeenCalledTimes(1);

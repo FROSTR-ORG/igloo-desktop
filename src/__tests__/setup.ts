@@ -14,6 +14,7 @@ global.window = Object.create(window);
 const mockIpcRenderer = {
   invoke: jest.fn(),
   on: jest.fn(),
+  removeListener: jest.fn(),
   removeAllListeners: jest.fn(),
 };
 
