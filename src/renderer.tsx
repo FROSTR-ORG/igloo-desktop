@@ -7,8 +7,6 @@ const Root: React.FC = () => {
   return (
     <div>
       <App />
-      {/* <h1 className="text-3xl font-bold underline">Hello Electron with React!</h1>
-      <p>This is a minimal Electron TypeScript React boilerplate.</p> */}
     </div>
   );
 };
