@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { clientShareManager, IglooShare } from '@/lib/clientShareManager';
 import type { SharePolicy } from '@/types';
 import { decodeGroup, decodeShare } from '@frostr/igloo-core';
@@ -81,10 +81,21 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
   const [isLoading, setIsLoading] = useState(true);
   const [loadingShare, setLoadingShare] = useState<IglooShare | null>(null);
   const [shareToDelete, setShareToDelete] = useState<IglooShare | null>(null);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    // Keep ref true while mounted; StrictMode runs cleanup after first setup
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   useEffect(() => {
     const loadShares = async () => {
       const result = await clientShareManager.getShares();
+      if (!isMountedRef.current) return;
+
       if (Array.isArray(result)) {
         setShares(result);
       }
@@ -121,8 +132,10 @@ const ShareList: React.FC<ShareListProps> = ({ onShareLoaded, onNewKeyset }) => 
     if (!shareToDelete) return;
     
     const success = await clientShareManager.deleteShare(shareToDelete.id);
+    if (!isMountedRef.current) return;
+
     if (success) {
-      setShares(shares.filter(share => share.id !== shareToDelete.id));
+      setShares(prev => prev.filter(share => share.id !== shareToDelete.id));
     }
     setShareToDelete(null);
   };

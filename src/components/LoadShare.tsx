@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   derive_secret_async, 
   decrypt_payload,
@@ -31,6 +31,15 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
   const [isPasswordValid, setIsPasswordValid] = useState<boolean>(false);
   const [passwordError, setPasswordError] = useState<string | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const isMountedRef = useRef(true);
+
+  useEffect(() => {
+    // Ensure ref is true while mounted; React 18 StrictMode will invoke cleanup immediately after first setup
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
@@ -63,9 +72,13 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       } else if (share.version === CURRENT_SHARE_VERSION) {
         targetIterations = PBKDF2_ITERATIONS_DEFAULT;
       } else {
-        setIsPasswordValid(false);
-        setPasswordError(`Unsupported share version ${share.version}. Please upgrade Igloo Desktop to open this share.`);
-        setIsSubmitting(false);
+        if (isMountedRef.current) {
+          setIsPasswordValid(false);
+          setPasswordError(
+            `Unsupported share version ${share.version}. Please upgrade Igloo Desktop to open this share.`
+          );
+          setIsSubmitting(false);
+        }
         return;
       }
 
@@ -79,21 +92,28 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
       
       // Validate the decrypted share format (should start with 'bfshare')
       if (!decryptedShare.startsWith('bfshare')) {
-        setIsPasswordValid(false);
-        setPasswordError('Invalid password or corrupted share data');
-        setIsSubmitting(false);
+        if (isMountedRef.current) {
+          setIsPasswordValid(false);
+          setPasswordError('Invalid password or corrupted share data');
+          setIsSubmitting(false);
+        }
         return;
       }
       
       // Call the onLoad prop with decrypted data
-      if (onLoad) {
+      if (onLoad && isMountedRef.current) {
         onLoad(decryptedShare, share.groupCredential);
       }
       
       // Reset form
-      setPassword('');
-      setIsSubmitting(false);
+      if (isMountedRef.current) {
+        setPassword('');
+        setIsSubmitting(false);
+      }
     } catch (err) {
+      if (!isMountedRef.current) {
+        return;
+      }
       setIsPasswordValid(false);
       setPasswordError('Failed to decrypt share: ' + (err instanceof Error ? err.message : String(err)));
       setIsSubmitting(false);
