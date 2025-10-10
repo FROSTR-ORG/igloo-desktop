@@ -2,6 +2,7 @@ import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Signer from '../../components/Signer';
+import '@testing-library/jest-dom';
 
 // Mock signer keepalive to avoid timers and side effects in tests
 jest.mock('@/lib/signer-keepalive', () => {
