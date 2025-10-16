@@ -85,6 +85,7 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
   let replaceCallback: ((payload: ReplacedNodePayload) => void) | null = null;
   let closeBridge: CloseBridge | null = null;
   let tickInProgress = false;
+  let peerCursor = 0;
 
   const messageListener = () => {
     lastActivityTs = Date.now();
@@ -246,6 +247,26 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     }
   };
 
+  const pickPingTarget = (): string | null => {
+    try {
+      const peers = (currentNode as unknown as { peers?: Array<{ pubkey: string; status?: string }> }).peers;
+      if (!Array.isArray(peers) || peers.length === 0) return null;
+
+      const online = peers.filter(p => (p?.status as string) === 'online');
+      if (online.length > 0) {
+        const candidate = online[peerCursor % online.length]?.pubkey;
+        peerCursor = (peerCursor + 1) % Math.max(online.length, 1);
+        return typeof candidate === 'string' && candidate.length > 0 ? candidate.toLowerCase() : null;
+      }
+
+      const candidate = peers[peerCursor % peers.length]?.pubkey;
+      peerCursor = (peerCursor + 1) % Math.max(peers.length, 1);
+      return typeof candidate === 'string' && candidate.length > 0 ? candidate.toLowerCase() : null;
+    } catch {
+      return null;
+    }
+  };
+
   const tick = async () => {
     if (!isRunning || tickInProgress) {
       return;
@@ -256,25 +277,46 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     const inactive = now - lastActivityTs > resolvedOptions.staleMs;
     let needHeal = inactive;
 
-    try {
-      const pingPromise = currentNode.req.ping(selfPubkey);
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('heartbeat timeout')), resolvedOptions.timeoutMs);
-      });
+    const target = pickPingTarget();
 
-      const result = await Promise.race([pingPromise, timeoutPromise]) as { ok?: boolean; err?: unknown };
-      if (!result || result.ok !== true) {
-        const err = result?.err ?? 'ping failed';
-        throw err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
+    try {
+      if (!target) {
+        // No peers are known yet (very common at startup or in tiny clusters).
+        // Previously we pinged self, which refreshed lastActivityTs and avoided
+        // heal() thrashing. Emulate that explicitly:
+        //  - Count this tick as healthy (not a failure)
+        //  - Refresh activity to suppress the inactivity-based heal
+        //  - Clear needHeal computed earlier from the stale timestamp
+        logger('debug', 'Keep-alive: no peers; treating tick as healthy to avoid heal thrash');
+        consecutiveFailures = 0;
+        lastActivityTs = now;
+        needHeal = false;
+      } else {
+        const pingPromise = currentNode.req.ping(target);
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('heartbeat timeout')), resolvedOptions.timeoutMs);
+        });
+
+        const result = await Promise.race([pingPromise, timeoutPromise]) as { ok?: boolean; err?: unknown };
+        if (!result || result.ok !== true) {
+          const err = result?.err ?? 'ping failed';
+          throw err instanceof Error ? err : new Error(typeof err === 'string' ? err : JSON.stringify(err));
+        }
+        consecutiveFailures = 0;
+        lastActivityTs = Date.now();
+        // Successful heartbeat observed; cancel any inactivity-driven heal for this tick.
+        needHeal = false;
       }
-      consecutiveFailures = 0;
-      lastActivityTs = Date.now();
     } catch (error) {
+      // Do not mark needHeal solely on a single peer failure; rotate and rely on inactivity or failure threshold.
       consecutiveFailures += 1;
       logger('debug', 'Heartbeat failed', { error: error instanceof Error ? error.message : String(error), failures: consecutiveFailures });
-      needHeal = true;
     } finally {
-      const shouldHeal = needHeal || consecutiveFailures >= 2;
+      // Only heal if we remained inactive for this tick (needHeal true)
+      // or we accumulated enough consecutive failures. When there are no
+      // peers or a heartbeat succeeds, we set needHeal=false above to avoid
+      // thrashing the connection with unnecessary resubscribe/reconnect cycles.
+      const shouldHeal = needHeal || consecutiveFailures >= 4;
       if (shouldHeal) {
         const reason = inactive && needHeal && consecutiveFailures < 2 ? 'inactivity' : 'heartbeat failures';
         await heal(reason);

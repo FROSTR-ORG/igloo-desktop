@@ -5,13 +5,14 @@ import { fileURLToPath } from 'url';
 import { ShareManager, getAllShares } from './lib/shareManager.js';
 import {
   decodeGroup,
+  DEFAULT_ECHO_RELAYS,
+  startListeningForAllEchoes,
   createBifrostNode,
   connectNode,
   closeNode,
-  DEFAULT_ECHO_RELAYS,
 } from '@frostr/igloo-core';
-import type { BifrostNode } from '@frostr/igloo-core';
 import { SimplePool } from 'nostr-tools';
+// import type { BifrostNode } from '@frostr/igloo-core';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -20,55 +21,26 @@ type EchoListener = { cleanup: () => void };
 
 const activeEchoListeners = new Map<string, EchoListener>();
 
-type SubscribeManyFn = (...args: unknown[]) => unknown;
-type SimplePoolPrototype = typeof SimplePool.prototype & {
-  __iglooFilterNormalizePatched?: boolean;
-  subscribeMany?: SubscribeManyFn;
-};
-
+// Minimal SimplePool shim: unwrap single-element filter arrays to a plain object.
+// This matches igloo-cli/server behavior and avoids nested [[filter]] payloads
+// that relays reject with "provided filter is not an object".
 try {
-  const poolProto = SimplePool?.prototype as SimplePoolPrototype | undefined;
-  if (poolProto && !poolProto.__iglooFilterNormalizePatched) {
-    const originalSubscribeMany = poolProto.subscribeMany as SubscribeManyFn | undefined;
-    if (typeof originalSubscribeMany === 'function') {
-      const patchedSubscribeMany: SubscribeManyFn = function patchedSubscribeMany(this: SimplePoolPrototype, relays: unknown, filters: unknown, params: unknown) {
-        let normalizedFilters = filters;
-
-        if (Array.isArray(filters)) {
-          if (filters.length === 1) {
-            const first = filters[0];
-            normalizedFilters = Array.isArray(first) ? first : filters;
-          } else {
-            normalizedFilters = filters.reduce<unknown[]>((acc, item) => {
-              if (Array.isArray(item)) {
-                if (item.length > 1) {
-                  acc.push(...item);
-                } else {
-                  acc.push(item);
-                }
-              } else {
-                acc.push(item);
-              }
-              return acc;
-            }, []);
-          }
+  const poolProto = SimplePool?.prototype as typeof SimplePool.prototype & { __iglooSubscribeFixApplied?: boolean } | undefined;
+  if (poolProto && !poolProto.__iglooSubscribeFixApplied) {
+    const original = poolProto.subscribeMany as (relays: unknown, filter: unknown, params: unknown) => any;
+    if (typeof original === 'function') {
+      poolProto.subscribeMany = function patchedSubscribeMany(this: any, relays: unknown, filter: unknown, params: unknown) {
+        if (Array.isArray(filter) && filter.length === 1 && filter[0] && typeof filter[0] === 'object' && !Array.isArray(filter[0])) {
+          // unwrap [filter] -> filter
+          return original.call(this, relays, filter[0], params);
         }
-
-        return originalSubscribeMany.call(this, relays, normalizedFilters, params);
-      };
-
-      poolProto.subscribeMany = patchedSubscribeMany as typeof poolProto.subscribeMany;
-
-      Object.defineProperty(poolProto, '__iglooFilterNormalizePatched', {
-        value: true,
-        enumerable: false,
-        configurable: false,
-        writable: false,
-      });
+        return original.call(this, relays, filter, params);
+      } as typeof poolProto.subscribeMany;
+      Object.defineProperty(poolProto, '__iglooSubscribeFixApplied', { value: true });
     }
   }
 } catch (error) {
-  console.warn('[EchoBridge] Failed to normalize nostr subscribe filters:', error);
+  console.warn('[EchoBridge] Failed to apply SimplePool subscribeMany shim:', error);
 }
 
 const SHOULD_THROW_ON_MISSING_LISTENER = process.env.SHOULD_THROW_ON_MISSING_LISTENER === 'true';
@@ -86,18 +58,15 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
 
 type EventHandler = (...args: unknown[]) => void;
 
-type ListenerRecord = {
-  node: BifrostNode;
-  handlers: Array<{ event: string; handler: EventHandler }>;
-};
+// Legacy listener record removed; igloo-core manages nodes internally.
 
-const startEchoMonitor = (
+const startEchoMonitor = async (
   groupCredential: string,
   shareCredentials: string[],
   onEcho: (shareIndex: number, shareCredential: string) => void
-): EchoListener => {
+): Promise<EchoListener> => {
   const handledShares = new Set<string>();
-  const listenerRecords: ListenerRecord[] = [];
+  let coreListener: { cleanup: () => void; isActive?: boolean } | null = null;
   
   let disposed = false;
 
@@ -122,56 +91,6 @@ const startEchoMonitor = (
   const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
   const hasCustomRelays = extraRelays.length > 0;
 
-  type EventfulNode = {
-    on?: (event: string, handler: EventHandler) => unknown;
-    off?: (event: string, handler: EventHandler) => unknown;
-    removeListener?: (event: string, handler: EventHandler) => unknown;
-  };
-
-  const attachListener = (node: BifrostNode, event: string, handler: EventHandler) => {
-    const emitter = node as unknown as EventfulNode;
-    if (typeof emitter.on === 'function') {
-      emitter.on(event, handler);
-      return;
-    }
-    const nodeType = 'BifrostNode';
-    const handlerName = handler.name || 'anonymous';
-    console.warn(`[EchoBridge] attachListener: Missing 'on' method on ${nodeType} for event '${event}' and handler '${handlerName}'`);
-    if (SHOULD_THROW_ON_MISSING_LISTENER) {
-      throw new Error(`Critical: Missing 'on' method on ${nodeType} for event '${event}'`);
-    }
-  };
-
-  const detachListener = (node: BifrostNode, event: string, handler: EventHandler) => {
-    const emitter = node as unknown as EventfulNode;
-    if (typeof emitter.off === 'function') {
-      emitter.off(event, handler);
-      return;
-    } else if (typeof emitter.removeListener === 'function') {
-      emitter.removeListener(event, handler);
-      return;
-    }
-    const nodeType = 'BifrostNode';
-    const handlerName = handler.name || 'anonymous';
-    console.warn(`[EchoBridge] detachListener: Missing 'off' and 'removeListener' methods on ${nodeType} for event '${event}' and handler '${handlerName}'`);
-    if (SHOULD_THROW_ON_MISSING_LISTENER) {
-      throw new Error(`Critical: Missing listener detachment methods on ${nodeType} for event '${event}'`);
-    }
-  };
-
-  const cleanupRecord = (record: ListenerRecord) => {
-    const { node, handlers } = record;
-    handlers.forEach(({ event, handler }) => {
-      detachListener(node, event, handler);
-    });
-
-    try {
-      closeNode(node);
-    } catch (error) {
-      console.warn('[EchoBridge] Error during echo listener cleanup:', error);
-    }
-  };
-
   const notifyEcho = (shareIndex: number, shareCredential: string) => {
     const key = `${shareIndex}:${shareCredential}`;
     if (handledShares.has(key)) {
@@ -182,130 +101,93 @@ const startEchoMonitor = (
     onEcho(shareIndex, shareCredential);
   };
 
-  const createRecord = (
-    shareCredential: string,
-    shareIndex: number,
-    relays: string[]
-  ): ListenerRecord => {
-    const node = createBifrostNode(
-      { group: groupCredential, share: shareCredential, relays },
-      { enableLogging: false }
+  // Reinstate per-share fallback:
+  // - Some shares may be unable to reach custom group relays while others can.
+  // - Probe connectivity for each share individually.
+  // - Use `primaryRelays` when the probe succeeds; otherwise fall back to DEFAULT_ECHO_RELAYS.
+  // - Group shares by the relay set that works to minimize connections.
+
+  type ShareProbe = { share: string; originalIndex: number; relays: string[] };
+  const perShare: ShareProbe[] = [];
+
+  for (let i = 0; i < shareCredentials.length; i++) {
+    const share = shareCredentials[i];
+
+    // Default to primary; only probe if there are custom relays to verify.
+    let chosen: string[] = primaryRelays;
+
+    if (hasCustomRelays) {
+      let probeNode: any = null;
+      try {
+        // Attempt a lightweight connect to the custom relay set for this share.
+        probeNode = createBifrostNode(
+          { group: groupCredential, share, relays: primaryRelays },
+          { enableLogging: false }
+        );
+        await connectNode(probeNode);
+      } catch (err) {
+        console.warn('[EchoBridge] Probe failed for share; falling back to defaults', { idx: i, err });
+        chosen = defaultRelays;
+      } finally {
+        if (probeNode) {
+          try { closeNode(probeNode); } catch { /* ignore close error */ }
+          probeNode = null;
+        }
+      }
+    }
+
+    perShare.push({ share, originalIndex: i, relays: chosen });
+  }
+
+  // Group shares by the resolved relay set to avoid duplicating listeners.
+  const groups = new Map<string, { relays: string[]; shares: string[]; idxMap: number[] }>();
+  for (const item of perShare) {
+    const key = item.relays.join('|');
+    const existing = groups.get(key);
+    if (existing) {
+      existing.shares.push(item.share);
+      existing.idxMap.push(item.originalIndex);
+    } else {
+      groups.set(key, { relays: item.relays, shares: [item.share], idxMap: [item.originalIndex] });
+    }
+  }
+
+  // Start one listener per relay-set group and translate subset indexes back to the
+  // original share index so downstream consumers remain stable.
+  const listeners: Array<{ cleanup: () => void }> = [];
+  for (const { relays, shares, idxMap } of groups.values()) {
+    const listener = startListeningForAllEchoes(
+      groupCredential,
+      shares,
+      (subsetIndex, shareCredential) => {
+        if (disposed) return;
+        const originalIndex = idxMap[subsetIndex] ?? subsetIndex;
+        notifyEcho(originalIndex, shareCredential);
+      },
+      {
+        relays,
+        eventConfig: { enableLogging: false }
+      }
     );
+    listeners.push(listener);
+  }
 
-    const handlers: Array<{ event: string; handler: EventHandler }> = [];
-
-    const register = (event: string, handler: EventHandler) => {
-      handlers.push({ event, handler });
-      attachListener(node, event, handler);
-    };
-
-    const messageHandler = (payload: unknown) => {
-      const tag = (payload as { tag?: unknown })?.tag;
-      if (tag === '/echo/req' || tag === '/echo/res' || tag === '/echo/handler/req') {
-        notifyEcho(shareIndex, shareCredential);
+  // Compose cleanup for all listeners started above.
+  coreListener = {
+    cleanup: () => {
+      for (const l of listeners) {
+        try { l.cleanup?.(); } catch { /* ignore */ }
       }
-    };
-
-    const responseHandler = () => {
-      notifyEcho(shareIndex, shareCredential);
-    };
-
-    const errorHandler = (error: unknown) => {
-      console.error(`[EchoBridge] Listener error for share index ${shareIndex}:`, error);
-    };
-
-    const closedHandler = () => {
-      console.info(`[EchoBridge] Listener connection closed for share index ${shareIndex}`);
-    };
-
-    register('message', messageHandler);
-    register('/echo/handler/req', responseHandler);
-    register('/echo/handler/res', responseHandler);
-    register('/echo/handler/ret', responseHandler);
-    register('/echo/sender/res', responseHandler);
-    register('error', errorHandler);
-    register('closed', closedHandler);
-
-    return { node, handlers };
+    },
+    isActive: true,
   };
-
-  const attemptConnection = async (
-    shareCredential: string,
-    shareIndex: number,
-    relays: string[],
-    allowFallback: boolean
-  ) => {
-    if (disposed) {
-      return;
-    }
-
-    let record: ListenerRecord | null = null;
-
-    try {
-      console.debug(
-        `[EchoBridge] Connecting listener for share index ${shareIndex} using relays: ${relays.join(', ')}`
-      );
-
-      record = createRecord(shareCredential, shareIndex, relays);
-
-      if (disposed) {
-        cleanupRecord(record);
-        return;
-      }
-
-      await connectNode(record.node);
-
-      if (disposed) {
-        cleanupRecord(record);
-        return;
-      }
-
-      console.info(
-        `[EchoBridge] Echo listener ready for share index ${shareIndex} on relays: ${relays.join(', ')}`
-      );
-      listenerRecords.push(record);
-    } catch (error: unknown) {
-      if (record) {
-        cleanupRecord(record);
-      }
-
-      const underlying =
-        typeof error === 'object' && error !== null && 'details' in error
-          ? (error as { details?: { error?: unknown } }).details?.error ?? error
-          : error;
-
-      if (allowFallback && !disposed) {
-        console.warn(
-          `[EchoBridge] Primary relay set failed for share index ${shareIndex}. Falling back to defaults.`,
-          underlying
-        );
-        await attemptConnection(shareCredential, shareIndex, defaultRelays, false);
-      } else {
-        console.error(
-          `[EchoBridge] Failed to establish echo listener for share index ${shareIndex}:`,
-          underlying
-        );
-      }
-    }
-  };
-
-  shareCredentials.forEach((shareCredential, shareIndex) => {
-    void attemptConnection(
-      shareCredential,
-      shareIndex,
-      primaryRelays,
-      hasCustomRelays
-    ).catch(error => {
-      console.error(`[EchoBridge] Unexpected error while connecting listener for share index ${shareIndex}:`, error);
-    });
-  });
 
   return {
     cleanup: () => {
       disposed = true;
-      listenerRecords.splice(0).forEach(record => {
-        cleanupRecord(record);
-      });
+      try { coreListener?.cleanup?.(); } catch {
+        // ignore cleanup error
+      }
       handledShares.clear();
     }
   };
@@ -400,7 +282,7 @@ app.whenReady().then(() => {
       return { ok: false, reason: 'no-valid-shares' };
     }
 
-    const listener = startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential) => {
+    const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential) => {
       if (!event.sender.isDestroyed()) {
         event.sender.send('echo-received', {
           listenerId,

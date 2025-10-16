@@ -3,7 +3,6 @@ import {
   createPeerManagerRobust,
   decodeGroup,
   normalizePubkey,
-  comparePubkeys,
   extractSelfPubkeyFromCredentials,
   getNodePolicies,
   updateNodePolicy
@@ -104,7 +103,7 @@ const PeerList: React.FC<PeerListProps> = ({
     if (!selfPubkey) return peers;
     
     return peers.filter(peer => {
-      const isSelf = comparePubkeys(peer.pubkey, selfPubkey);
+      const isSelf = toPolicyKey(peer.pubkey) === toPolicyKey(selfPubkey);
       if (isSelf) {
         console.debug(`[PeerList] Filtering out self pubkey: ${peer.pubkey}`);
       }
@@ -164,13 +163,19 @@ const PeerList: React.FC<PeerListProps> = ({
 
     console.debug('[PeerList] Setting up ping event listeners');
 
+    const getMsgSender = (msg: any): string | null => {
+      const pk = msg?.env?.pubkey || msg?.from || msg?.pub || msg?.pubkey;
+      return typeof pk === 'string' && pk.length > 0 ? pk : null;
+    };
+
     const handlePingRequest = (msg: any) => {
-      if (msg?.from) {
-        const normalizedFrom = normalizePubkey(msg.from);
-        console.debug(`[PeerList] Ping request from: ${msg.from} -> ${normalizedFrom}`);
+      const sender = getMsgSender(msg);
+      if (sender) {
+        const normalizedFrom = normalizePubkey(sender).toLowerCase();
+        console.debug(`[PeerList] Ping request from: ${sender} -> ${normalizedFrom}`);
         
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, msg.from)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(sender)) {
             return {
               ...peer,
               online: true,
@@ -183,13 +188,14 @@ const PeerList: React.FC<PeerListProps> = ({
     };
 
     const handlePingResponse = (msg: any) => {
-      if (msg?.from) {
-        const normalizedFrom = normalizePubkey(msg.from);
+      const sender = getMsgSender(msg);
+      if (sender) {
+        const normalizedFrom = normalizePubkey(sender).toLowerCase();
         const latency = msg.latency || (msg.timestamp ? Date.now() - msg.timestamp : undefined);
-        console.debug(`[PeerList] Ping response from: ${msg.from} -> ${normalizedFrom}${latency ? ` (${latency}ms)` : ''}`);
+        console.debug(`[PeerList] Ping response from: ${sender} -> ${normalizedFrom}${latency ? ` (${latency}ms)` : ''}`);
         
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, msg.from)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(sender)) {
             return {
               ...peer,
               online: true,
@@ -341,7 +347,7 @@ const PeerList: React.FC<PeerListProps> = ({
           
           try {
             const pingPromises = initialPeers.map(async (peer) => {
-              const normalizedPubkey = normalizePubkey(peer.pubkey);
+              const normalizedPubkey = normalizePubkey(peer.pubkey).toLowerCase();
               try {
                 const startTime = Date.now();
                 const result = await Promise.race([
@@ -355,7 +361,7 @@ const PeerList: React.FC<PeerListProps> = ({
                   console.debug(`[PeerList] Initial ping successful to ${normalizedPubkey} (${latency}ms)`);
                   if (isActive) {
                     setPeers(prev => prev.map(p => {
-                      if (comparePubkeys(p.pubkey, peer.pubkey)) {
+                      if (toPolicyKey(p.pubkey) === toPolicyKey(peer.pubkey)) {
                         return { ...p, online: true, lastSeen: new Date(), latency };
                       }
                       return p;
@@ -516,7 +522,7 @@ const PeerList: React.FC<PeerListProps> = ({
   const handlePingPeer = useCallback(async (peerPubkey: string) => {
     if (!node || !isSignerRunning) return;
 
-    const normalizedPubkey = normalizePubkey(peerPubkey);
+      const normalizedPubkey = normalizePubkey(peerPubkey).toLowerCase();
     setPingingPeers(prev => new Set(prev).add(normalizedPubkey));
 
     try {
@@ -529,7 +535,7 @@ const PeerList: React.FC<PeerListProps> = ({
       if (result.ok) {
         console.debug(`[PeerList] Manual ping successful to ${normalizedPubkey} (${latency}ms)`);
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, peerPubkey)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(peerPubkey)) {
             return {
               ...peer,
               online: true,
@@ -542,7 +548,7 @@ const PeerList: React.FC<PeerListProps> = ({
       } else {
         console.info(`[PeerList] Ping timeout to ${normalizedPubkey} - this is normal in P2P networks`);
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, peerPubkey)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -558,7 +564,7 @@ const PeerList: React.FC<PeerListProps> = ({
       if (errorMessage.includes('peer data not found')) {
         console.info(`[PeerList] Peer ${normalizedPubkey} not yet discovered by node - this is normal in P2P networks`);
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, peerPubkey)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -570,7 +576,7 @@ const PeerList: React.FC<PeerListProps> = ({
       } else {
         console.warn(`[PeerList] Ping failed to ${normalizedPubkey}:`, error);
         setPeers(prev => prev.map(peer => {
-          if (comparePubkeys(peer.pubkey, peerPubkey)) {
+          if (toPolicyKey(peer.pubkey) === toPolicyKey(peerPubkey)) {
             return {
               ...peer,
               online: false,
@@ -596,7 +602,7 @@ const PeerList: React.FC<PeerListProps> = ({
     console.debug(`[PeerList] Pinging all ${filteredPeers.length} peers`);
 
     const pingPromises = filteredPeers.map(async (peer) => {
-      const normalizedPubkey = normalizePubkey(peer.pubkey);
+      const normalizedPubkey = normalizePubkey(peer.pubkey).toLowerCase();
       try {
         const startTime = Date.now();
         const result = await Promise.race([
@@ -608,14 +614,14 @@ const PeerList: React.FC<PeerListProps> = ({
         
         if ((result as any).ok) {
           setPeers(prev => prev.map(p => {
-            if (comparePubkeys(p.pubkey, peer.pubkey)) {
+            if (toPolicyKey(p.pubkey) === toPolicyKey(peer.pubkey)) {
               return { ...p, online: true, lastSeen: new Date(), latency };
             }
             return p;
           }));
         } else {
           setPeers(prev => prev.map(p => {
-            if (comparePubkeys(p.pubkey, peer.pubkey)) {
+            if (toPolicyKey(p.pubkey) === toPolicyKey(peer.pubkey)) {
               return { ...p, online: false, lastPingAttempt: new Date() };
             }
             return p;
@@ -628,7 +634,7 @@ const PeerList: React.FC<PeerListProps> = ({
           console.debug(`[PeerList] Ping error to ${normalizedPubkey}:`, error);
         }
         setPeers(prev => prev.map(p => {
-          if (comparePubkeys(p.pubkey, peer.pubkey)) {
+          if (toPolicyKey(p.pubkey) === toPolicyKey(peer.pubkey)) {
             return { ...p, online: false, lastPingAttempt: new Date() };
           }
           return p;
@@ -798,7 +804,7 @@ const PeerList: React.FC<PeerListProps> = ({
                   </div>
                 )}
                 {filteredPeers.map((peer) => {
-                  const normalizedPubkey = normalizePubkey(peer.pubkey);
+                  const normalizedPubkey = normalizePubkey(peer.pubkey).toLowerCase();
                   const policyKey = toPolicyKey(peer.pubkey);
                   const isPinging = pingingPeers.has(normalizedPubkey);
                   const policySummary = getPolicyForPeer(peer.pubkey);
