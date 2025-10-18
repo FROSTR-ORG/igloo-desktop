@@ -129,4 +129,4 @@ We've made several improvements to the test suite:
 
 ## Configuration
 
-See `jest.config.js`
+See `jest.config.cjs`

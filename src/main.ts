@@ -40,8 +40,6 @@ try {
   console.warn('[EchoBridge] Failed to apply SimplePool subscribeMany shim:', error);
 }
 
-const SHOULD_THROW_ON_MISSING_LISTENER = process.env.SHOULD_THROW_ON_MISSING_LISTENER === 'true';
-
 const sanitizeRelayList = (relays?: unknown): string[] => {
   if (!Array.isArray(relays)) {
     return [];
@@ -52,8 +50,6 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
     .map(relay => relay.trim())
     .filter(relay => relay.length > 0);
 };
-
-type EventHandler = (...args: unknown[]) => void;
 
 // Legacy listener record removed; igloo-core manages nodes internally.
 
@@ -189,11 +185,43 @@ app.whenReady().then(() => {
   });
   
   ipcMain.handle('save-share', async (_event: IpcMainInvokeEvent, share: Parameters<ShareManager['saveShare']>[0]) => {
-    return shareManager.saveShare(share);
+    try {
+      if (!share || typeof share !== 'object') {
+        console.warn('[ShareManager] save-share rejected: invalid payload type');
+        return false;
+      }
+      const s = (share as unknown) as Record<string, unknown>;
+      const required = {
+        id: s.id,
+        name: s.name,
+        share: s.share,
+        salt: s.salt,
+        groupCredential: s.groupCredential,
+      } as Record<string, unknown>;
+      for (const [key, value] of Object.entries(required)) {
+        if (typeof value !== 'string' || value.trim().length === 0) {
+          console.warn('[ShareManager] save-share rejected: missing/invalid field', { field: key });
+          return false;
+        }
+      }
+      return shareManager.saveShare(share);
+    } catch (err) {
+      console.error('[ShareManager] save-share failed:', err);
+      return false;
+    }
   });
   
   ipcMain.handle('delete-share', async (_event: IpcMainInvokeEvent, shareId: string) => {
-    return shareManager.deleteShare(shareId);
+    try {
+      if (typeof shareId !== 'string' || shareId.trim().length === 0) {
+        console.warn('[ShareManager] delete-share rejected: invalid shareId');
+        return false;
+      }
+      return shareManager.deleteShare(shareId.trim());
+    } catch (err) {
+      console.error('[ShareManager] delete-share failed:', err);
+      return false;
+    }
   });
 
   ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: string) => {
@@ -226,8 +254,13 @@ app.whenReady().then(() => {
 
     if (activeEchoListeners.has(listenerId)) {
       const existing = activeEchoListeners.get(listenerId);
-      existing?.cleanup?.();
-      activeEchoListeners.delete(listenerId);
+      try {
+        existing?.cleanup?.();
+      } catch (err) {
+        console.warn('[EchoBridge] Failed to cleanup existing listener during start', { listenerId, err });
+      } finally {
+        activeEchoListeners.delete(listenerId);
+      }
     }
 
     const normalizedShares = Array.isArray(shareCredentials)
@@ -241,27 +274,43 @@ app.whenReady().then(() => {
       return { ok: false, reason: 'no-valid-shares' };
     }
 
-    const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential) => {
+    try {
+      const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential) => {
+        if (!event.sender.isDestroyed()) {
+          event.sender.send('echo-received', {
+            listenerId,
+            shareIndex,
+            shareCredential
+          });
+        }
+      });
+
+      activeEchoListeners.set(listenerId, listener);
+
+      event.sender.once('destroyed', () => {
+        if (activeEchoListeners.has(listenerId)) {
+          const existing = activeEchoListeners.get(listenerId);
+          try {
+            existing?.cleanup?.();
+          } catch (err) {
+            console.warn('[EchoBridge] Listener cleanup failed on sender destroyed', { listenerId, err });
+          } finally {
+            activeEchoListeners.delete(listenerId);
+          }
+        }
+      });
+
+      return { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
       if (!event.sender.isDestroyed()) {
-        event.sender.send('echo-received', {
-          listenerId,
-          shareIndex,
-          shareCredential
-        });
+        try {
+          event.sender.send('echo-error', { listenerId, reason: 'start-failed', message });
+        } catch { /* ignore send error */ }
       }
-    });
-
-    activeEchoListeners.set(listenerId, listener);
-
-    event.sender.once('destroyed', () => {
-      if (activeEchoListeners.has(listenerId)) {
-        const existing = activeEchoListeners.get(listenerId);
-        existing?.cleanup?.();
-        activeEchoListeners.delete(listenerId);
-      }
-    });
-
-    return { ok: true };
+      console.error('[EchoBridge] Failed to start echo listener:', { listenerId, error: err });
+      return { ok: false, reason: 'start-failed', message };
+    }
   });
 
   type EchoStopArgs = { listenerId?: unknown };
@@ -275,8 +324,13 @@ app.whenReady().then(() => {
 
     const existing = activeEchoListeners.get(listenerId);
     if (existing) {
-      existing.cleanup?.();
-      activeEchoListeners.delete(listenerId);
+      try {
+        existing.cleanup?.();
+      } catch (err) {
+        console.warn('[EchoBridge] Listener cleanup failed on stop', { listenerId, err });
+      } finally {
+        activeEchoListeners.delete(listenerId);
+      }
     }
 
     return { ok: true };
