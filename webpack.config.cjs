@@ -30,7 +30,8 @@ module.exports = {
     extensions: ['.tsx', '.ts', '.js', '.jsx'],
     alias: {
       '@': path.resolve(__dirname, 'src'),
-      'react/jsx-runtime': require.resolve('react/jsx-runtime.js')
+      // Map to the React export, not a file path with extension
+      'react/jsx-runtime': require.resolve('react/jsx-runtime')
     }
   },
   output: {

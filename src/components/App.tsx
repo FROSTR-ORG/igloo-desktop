@@ -4,14 +4,16 @@ import Create from "@/components/Create"
 import Keyset from "@/components/Keyset"
 import Signer, { SignerHandle } from "@/components/Signer"
 import Recover from "@/components/Recover"
+import AddShare from "@/components/AddShare"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { HelpCircle, Plus } from "lucide-react"
+import { HelpCircle, Plus, Upload } from "lucide-react"
 import { clientShareManager } from "@/lib/clientShareManager"
 import { Tooltip } from "@/components/ui/tooltip"
 import { PageLayout } from "@/components/ui/page-layout"
 import { AppHeader } from "@/components/ui/app-header"
 import { ContentCard } from "@/components/ui/content-card"
+import type { IglooShare } from '@/lib/clientShareManager';
 
 interface KeysetData {
   groupCredential: string;
@@ -20,15 +22,17 @@ interface KeysetData {
 }
 
 interface SignerData {
-  share: string;
+  decryptedShare: string;
   groupCredential: string;
-  name?: string;
+  shareRecord: IglooShare;
   threshold?: number;
   totalShares?: number;
 }
 
 const App: React.FC = () => {
   const [showingCreate, setShowingCreate] = useState(false);
+  const [showingRecover, setShowingRecover] = useState(false);
+  const [showingAddShare, setShowingAddShare] = useState(false);
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
@@ -52,8 +56,12 @@ const App: React.FC = () => {
     setShowingCreate(false);
   };
 
-  const handleShareLoaded = (share: string, groupCredential: string, shareName: string) => {
-    setSignerData({ share, groupCredential, name: shareName });
+  const handleShareLoaded = ({ decryptedShare, groupCredential, shareRecord }: {
+    decryptedShare: string;
+    groupCredential: string;
+    shareRecord: IglooShare;
+  }) => {
+    setSignerData({ decryptedShare, groupCredential, shareRecord });
     // Ensure we're on the signer tab when a share is loaded
     const signerTab = document.querySelector('[data-state="active"][value="signer"]');
     if (!signerTab) {
@@ -69,6 +77,8 @@ const App: React.FC = () => {
     await signerRef.current?.stopSigner().catch(console.error);
     setSignerData(null);
     setShowingCreate(false);
+    setShowingRecover(false);
+    setShowingAddShare(false);
   };
 
   const handleTabChange = async (value: string) => {
@@ -83,6 +93,21 @@ const App: React.FC = () => {
     setKeysetData(null);
     setShowingNewKeyset(false);
     setShowingCreate(false);
+  };
+
+  const handleRecoverBack = () => {
+    setShowingRecover(false);
+  };
+
+  const handleAddShareComplete = async () => {
+    setShowingAddShare(false);
+    // Refresh shares list
+    const shares = await clientShareManager.getShares();
+    setHasShares(Array.isArray(shares) && shares.length > 0);
+  };
+
+  const handleAddShareCancel = () => {
+    setShowingAddShare(false);
   };
 
   // Show new keyset view
@@ -112,6 +137,71 @@ const App: React.FC = () => {
             shareCredentials={keysetData.shareCredentials}
             onFinish={handleFinish}
           />
+        </ContentCard>
+      </PageLayout>
+    );
+  }
+
+  // Show standalone recovery view
+  if (showingRecover) {
+    return (
+      <PageLayout>
+        <AppHeader />
+
+        <ContentCard
+          title="Recover NSEC"
+          headerRight={
+            <div className="flex items-center gap-2">
+              <Tooltip
+                trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
+                content={
+                  <>
+                    <p className="mb-2 font-semibold">Standalone Recovery:</p>
+                    <p className="mb-2">This flow allows you to recover your nsec without loading a saved share first.</p>
+                    <p className="mb-2">Start by pasting your group credential (bfgroup...), which will determine how many shares you need.</p>
+                    <p>Then paste the required number of share credentials to reconstruct your private key.</p>
+                  </>
+                }
+              />
+              <Button
+                variant="ghost"
+                onClick={handleRecoverBack}
+                className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+              >
+                Back
+              </Button>
+            </div>
+          }
+        >
+          <Recover mode="standalone" />
+        </ContentCard>
+      </PageLayout>
+    );
+  }
+
+  // Show add share wizard
+  if (showingAddShare) {
+    return (
+      <PageLayout>
+        <AppHeader />
+
+        <ContentCard
+          title="Add Existing Share"
+          headerRight={
+            <Tooltip
+              trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer" />}
+              content={
+                <>
+                  <p className="mb-2 font-semibold">Import a Share:</p>
+                  <p className="mb-2">This flow allows you to import an existing share without creating a new keyset.</p>
+                  <p className="mb-2">First, paste your group credential to see keyset details.</p>
+                  <p>Then, paste one share credential and save it with a password.</p>
+                </>
+              }
+            />
+          }
+        >
+          <AddShare onComplete={handleAddShareComplete} onCancel={handleAddShareCancel} />
         </ContentCard>
       </PageLayout>
     );
@@ -159,7 +249,7 @@ const App: React.FC = () => {
             
             <TabsContent value="recover" className="border border-purple-900/30 rounded-lg p-4">
               <Recover 
-                initialShare={signerData?.share} 
+                initialShare={signerData?.decryptedShare} 
                 initialGroupCredential={signerData?.groupCredential}
                 defaultThreshold={signerData?.threshold}
                 defaultTotalShares={signerData?.totalShares}
@@ -185,7 +275,7 @@ const App: React.FC = () => {
               <h2 className="text-xl font-semibold text-blue-300">Available Shares</h2>
               <div className="flex items-center gap-2">
                 {hasShares && (
-                  <Tooltip 
+                  <Tooltip
                     trigger={<HelpCircle size={20} className="text-blue-400 cursor-pointer mr-2" />}
                     content={
                       <>
@@ -198,6 +288,19 @@ const App: React.FC = () => {
                     }
                   />
                 )}
+                <Button
+                  onClick={() => setShowingAddShare(true)}
+                  className="bg-green-600 hover:bg-green-700 text-green-100 transition-colors"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  Add
+                </Button>
+                <Button
+                  onClick={() => setShowingRecover(true)}
+                  className="bg-purple-600 hover:bg-purple-700 text-purple-100 transition-colors"
+                >
+                  Recover
+                </Button>
                 <Button
                   onClick={() => setShowingCreate(true)}
                   className="bg-blue-600 hover:bg-blue-700 text-blue-100 transition-colors"

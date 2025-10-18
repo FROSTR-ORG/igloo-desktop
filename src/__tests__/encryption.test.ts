@@ -5,8 +5,11 @@ setupBuffMock();
 // Now we can safely import from modules that use @cmdcode/buff
 import { 
   derive_secret,
+  derive_secret_async,
   encrypt_payload,
-  decrypt_payload
+  decrypt_payload,
+  PBKDF2_ITERATIONS_DEFAULT,
+  PBKDF2_ITERATIONS_LEGACY
 } from '../lib/encryption';
 
 // Mock implementations need to be before variable declarations
@@ -16,7 +19,8 @@ jest.mock('@noble/hashes/sha256', () => ({
 }));
 
 jest.mock('@noble/hashes/pbkdf2', () => ({
-  pbkdf2: jest.fn().mockReturnValue(new Uint8Array(32).fill(42)) // 32 bytes of data
+  pbkdf2: jest.fn().mockReturnValue(new Uint8Array(32).fill(42)), // 32 bytes of data
+  pbkdf2Async: jest.fn().mockResolvedValue(new Uint8Array(32).fill(84))
 }));
 
 // Create spy functions for the noble cipher
@@ -65,7 +69,7 @@ describe('Encryption Functions', () => {
         expect.anything(),         // Password bytes (could be Buffer or Uint8Array)
         expect.anything(),         // Salt bytes (could be Buffer or Uint8Array)
         expect.objectContaining({  // Options
-          c: 32,                   // Iterations
+          c: PBKDF2_ITERATIONS_DEFAULT, // Iterations
           dkLen: 32                // Output length
         })
       );
@@ -122,6 +126,52 @@ describe('Encryption Functions', () => {
       // But the password bytes (second parameter) should be different
       // Note: We can't directly compare the Uint8Arrays since they come from our mock,
       // but in a real implementation they would be different
+    });
+
+    it('should allow overriding iteration count', () => {
+      const { pbkdf2 } = jest.requireMock('@noble/hashes/pbkdf2');
+      pbkdf2.mockClear();
+
+      derive_secret('password', 'salt', PBKDF2_ITERATIONS_LEGACY);
+
+      expect(pbkdf2).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ c: PBKDF2_ITERATIONS_LEGACY })
+      );
+    });
+  });
+
+  describe('derive_secret_async', () => {
+    it('should resolve to a hex string', async () => {
+      const { pbkdf2Async } = jest.requireMock('@noble/hashes/pbkdf2');
+      const { sha256 } = jest.requireMock('@noble/hashes/sha256');
+
+      const result = await derive_secret_async('password', 'salt');
+
+      expect(typeof result).toBe('string');
+      expect(result.length).toBeGreaterThan(0);
+      expect(pbkdf2Async).toHaveBeenCalledWith(
+        sha256,
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ c: PBKDF2_ITERATIONS_DEFAULT, dkLen: 32 })
+      );
+    });
+
+    it('should support overriding iteration count', async () => {
+      const { pbkdf2Async } = jest.requireMock('@noble/hashes/pbkdf2');
+      pbkdf2Async.mockClear();
+
+      await derive_secret_async('password', 'salt', PBKDF2_ITERATIONS_LEGACY);
+
+      expect(pbkdf2Async).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.anything(),
+        expect.anything(),
+        expect.objectContaining({ c: PBKDF2_ITERATIONS_LEGACY })
+      );
     });
   });
   
