@@ -76,7 +76,7 @@ Electron Builder is already wired to notarize via the custom `afterSign` hook. T
 ```json
 {
   "build": {
-    "afterSign": "scripts/notarize.js",
+    "afterSign": "scripts/notarize.cjs",
     "mac": {
       "notarize": false
     }
