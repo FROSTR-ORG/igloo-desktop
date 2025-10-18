@@ -51,6 +51,12 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
     .filter(relay => relay.length > 0);
 };
 
+const normalizeRelay = (url: string): string => {
+  const trimmed = url.trim();
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed.replace(/^http/i, 'ws');
+  return `wss://${trimmed}`;
+};
+
 // Legacy listener record removed; igloo-core manages nodes internally.
 
 const startEchoMonitor = async (
@@ -79,8 +85,14 @@ const startEchoMonitor = async (
     console.warn('[EchoBridge] Failed to decode group relay list:', error);
   }
 
-  const defaultRelays = DEFAULT_ECHO_RELAYS.slice();
-  const extraRelays = groupRelays.filter(relay => !defaultRelays.includes(relay));
+  // Optional single-relay override for debugging / CI sync
+  const envRelay = (process.env.IGLOO_TEST_RELAY ?? '').trim();
+  const defaultRelays = envRelay
+    ? [normalizeRelay(envRelay)]
+    : DEFAULT_ECHO_RELAYS.slice();
+  const extraRelays = envRelay
+    ? []
+    : groupRelays.filter(relay => !defaultRelays.includes(relay)).map(normalizeRelay);
   const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
 
   const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
@@ -131,16 +143,27 @@ const startEchoMonitor = async (
   // - one on the group's extra relays (if any)
   const listeners: Array<{ cleanup: () => void }> = [];
 
+  const debugEnabled = ((process.env.IGLOO_DEBUG_ECHO ?? '').toLowerCase() === '1' || (process.env.IGLOO_DEBUG_ECHO ?? '').toLowerCase() === 'true');
+  const debugLogger = debugEnabled
+    ? ((level: string, message: string, data?: unknown) => {
+        try { 
+          console.log(`[echo-listen] ${level.toUpperCase()} ${message}`, data ?? ''); 
+        } catch (err) { 
+          /* suppress potential log failure */
+        }
+      })
+    : undefined;
+
   const defaultListener = startListeningForAllEchoes(
     groupCredential,
     shareCredentials,
-    (a: any, b?: any, c?: any) => {
+    (subsetIndex: number, shareCredential: string, details?: unknown) => {
       if (disposed) return;
-      handleCoreCallback(a, b, c);
+      handleCoreCallback(subsetIndex, shareCredential, details);
     },
     {
       relays: defaultRelays,
-      eventConfig: { enableLogging: false }
+      eventConfig: { enableLogging: debugEnabled, customLogger: debugLogger }
     }
   );
   listeners.push(defaultListener);
@@ -149,13 +172,13 @@ const startEchoMonitor = async (
     const groupListener = startListeningForAllEchoes(
       groupCredential,
       shareCredentials,
-      (a: any, b?: any, c?: any) => {
+      (subsetIndex: number, shareCredential: string, details?: unknown) => {
         if (disposed) return;
-        handleCoreCallback(a, b, c);
+        handleCoreCallback(subsetIndex, shareCredential, details);
       },
       {
         relays: extraRelays,
-        eventConfig: { enableLogging: false }
+        eventConfig: { enableLogging: debugEnabled, customLogger: debugLogger }
       }
     );
     listeners.push(groupListener);
