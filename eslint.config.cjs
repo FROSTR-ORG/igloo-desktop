@@ -142,7 +142,8 @@ module.exports = [
       'node_modules/**',
       '*.config.js',
       '*.config.ts',
-      'webpack.config.js'
+      'webpack.config.js',
+      'webpack.config.cjs'
     ]
   }
-]; 
+];
