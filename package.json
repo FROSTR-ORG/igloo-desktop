@@ -33,7 +33,7 @@
   "build": {
     "appId": "com.igloo.app",
     "productName": "Igloo",
-    "afterSign": "scripts/notarize.js",
+    "afterSign": "scripts/notarize.cjs",
     "directories": {
       "output": "release"
     },
