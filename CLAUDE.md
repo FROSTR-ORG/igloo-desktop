@@ -295,5 +295,5 @@ Desktop app should remain thin—delegate crypto operations to `@frostr/igloo-co
 ### Known Quirks
 - Electron's main process uses CommonJS (`require`), renderer uses ESM (`import`)
 - `@frostr/igloo-core` is mocked in tests to avoid ESM/Jest complications
-- macOS notarization happens post-build via `scripts/notarize.js`
+- macOS notarization happens post-build via `scripts/notarize.cjs`
 - Version must match between `package.json` and git tag or CI will fail
