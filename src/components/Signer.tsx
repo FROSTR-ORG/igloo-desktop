@@ -2,15 +2,30 @@ import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle, us
 import { Button } from "@/components/ui/button"
 import { IconButton } from "@/components/ui/icon-button"
 import { Tooltip } from "@/components/ui/tooltip"
-import { createConnectedNode, validateShare, validateGroup, decodeShare, decodeGroup, cleanupBifrostNode } from "@frostr/igloo-core"
+import {
+  createConnectedNode,
+  validateShare,
+  validateGroup,
+  decodeShare,
+  decodeGroup,
+  cleanupBifrostNode,
+  extractSelfPubkeyFromCredentials,
+  setNodePolicies,
+  normalizePubkey
+} from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
 import PeerList from "@/components/ui/peer-list"
+import { createSignerKeepAlive, type SignerKeepAliveHandle } from '@/lib/signer-keepalive';
+import { clientShareManager } from '@/lib/clientShareManager';
 import type {
   SignerHandle,
-  SignerProps
+  SignerProps,
+  SharePolicy,
+  SharePolicyEntry,
+  IglooShare
 } from '@/types';
 
 // Add CSS for the pulse animation
@@ -54,6 +69,127 @@ const EVENT_MAPPINGS = {
 
 const DEFAULT_RELAY = "wss://relay.primal.net";
 
+const DEFAULT_POLICY_ENTRY: SharePolicyEntry = {
+  allowSend: true,
+  allowReceive: true
+};
+
+const safeNormalizePubkey = (pubkey: string): string => {
+  if (!pubkey || typeof pubkey !== 'string') {
+    return '';
+  }
+
+  try {
+    const normalized = normalizePubkey(pubkey);
+    if (typeof normalized === 'string' && normalized.length > 0) {
+      return normalized.toLowerCase();
+    }
+  } catch {
+    // Swallow normalization errors and fall back to lowercase pubkey
+  }
+
+  return pubkey.toLowerCase();
+};
+
+const ensurePolicyEntry = (entry?: SharePolicyEntry): SharePolicyEntry => ({
+  allowSend: entry?.allowSend ?? DEFAULT_POLICY_ENTRY.allowSend,
+  allowReceive: entry?.allowReceive ?? DEFAULT_POLICY_ENTRY.allowReceive,
+  ...(entry?.updatedAt ? { updatedAt: entry.updatedAt } : {})
+});
+
+const normalizeSharePolicy = (policy?: SharePolicy): SharePolicy => {
+  const defaults = ensurePolicyEntry(policy?.defaults);
+  const peers = policy?.peers
+    ? Object.entries(policy.peers).reduce<Record<string, SharePolicyEntry>>((acc, [key, value]) => {
+        const normalizedKey = safeNormalizePubkey(key);
+        acc[normalizedKey] = ensurePolicyEntry(value);
+        return acc;
+      }, {})
+    : {};
+
+  const normalized: SharePolicy = {
+    defaults,
+    updatedAt: policy?.updatedAt
+  };
+
+  if (Object.keys(peers).length > 0) {
+    normalized.peers = peers;
+  }
+
+  return normalized;
+};
+
+const policyEntriesToArray = (policy: SharePolicy): Array<{
+  pubkey: string;
+  allowSend: boolean;
+  allowReceive: boolean;
+}> => {
+  if (!policy.peers) {
+    return [];
+  }
+
+  return Object.entries(policy.peers).map(([pubkey, entry]) => ({
+    pubkey,
+    allowSend: entry.allowSend,
+    allowReceive: entry.allowReceive
+  }));
+};
+
+const stampPolicyUpdate = () => new Date().toISOString();
+
+const updatePolicyEntryForPeer = (
+  policy: SharePolicy,
+  pubkey: string,
+  allowSend: boolean,
+  allowReceive: boolean
+): { next: SharePolicy; changed: boolean } => {
+  const key = safeNormalizePubkey(pubkey);
+  const defaults = ensurePolicyEntry(policy.defaults);
+  const peers = policy.peers ? { ...policy.peers } : {};
+  const current = peers[key];
+  const currentAllowSend = current?.allowSend ?? defaults.allowSend;
+  const currentAllowReceive = current?.allowReceive ?? defaults.allowReceive;
+
+  if (currentAllowSend === allowSend && currentAllowReceive === allowReceive) {
+    return { next: policy, changed: false };
+  }
+
+  const timestamp = stampPolicyUpdate();
+
+  if (allowSend === defaults.allowSend && allowReceive === defaults.allowReceive) {
+    if (!current) {
+      return { next: policy, changed: false };
+    }
+
+    delete peers[key];
+    const remainingKeys = Object.keys(peers);
+    const nextPolicy: SharePolicy = {
+      defaults,
+      updatedAt: timestamp
+    };
+
+    if (remainingKeys.length > 0) {
+      nextPolicy.peers = peers;
+    }
+
+    return { next: nextPolicy, changed: true };
+  }
+
+  peers[key] = {
+    allowSend,
+    allowReceive,
+    updatedAt: timestamp
+  };
+
+  const nextPolicy: SharePolicy = {
+    defaults,
+    peers,
+    updatedAt: timestamp
+  };
+
+  return { next: nextPolicy, changed: true };
+};
+
 // Helper function to extract share information
 const getShareInfo = (groupCredential: string, shareCredential: string, shareName?: string) => {
   try {
@@ -76,7 +212,7 @@ const getShareInfo = (groupCredential: string, shareCredential: string, shareNam
     }
 
     return null;
-  } catch (error) {
+  } catch {
     return null;
   }
 };
@@ -84,13 +220,17 @@ const getShareInfo = (groupCredential: string, shareCredential: string, shareNam
 const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const [isSignerRunning, setIsSignerRunning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
-  const [signerSecret, setSignerSecret] = useState(initialData?.share || "");
+  const [signerSecret, setSignerSecret] = useState(initialData?.decryptedShare || "");
   const [isShareValid, setIsShareValid] = useState(false);
   const [relayUrls, setRelayUrls] = useState<string[]>([DEFAULT_RELAY]);
   const [newRelayUrl, setNewRelayUrl] = useState("");
 
   const [groupCredential, setGroupCredential] = useState(initialData?.groupCredential || "");
   const [isGroupValid, setIsGroupValid] = useState(false);
+
+  const [shareRecord, setShareRecord] = useState<IglooShare | null>(initialData?.shareRecord ?? null);
+  const [sharePolicy, setSharePolicy] = useState<SharePolicy>(() => normalizeSharePolicy(initialData?.shareRecord?.policy));
+  const sharePolicyRef = useRef<SharePolicy>(normalizeSharePolicy(initialData?.shareRecord?.policy));
 
   const [copiedStates, setCopiedStates] = useState({
     group: false,
@@ -105,6 +245,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const nodeRef = useRef<BifrostNode | null>(null);
   // Track cleanup functions for event listeners to prevent memory leaks
   const cleanupListenersRef = useRef<(() => void)[]>([]);
+  const keepAliveRef = useRef<SignerKeepAliveHandle | null>(null);
+  const isSignerRunningRef = useRef(false);
+
+  const updateSignerRunning = useCallback((running: boolean) => {
+    isSignerRunningRef.current = running;
+    setIsSignerRunning(running);
+  }, []);
 
   // Expose the stopSigner method to parent components through ref
   useImperativeHandle(ref, () => ({
@@ -177,13 +324,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const setupBasicEventListeners = useCallback((node: BifrostNode) => {
     const closedHandler = () => {
       addLog('bifrost', 'Bifrost node is closed');
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     };
 
     const errorHandler = (error: unknown) => {
       addLog('error', 'Node error', error);
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     };
 
@@ -194,7 +341,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         data;
       addLog('ready', 'Node is ready', logData);
       setIsConnecting(false);
-      setIsSignerRunning(true);
+      updateSignerRunning(true);
     };
 
     const bouncedHandler = (reason: string, msg: unknown) =>
@@ -217,7 +364,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         console.warn('Error removing basic event listeners:', error);
       }
     };
-  }, [addLog, setIsSignerRunning, setIsConnecting]);
+  }, [addLog, updateSignerRunning, setIsConnecting]);
 
   const setupMessageEventListener = useCallback((node: BifrostNode) => {
     const messageHandler = (msg: unknown) => {
@@ -271,7 +418,6 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   }, [addLog]);
 
   const setupLegacyEventListeners = useCallback((node: BifrostNode) => {
-    const nodeAny = node as any;
     const cleanupFunctions: (() => void)[] = [];
 
     // Legacy direct event listeners for backward compatibility
@@ -289,18 +435,23 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       // Note: Ping events are handled by the main message handler - no duplicates needed
     ];
 
+    const emitter = node as unknown as {
+      on: (event: string, handler: (...args: unknown[]) => void) => void;
+      off: (event: string, handler: (...args: unknown[]) => void) => void;
+    };
+
     legacyEvents.forEach(({ event, type, message }) => {
       try {
         const handler = (msg: unknown) => addLog(type, message, msg);
-        nodeAny.on(event, handler);
+        emitter.on(event, handler);
         cleanupFunctions.push(() => {
           try {
-            nodeAny.off(event, handler);
-          } catch (e) {
+            emitter.off(event, handler);
+          } catch {
             // Silently ignore cleanup errors for legacy events
           }
         });
-      } catch (e) {
+      } catch {
         // Silently ignore if event doesn't exist
       }
     });
@@ -327,8 +478,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           node.off('/ecdh/sender/ret', ecdhSenderRetHandler);
           node.off('/ecdh/sender/err', ecdhSenderErrHandler);
           node.off('/ecdh/handler/rej', ecdhHandlerRejHandler);
-        } catch (e) {
-          console.warn('Error removing ECDH event listeners:', e);
+        } catch (error) {
+          console.warn('Error removing ECDH event listeners:', error);
         }
       });
 
@@ -352,8 +503,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           node.off('/sign/sender/ret', signSenderRetHandler);
           node.off('/sign/sender/err', signSenderErrHandler);
           node.off('/sign/handler/rej', signHandlerRejHandler);
-        } catch (e) {
-          console.warn('Error removing signature event listeners:', e);
+        } catch (error) {
+          console.warn('Error removing signature event listeners:', error);
         }
       });
 
@@ -387,8 +538,20 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     cleanupListenersRef.current = [];
   }, []);
 
+  const stopKeepAlive = useCallback(() => {
+    if (keepAliveRef.current) {
+      try {
+        keepAliveRef.current.stop();
+      } catch (error) {
+        console.warn('Error stopping keep-alive manager:', error);
+      }
+      keepAliveRef.current = null;
+    }
+  }, []);
+
   // Clean node cleanup using igloo-core
   const cleanupNode = useCallback(() => {
+    stopKeepAlive();
     if (nodeRef.current) {
       // First clean up our event listeners
       cleanupEventListeners();
@@ -415,7 +578,36 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         nodeRef.current = null;
       }
     }
-  }, [cleanupEventListeners]);
+  }, [cleanupEventListeners, stopKeepAlive]);
+
+  const applyNodeListeners = useCallback((node: BifrostNode) => {
+    const cleanupBasic = setupBasicEventListeners(node);
+    const cleanupMessage = setupMessageEventListener(node);
+    const cleanupLegacy = setupLegacyEventListeners(node);
+    cleanupListenersRef.current.push(cleanupBasic, cleanupMessage, cleanupLegacy);
+  }, [setupBasicEventListeners, setupMessageEventListener, setupLegacyEventListeners]);
+
+  const registerNode = useCallback((node: BifrostNode) => {
+    cleanupEventListeners();
+    nodeRef.current = node;
+    applyNodeListeners(node);
+  }, [applyNodeListeners, cleanupEventListeners]);
+
+  const applySavedPoliciesToNode = useCallback(async (node: BifrostNode, policy: SharePolicy) => {
+    const entries = policyEntriesToArray(policy);
+    if (entries.length === 0) {
+      return;
+    }
+
+    try {
+      await setNodePolicies(node, entries, { merge: true });
+      addLog('info', 'Applied saved peer policies', { count: entries.length });
+    } catch (error) {
+      addLog('error', 'Failed to apply saved policies', {
+        error: error instanceof Error ? error.message : String(error)
+      });
+    }
+  }, [addLog]);
 
   // Add effect to cleanup on unmount
   useEffect(() => {
@@ -423,23 +615,41 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     return () => {
       if (nodeRef.current) {
         addLog('info', 'Signer stopped due to page navigation');
-        cleanupNode();
       }
+      cleanupNode();
     };
   }, [addLog, cleanupNode]); // Include dependencies
 
-  // Validate initial data
+  // Prime state from initial data whenever it changes
   useEffect(() => {
-    if (initialData?.share) {
-      const validation = validateShare(initialData.share);
+    const decryptedShare = initialData?.decryptedShare ?? initialData?.share ?? "";
+    if (decryptedShare) {
+      setSignerSecret(decryptedShare);
+      const validation = validateShare(decryptedShare);
       setIsShareValid(validation.isValid);
+    } else {
+      setSignerSecret("");
+      setIsShareValid(false);
     }
 
     if (initialData?.groupCredential) {
+      setGroupCredential(initialData.groupCredential);
       const validation = validateGroup(initialData.groupCredential);
       setIsGroupValid(validation.isValid);
+    } else {
+      setGroupCredential("");
+      setIsGroupValid(false);
     }
+
+    const normalizedPolicy = normalizeSharePolicy(initialData?.shareRecord?.policy);
+    setShareRecord(initialData?.shareRecord ?? null);
+    setSharePolicy(normalizedPolicy);
+    sharePolicyRef.current = normalizedPolicy;
   }, [initialData]);
+
+  useEffect(() => {
+    sharePolicyRef.current = sharePolicy;
+  }, [sharePolicy]);
 
   const handleCopy = async (text: string, field: 'group' | 'share') => {
     try {
@@ -482,6 +692,59 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     }
   }, [expandedItems.share, signerSecret, isShareValid]);
 
+  const persistPolicyChange = useCallback(async ({
+    pubkey,
+    allowSend,
+    allowReceive
+  }: {
+    pubkey: string;
+    allowSend: boolean;
+    allowReceive: boolean;
+  }) => {
+    if (!shareRecord) {
+      addLog('bifrost', 'Skipping policy persistence: share not backed by saved file', {
+        pubkey
+      });
+      return;
+    }
+
+    const currentPolicy = sharePolicyRef.current;
+    const { next, changed } = updatePolicyEntryForPeer(currentPolicy, pubkey, allowSend, allowReceive);
+
+    if (!changed) {
+      return;
+    }
+
+    const previousPolicy = currentPolicy;
+    setSharePolicy(next);
+    sharePolicyRef.current = next;
+
+    const updatedShareRecord: IglooShare = {
+      ...shareRecord,
+      policy: next,
+      savedAt: new Date().toISOString()
+    };
+
+    try {
+      const success = await clientShareManager.saveShare(updatedShareRecord);
+      if (!success) {
+        throw new Error('Share manager rejected policy update');
+      }
+      setShareRecord(updatedShareRecord);
+      addLog('info', 'Persisted peer policy', { pubkey, allowSend, allowReceive });
+    } catch (error) {
+      sharePolicyRef.current = previousPolicy;
+      setSharePolicy(previousPolicy);
+      addLog('error', 'Failed to persist peer policy', {
+        pubkey,
+        allowSend,
+        allowReceive,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      throw error;
+    }
+  }, [shareRecord, addLog]);
+
   const renderDecodedInfo = (data: unknown, rawString?: string) => {
     // Safe JSON stringification with error handling
     const getJsonString = (obj: unknown): string => {
@@ -501,7 +764,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
             }
             return value;
           }, 2);
-        } catch (fallbackError) {
+        } catch {
           // Final fallback - show error message
           return `[Serialization Error: ${error instanceof Error ? error.message : 'Unknown error'}]`;
         }
@@ -607,6 +870,16 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
       setIsConnecting(true);
       addLog('info', 'Creating and connecting node...');
 
+      const selfPubkeyResult = extractSelfPubkeyFromCredentials(
+        groupCredential,
+        signerSecret,
+        {
+          normalize: true,
+          suppressWarnings: true
+        }
+      );
+      const selfPubkey = selfPubkeyResult.pubkey;
+
       // Use the improved createConnectedNode API which returns enhanced state info
       const result = await createConnectedNode({
         group: groupCredential,
@@ -614,32 +887,71 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         relays: relayUrls
       });
 
-      nodeRef.current = result.node;
-
-      // Set up all event listeners using our extracted functions
-      const cleanupBasic = setupBasicEventListeners(result.node);
-      const cleanupMessage = setupMessageEventListener(result.node);
-      const cleanupLegacy = setupLegacyEventListeners(result.node);
+      registerNode(result.node);
+      await applySavedPoliciesToNode(result.node, sharePolicyRef.current);
 
       // Use the enhanced state info from createConnectedNode
       if (result.state.isReady) {
         addLog('info', 'Node connected and ready');
         setIsConnecting(false);
-        setIsSignerRunning(true);
+        updateSignerRunning(true);
       } else {
         addLog('warning', 'Node created but not yet ready, waiting...');
         // Keep connecting state until ready
       }
 
-      // Add cleanup functions to cleanupListenersRef
-      cleanupListenersRef.current.push(cleanupBasic);
-      cleanupListenersRef.current.push(cleanupMessage);
-      cleanupListenersRef.current.push(cleanupLegacy);
+      if (selfPubkey) {
+        const keepAlive = createSignerKeepAlive({
+          node: result.node,
+          groupCredential,
+          shareCredential: signerSecret,
+          relays: relayUrls,
+          selfPubkey,
+          logger: (level, message, context) => {
+            if (level === 'warn' || level === 'error') {
+              const logType = level === 'error' ? 'error' : 'bifrost';
+              addLog(logType, `Keep-alive: ${message}`, context);
+            }
+          }
+        });
+
+        keepAlive.onReplace(({ next, previous }) => {
+          if (!isSignerRunningRef.current) {
+            return;
+          }
+          addLog('bifrost', 'Keep-alive replaced signer node', {
+            relays: relayUrls,
+            previousPubkey: previous.pubkey
+          });
+
+          registerNode(next);
+          void applySavedPoliciesToNode(next, sharePolicyRef.current);
+          updateSignerRunning(true);
+          setIsConnecting(false);
+
+          if (previous && previous !== next) {
+            try {
+              cleanupBifrostNode(previous);
+            } catch (cleanupError) {
+              addLog('bifrost', 'Failed to cleanup replaced node', {
+                error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+              });
+            }
+          }
+        });
+
+        keepAliveRef.current = keepAlive;
+        keepAlive.start();
+      } else {
+        addLog('bifrost', 'Keep-alive disabled: unable to derive self pubkey', {
+          warnings: selfPubkeyResult.warnings
+        });
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
       cleanupNode();
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     }
   };
@@ -648,7 +960,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     try {
       cleanupNode();
       addLog('info', 'Signer stopped');
-      setIsSignerRunning(false);
+      updateSignerRunning(false);
       setIsConnecting(false);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -684,7 +996,11 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
       {/* Share Information Header */}
       {(() => {
-        const shareInfo = getShareInfo(groupCredential, signerSecret, initialData?.name);
+        const shareInfo = getShareInfo(
+          groupCredential,
+          signerSecret,
+          shareRecord?.name ?? initialData?.shareRecord?.name ?? initialData?.name
+        );
         return shareInfo && isGroupValid && isShareValid ? (
           <div className="border border-blue-800/30 rounded-lg p-4">
             <div className="flex items-center gap-3">
@@ -945,6 +1261,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           shareCredential={signerSecret}
           isSignerRunning={isSignerRunning}
           disabled={!isGroupValid || !isShareValid}
+          onPolicyChange={persistPolicyChange}
         />
 
         <EventLog
