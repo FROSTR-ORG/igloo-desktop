@@ -1,6 +1,6 @@
 {
   "name": "igloo",
-  "version": "0.1.3",
+  "version": "1.0.1",
   "description": "Frostr desktop signer and key management app",
   "author": {
     "name": "austinkelsay",
@@ -33,7 +33,7 @@
   "build": {
     "appId": "com.igloo.app",
     "productName": "Igloo",
-    "afterSign": "scripts/notarize.js",
+    "afterSign": "scripts/notarize.cjs",
     "directories": {
       "output": "release"
     },
@@ -158,7 +158,7 @@
   "dependencies": {
     "@cmdcode/buff": "^2.2.5",
     "@frostr/bifrost": "^1.0.6",
-    "@frostr/igloo-core": "^0.2.3",
+    "@frostr/igloo-core": "^0.2.4",
     "@noble/ciphers": "^1.2.1",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.7.1",

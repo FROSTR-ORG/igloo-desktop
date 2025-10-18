@@ -199,7 +199,10 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     const listenerId = `keyset-${groupCredential}`;
     echoListenerIdRef.current = listenerId;
 
-    const handleIpcEcho = (_event: unknown, payload: { listenerId: string; shareIndex: number }) => {
+    const handleIpcEcho = (
+      _event: unknown,
+      payload: { listenerId: string; shareIndex: number; shareCredential?: string; challenge?: string | null }
+    ) => {
       if (!payload || payload.listenerId !== listenerId) {
         return;
       }

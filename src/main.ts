@@ -56,7 +56,7 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
 const startEchoMonitor = async (
   groupCredential: string,
   shareCredentials: string[],
-  onEcho: (shareIndex: number, shareCredential: string) => void
+  onEcho: (shareIndex: number, shareCredential: string, challenge?: string | null) => void
 ): Promise<EchoListener> => {
   const handledShares = new Set<string>();
   let coreListener: { cleanup: () => void; isActive?: boolean } | null = null;
@@ -83,14 +83,47 @@ const startEchoMonitor = async (
   const extraRelays = groupRelays.filter(relay => !defaultRelays.includes(relay));
   const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
 
-  const notifyEcho = (shareIndex: number, shareCredential: string) => {
-    const key = `${shareIndex}:${shareCredential}`;
+  const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
+    const key = `${shareIndex}:${shareCredential}:${challenge ?? ''}`;
     if (handledShares.has(key)) {
       return;
     }
 
     handledShares.add(key);
-    onEcho(shareIndex, shareCredential);
+    onEcho(shareIndex, shareCredential, challenge ?? undefined);
+  };
+
+  // Parser to support new and old igloo-core callback signatures.
+  // New form may pass an object or include a challenge; old form is (index, shareCredential).
+  const handleCoreCallback = (arg1: any, arg2?: any, arg3?: any) => {
+    try {
+      // Case 1: (subsetIndex: number, shareCredential: string, details?: { challenge?: string })
+      if (typeof arg1 === 'number' && typeof arg2 === 'string') {
+        const subsetIndex = arg1 as number;
+        const shareCredential = arg2 as string;
+        const challenge = typeof arg3 === 'string'
+          ? (arg3 as string)
+          : (arg3 && typeof arg3 === 'object' && typeof arg3.challenge === 'string')
+            ? arg3.challenge
+            : undefined;
+        notifyEcho(subsetIndex, shareCredential, challenge);
+        return;
+      }
+
+      // Case 2: (payload: { shareIndex, shareCredential, challenge? })
+      if (arg1 && typeof arg1 === 'object' && typeof arg1.shareIndex === 'number' && typeof arg1.shareCredential === 'string') {
+        notifyEcho(arg1.shareIndex, arg1.shareCredential, typeof arg1.challenge === 'string' ? arg1.challenge : undefined);
+        return;
+      }
+
+      // Unknown form; try best-effort
+      if (typeof arg1 === 'number') {
+        notifyEcho(arg1, String(arg2 ?? '')); // fallback
+        return;
+      }
+    } catch (err) {
+      console.warn('[EchoBridge] Failed to parse echo callback payload', { err });
+    }
   };
 
   // Start two listeners to avoid connect-all-or-fail on a combined set:
@@ -101,9 +134,9 @@ const startEchoMonitor = async (
   const defaultListener = startListeningForAllEchoes(
     groupCredential,
     shareCredentials,
-    (shareIndex, shareCredential) => {
+    (a: any, b?: any, c?: any) => {
       if (disposed) return;
-      notifyEcho(shareIndex, shareCredential);
+      handleCoreCallback(a, b, c);
     },
     {
       relays: defaultRelays,
@@ -116,9 +149,9 @@ const startEchoMonitor = async (
     const groupListener = startListeningForAllEchoes(
       groupCredential,
       shareCredentials,
-      (shareIndex, shareCredential) => {
+      (a: any, b?: any, c?: any) => {
         if (disposed) return;
-        notifyEcho(shareIndex, shareCredential);
+        handleCoreCallback(a, b, c);
       },
       {
         relays: extraRelays,
@@ -275,12 +308,13 @@ app.whenReady().then(() => {
     }
 
     try {
-      const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential) => {
+      const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential, challenge) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send('echo-received', {
             listenerId,
             shareIndex,
-            shareCredential
+            shareCredential,
+            challenge: challenge ?? null,
           });
         }
       });
