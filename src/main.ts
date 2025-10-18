@@ -7,9 +7,6 @@ import {
   decodeGroup,
   DEFAULT_ECHO_RELAYS,
   startListeningForAllEchoes,
-  createBifrostNode,
-  connectNode,
-  closeNode,
 } from '@frostr/igloo-core';
 import { SimplePool } from 'nostr-tools';
 // import type { BifrostNode } from '@frostr/igloo-core';
@@ -67,7 +64,7 @@ const startEchoMonitor = async (
 ): Promise<EchoListener> => {
   const handledShares = new Set<string>();
   let coreListener: { cleanup: () => void; isActive?: boolean } | null = null;
-  
+
   let disposed = false;
 
   let groupRelays: string[] = [];
@@ -89,7 +86,6 @@ const startEchoMonitor = async (
   const defaultRelays = DEFAULT_ECHO_RELAYS.slice();
   const extraRelays = groupRelays.filter(relay => !defaultRelays.includes(relay));
   const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
-  const hasCustomRelays = extraRelays.length > 0;
 
   const notifyEcho = (shareIndex: number, shareCredential: string) => {
     const key = `${shareIndex}:${shareCredential}`;
@@ -101,78 +97,41 @@ const startEchoMonitor = async (
     onEcho(shareIndex, shareCredential);
   };
 
-  // Reinstate per-share fallback:
-  // - Some shares may be unable to reach custom group relays while others can.
-  // - Probe connectivity for each share individually.
-  // - Use `primaryRelays` when the probe succeeds; otherwise fall back to DEFAULT_ECHO_RELAYS.
-  // - Group shares by the relay set that works to minimize connections.
-
-  type ShareProbe = { share: string; originalIndex: number; relays: string[] };
-  const perShare: ShareProbe[] = [];
-
-  for (let i = 0; i < shareCredentials.length; i++) {
-    const share = shareCredentials[i];
-
-    // Default to primary; only probe if there are custom relays to verify.
-    let chosen: string[] = primaryRelays;
-
-    if (hasCustomRelays) {
-      let probeNode: any = null;
-      try {
-        // Attempt a lightweight connect to the custom relay set for this share.
-        probeNode = createBifrostNode(
-          { group: groupCredential, share, relays: primaryRelays },
-          { enableLogging: false }
-        );
-        await connectNode(probeNode);
-      } catch (err) {
-        console.warn('[EchoBridge] Probe failed for share; falling back to defaults', { idx: i, err });
-        chosen = defaultRelays;
-      } finally {
-        if (probeNode) {
-          try { closeNode(probeNode); } catch { /* ignore close error */ }
-          probeNode = null;
-        }
-      }
-    }
-
-    perShare.push({ share, originalIndex: i, relays: chosen });
-  }
-
-  // Group shares by the resolved relay set to avoid duplicating listeners.
-  const groups = new Map<string, { relays: string[]; shares: string[]; idxMap: number[] }>();
-  for (const item of perShare) {
-    const key = item.relays.join('|');
-    const existing = groups.get(key);
-    if (existing) {
-      existing.shares.push(item.share);
-      existing.idxMap.push(item.originalIndex);
-    } else {
-      groups.set(key, { relays: item.relays, shares: [item.share], idxMap: [item.originalIndex] });
-    }
-  }
-
-  // Start one listener per relay-set group and translate subset indexes back to the
-  // original share index so downstream consumers remain stable.
+  // Start two listeners to avoid connect-all-or-fail on a combined set:
+  // - one on the stable defaults
+  // - one on the group's extra relays (if any)
   const listeners: Array<{ cleanup: () => void }> = [];
-  for (const { relays, shares, idxMap } of groups.values()) {
-    const listener = startListeningForAllEchoes(
+
+  const defaultListener = startListeningForAllEchoes(
+    groupCredential,
+    shareCredentials,
+    (shareIndex, shareCredential) => {
+      if (disposed) return;
+      notifyEcho(shareIndex, shareCredential);
+    },
+    {
+      relays: defaultRelays,
+      eventConfig: { enableLogging: false }
+    }
+  );
+  listeners.push(defaultListener);
+
+  if (extraRelays.length > 0) {
+    const groupListener = startListeningForAllEchoes(
       groupCredential,
-      shares,
-      (subsetIndex, shareCredential) => {
+      shareCredentials,
+      (shareIndex, shareCredential) => {
         if (disposed) return;
-        const originalIndex = idxMap[subsetIndex] ?? subsetIndex;
-        notifyEcho(originalIndex, shareCredential);
+        notifyEcho(shareIndex, shareCredential);
       },
       {
-        relays,
+        relays: extraRelays,
         eventConfig: { enableLogging: false }
       }
     );
-    listeners.push(listener);
+    listeners.push(groupListener);
   }
 
-  // Compose cleanup for all listeners started above.
   coreListener = {
     cleanup: () => {
       for (const l of listeners) {

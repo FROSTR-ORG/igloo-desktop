@@ -7,11 +7,12 @@
     "email": "austinkelsay@protonmail.com"
   },
   "main": "dist/main.js",
+  "type": "module",
   "scripts": {
     "start": "cross-env NODE_ENV=development npm run build && electron .",
-    "build": "tsc && webpack --config webpack.config.js",
+    "build": "tsc && webpack --config webpack.config.cjs",
     "watch": "tsc -w",
-    "dev": "cross-env NODE_ENV=development concurrently \"webpack --config webpack.config.js --watch\" \"electron .\"",
+    "dev": "cross-env NODE_ENV=development concurrently \"webpack --config webpack.config.cjs --watch\" \"electron .\"",
     "test": "jest",
     "test:watch": "jest --watch",
     "lint": "eslint src/**/*.{ts,tsx} --fix",
