@@ -87,13 +87,18 @@ const startEchoMonitor = async (
 
   // Optional single-relay override for debugging / CI sync
   const envRelay = (process.env.IGLOO_TEST_RELAY ?? '').trim();
-  const defaultRelays = envRelay
+  // Normalize all candidates before comparison to avoid mismatches like
+  // "example.com" vs "wss://example.com" and prevent duplicates.
+  const normalizedDefaultRelays = envRelay
     ? [normalizeRelay(envRelay)]
-    : DEFAULT_ECHO_RELAYS.slice();
+    : DEFAULT_ECHO_RELAYS.map(normalizeRelay);
+  const normalizedGroupRelays = groupRelays.map(normalizeRelay);
+
+  const defaultSet = new Set(normalizedDefaultRelays);
   const extraRelays = envRelay
     ? []
-    : groupRelays.filter(relay => !defaultRelays.includes(relay)).map(normalizeRelay);
-  const primaryRelays = Array.from(new Set([...defaultRelays, ...extraRelays]));
+    : normalizedGroupRelays.filter(relay => !defaultSet.has(relay));
+  const primaryRelays = Array.from(new Set([...normalizedDefaultRelays, ...extraRelays]));
 
   const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
     const key = `${shareIndex}:${shareCredential}:${challenge ?? ''}`;
@@ -162,7 +167,7 @@ const startEchoMonitor = async (
       handleCoreCallback(subsetIndex, shareCredential, details);
     },
     {
-      relays: defaultRelays,
+      relays: normalizedDefaultRelays,
       eventConfig: { enableLogging: debugEnabled, customLogger: debugLogger }
     }
   );
