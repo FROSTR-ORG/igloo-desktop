@@ -117,38 +117,49 @@ const startEchoMonitor = async (
     onEcho(shareIndex, shareCredential, challenge ?? undefined);
   };
 
-  // Parser to support new and old igloo-core callback signatures.
-  // New form may pass an object or include a challenge; old form is (index, shareCredential).
-  const handleCoreCallback = (arg1: any, arg2?: any, arg3?: any) => {
+  // Parser to support new and old igloo-core callback signatures with strict types.
+  type EchoDetails = { challenge?: string };
+  interface EchoPayload { shareIndex: number; shareCredential: string; challenge?: string }
+  const isEchoPayload = (v: unknown): v is EchoPayload => (
+    !!v && typeof v === 'object' &&
+    typeof (v as Record<string, unknown>).shareIndex === 'number' &&
+    typeof (v as Record<string, unknown>).shareCredential === 'string'
+  );
+  const isEchoDetails = (v: unknown): v is EchoDetails => (
+    !!v && typeof v === 'object' &&
+    ('challenge' in (v as Record<string, unknown>) ? typeof (v as Record<string, unknown>).challenge === 'string' : true)
+  );
+
+  function handleCoreCallback(
+    arg1: number | EchoPayload,
+    arg2?: string | Record<string, unknown>,
+    arg3?: unknown
+  ): void {
     try {
       // Case 1: (subsetIndex: number, shareCredential: string, details?: { challenge?: string })
-      if (typeof arg1 === 'number' && typeof arg2 === 'string') {
-        const subsetIndex = arg1 as number;
-        const shareCredential = arg2 as string;
-        const challenge = typeof arg3 === 'string'
-          ? (arg3 as string)
-          : (arg3 && typeof arg3 === 'object' && typeof arg3.challenge === 'string')
-            ? arg3.challenge
-            : undefined;
-        notifyEcho(subsetIndex, shareCredential, challenge);
+      if (typeof arg1 === 'number') {
+        if (typeof arg2 !== 'string') {
+          console.warn('[EchoBridge] Malformed echo callback (missing shareCredential string)', { arg2 });
+          return;
+        }
+        let challenge: string | undefined;
+        if (typeof arg3 === 'string') challenge = arg3;
+        else if (isEchoDetails(arg3)) challenge = arg3?.challenge;
+        notifyEcho(arg1, arg2, challenge);
         return;
       }
 
       // Case 2: (payload: { shareIndex, shareCredential, challenge? })
-      if (arg1 && typeof arg1 === 'object' && typeof arg1.shareIndex === 'number' && typeof arg1.shareCredential === 'string') {
-        notifyEcho(arg1.shareIndex, arg1.shareCredential, typeof arg1.challenge === 'string' ? arg1.challenge : undefined);
+      if (isEchoPayload(arg1)) {
+        notifyEcho(arg1.shareIndex, arg1.shareCredential, arg1.challenge);
         return;
       }
 
-      // Unknown form; try best-effort
-      if (typeof arg1 === 'number') {
-        notifyEcho(arg1, String(arg2 ?? '')); // fallback
-        return;
-      }
+      console.warn('[EchoBridge] Malformed echo callback payload', { arg1, arg2, arg3 });
     } catch (err) {
       console.warn('[EchoBridge] Failed to parse echo callback payload', { err });
     }
-  };
+  }
 
   // Start two listeners to avoid connect-all-or-fail on a combined set:
   // - one on the stable defaults
