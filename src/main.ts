@@ -24,9 +24,9 @@ const activeEchoListeners = new Map<string, EchoListener>();
 try {
   const poolProto = SimplePool?.prototype as typeof SimplePool.prototype & { __iglooSubscribeFixApplied?: boolean } | undefined;
   if (poolProto && !poolProto.__iglooSubscribeFixApplied) {
-    const original = poolProto.subscribeMany as (relays: unknown, filter: unknown, params: unknown) => any;
+    const original = poolProto.subscribeMany as (relays: unknown, filter: unknown, params: unknown) => unknown;
     if (typeof original === 'function') {
-      poolProto.subscribeMany = function patchedSubscribeMany(this: any, relays: unknown, filter: unknown, params: unknown) {
+      poolProto.subscribeMany = function patchedSubscribeMany(this: SimplePool, relays: unknown, filter: unknown, params: unknown) {
         if (Array.isArray(filter) && filter.length === 1 && filter[0] && typeof filter[0] === 'object' && !Array.isArray(filter[0])) {
           // unwrap [filter] -> filter
           return original.call(this, relays, filter[0], params);
@@ -89,16 +89,16 @@ const startEchoMonitor = async (
   const envRelay = (process.env.IGLOO_TEST_RELAY ?? '').trim();
   // Normalize all candidates before comparison to avoid mismatches like
   // "example.com" vs "wss://example.com" and prevent duplicates.
-  const normalizedDefaultRelays = envRelay
-    ? [normalizeRelay(envRelay)]
-    : DEFAULT_ECHO_RELAYS.map(normalizeRelay);
+  const normalizedDefaultRelays = DEFAULT_ECHO_RELAYS.map(normalizeRelay);
+  const normalizedEnvRelay = envRelay ? normalizeRelay(envRelay) : null;
+  if (normalizedEnvRelay && !normalizedDefaultRelays.includes(normalizedEnvRelay)) {
+    normalizedDefaultRelays.push(normalizedEnvRelay);
+  }
   const normalizedGroupRelays = groupRelays.map(normalizeRelay);
 
   const defaultSet = new Set(normalizedDefaultRelays);
-  const extraRelays = envRelay
-    ? []
-    : normalizedGroupRelays.filter(relay => !defaultSet.has(relay));
-  const primaryRelays = Array.from(new Set([...normalizedDefaultRelays, ...extraRelays]));
+  const extraRelays = normalizedGroupRelays.filter(relay => !defaultSet.has(relay));
+  // Combined set if needed in the future; not required for the two-listener strategy.
 
   const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
     const key = `${shareIndex}:${shareCredential}:${challenge ?? ''}`;
@@ -153,7 +153,7 @@ const startEchoMonitor = async (
     ? ((level: string, message: string, data?: unknown) => {
         try { 
           console.log(`[echo-listen] ${level.toUpperCase()} ${message}`, data ?? ''); 
-        } catch (err) { 
+        } catch { 
           /* suppress potential log failure */
         }
       })
