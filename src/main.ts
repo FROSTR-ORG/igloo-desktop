@@ -53,7 +53,14 @@ const sanitizeRelayList = (relays?: unknown): string[] => {
 
 const normalizeRelay = (url: string): string => {
   const trimmed = url.trim();
-  if (/^wss?:\/\//i.test(trimmed)) return trimmed.replace(/^http/i, 'ws');
+  // Already a ws or wss URL — return as-is
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed;
+  // Convert http/https to ws/wss respectively
+  if (/^https?:\/\//i.test(trimmed)) {
+    if (/^https:\/\//i.test(trimmed)) return trimmed.replace(/^https:/i, 'wss:');
+    return trimmed.replace(/^http:/i, 'ws:');
+  }
+  // Bare host — default to secure websocket
   return `wss://${trimmed}`;
 };
 
