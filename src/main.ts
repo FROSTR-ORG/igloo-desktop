@@ -108,7 +108,8 @@ const startEchoMonitor = async (
   // Combined set if needed in the future; not required for the two-listener strategy.
 
   const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
-    const key = `${shareIndex}:${shareCredential}:${challenge ?? ''}`;
+    // Use a collision-safe tuple key to avoid aliasing on ':' or other separators.
+    const key = JSON.stringify([shareIndex, shareCredential, challenge ?? null]);
     if (handledShares.has(key)) {
       return;
     }
