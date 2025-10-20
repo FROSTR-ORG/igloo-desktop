@@ -59,7 +59,8 @@ jobs:
           cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci || (echo "npm ci failed; updating lockfile" && npm i --package-lock-only && npm ci)
         
       - name: Build Linux
         run: npm run dist:linux
@@ -94,7 +95,8 @@ jobs:
           cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci || (echo "npm ci failed; updating lockfile" && npm i --package-lock-only && npm ci)
         
       - name: Build macOS
         run: npm run dist:mac
@@ -122,7 +124,8 @@ jobs:
           cache: 'npm'
           
       - name: Install dependencies
-        run: npm ci
+        run: |
+          npm ci || (echo "npm ci failed; updating lockfile" && npm i --package-lock-only && npm ci)
         
       - name: Build Windows
         run: npm run dist:win
