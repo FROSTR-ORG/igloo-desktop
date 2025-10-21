@@ -23,14 +23,61 @@ const normalizeShareIdentifier = (input: string): string =>
     .toLowerCase()
     .replace(/\s+/g, '_');
 
-const buildEchoRelayList = (groupRelays?: string[]): string[] => {
-  const sanitizedGroupRelays = Array.isArray(groupRelays)
-    ? groupRelays.filter(relay => typeof relay === 'string' && relay.trim().length > 0)
-    : [];
+// Normalize relay URLs similarly to our main-process and CLI logic
+const normalizeRelay = (url: string): string => {
+  const trimmed = String(url).trim();
+  if (!trimmed) return trimmed;
+  // Already ws:// or wss:// → keep scheme lowercase
+  if (/^wss?:\/\//i.test(trimmed)) return trimmed.replace(/^wss?:\/\//i, m => m.toLowerCase());
+  // http(s) → map to ws(s)
+  if (/^https?:\/\//i.test(trimmed)) {
+    return trimmed.replace(/^(https?):\/\//i, (_m, p1) => (String(p1).toLowerCase() === 'https' ? 'wss://' : 'ws://'));
+  }
+  // Bare host → assume secure websockets
+  return `wss://${trimmed}`;
+};
 
-  // Always include defaults first so we prioritise tested relays, then append any custom ones
-  // while avoiding duplicates.
-  return Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...sanitizedGroupRelays]));
+// Build a deduplicated relay list. Deduping is case-insensitive for scheme/host,
+// but preserves path/query/hash casing because WebSocket paths can be case-sensitive.
+const buildEchoRelayList = (groupRelays?: string[], legacyRelaysAlt?: string[] | undefined, legacyRelaysAlt2?: string[] | undefined): string[] => {
+  const fromGroup = Array.isArray(groupRelays) ? groupRelays : (Array.isArray(legacyRelaysAlt) ? legacyRelaysAlt : (Array.isArray(legacyRelaysAlt2) ? legacyRelaysAlt2 : []));
+  const sanitizedGroupRelays = fromGroup.filter(r => typeof r === 'string' && r.trim().length > 0).map(normalizeRelay);
+
+  const envRelay = (typeof process !== 'undefined' ? (process.env.IGLOO_TEST_RELAY ?? '').trim() : '');
+  const envRelays = envRelay ? [normalizeRelay(envRelay)] : [];
+
+  // Include defaults first to prioritise tested relays; then env override; then any group-defined relays
+  // Deduplicate while preserving order.
+  const ordered = [...DEFAULT_ECHO_RELAYS.map(normalizeRelay), ...envRelays, ...sanitizedGroupRelays];
+
+  const dedupeKey = (u: string): string => {
+    try {
+      const url = new URL(u);
+      const protocol = url.protocol.toLowerCase();
+      const hostname = url.hostname.toLowerCase();
+      const port = url.port ? `:${url.port}` : '';
+      // Preserve original path/query/hash casing
+      return `${protocol}//${hostname}${port}${url.pathname}${url.search}${url.hash}`;
+    } catch {
+      // Fallback: normalize only scheme/host if we can't parse
+      const m = u.match(/^(wss?):\/\/([^\/?#]+)(.*)$/i);
+      if (m) {
+        return `${m[1].toLowerCase()}://${m[2].toLowerCase()}${m[3] ?? ''}`;
+      }
+      return u;
+    }
+  };
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const r of ordered) {
+    const key = dedupeKey(r);
+    if (!seen.has(key)) {
+      seen.add(key);
+      result.push(r);
+    }
+  }
+  return result;
 };
 
 /**
@@ -388,11 +435,36 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
           crypto.getRandomValues(challengeBytes);
           const challenge = bytesToHex(challengeBytes);
 
-          const relays = buildEchoRelayList(decodedGroup?.relays);
+          type LegacyDecodedGroup = DecodedGroup & {
+            relayUrls?: string[];
+            relay_urls?: string[];
+          };
+
+          const legacyGroup = decodedGroup as LegacyDecodedGroup;
+
+          const relays = buildEchoRelayList(
+            legacyGroup.relays,
+            legacyGroup.relayUrls,
+            legacyGroup.relay_urls
+          );
+
+          // Enable verbose echo logging only when explicitly requested and when
+          // a Node-like `process` global is available (renderer may not have it).
+          const debugEnv = typeof process !== 'undefined' ? process.env.IGLOO_DEBUG_ECHO : undefined;
+          const debugEnabled = ((debugEnv ?? '').toLowerCase() === '1' || (debugEnv ?? '').toLowerCase() === 'true');
 
           await sendEcho(groupCredential, shareCredential, challenge, {
             relays,
             timeout: 10000,
+            // Bubble up debug logs if requested; guard access to process.env
+            eventConfig: debugEnabled
+              ? {
+                  enableLogging: true,
+                  customLogger: (level: string, message: string, data?: unknown) => {
+                    console.log(`[echo-send] ${level.toUpperCase()} ${message}`, data ?? '');
+                  }
+                }
+              : undefined
           });
 
           console.log('Echo sent successfully');
