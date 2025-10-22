@@ -3,6 +3,7 @@ import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { ShareManager, getAllShares } from './lib/shareManager.js';
+import { computeRelayPlan } from './lib/echoRelays.js';
 import {
   decodeGroup,
   DEFAULT_ECHO_RELAYS,
@@ -40,30 +41,6 @@ try {
   console.warn('[EchoBridge] Failed to apply SimplePool subscribeMany shim:', error);
 }
 
-const sanitizeRelayList = (relays?: unknown): string[] => {
-  if (!Array.isArray(relays)) {
-    return [];
-  }
-
-  return relays
-    .filter(relay => typeof relay === 'string')
-    .map(relay => relay.trim())
-    .filter(relay => relay.length > 0);
-};
-
-const normalizeRelay = (url: string): string => {
-  const trimmed = url.trim();
-  // Already a ws or wss URL — return as-is
-  if (/^wss?:\/\//i.test(trimmed)) return trimmed;
-  // Convert http/https to ws/wss respectively
-  if (/^https?:\/\//i.test(trimmed)) {
-    if (/^https:\/\//i.test(trimmed)) return trimmed.replace(/^https:/i, 'wss:');
-    return trimmed.replace(/^http:/i, 'ws:');
-  }
-  // Bare host — default to secure websocket
-  return `wss://${trimmed}`;
-};
-
 // Legacy listener record removed; igloo-core manages nodes internally.
 
 const startEchoMonitor = async (
@@ -76,36 +53,26 @@ const startEchoMonitor = async (
 
   let disposed = false;
 
-  let groupRelays: string[] = [];
+  let decodedRelaySource: Record<string, unknown> | null = null;
 
   try {
     const rawGroup = decodeGroup(groupCredential) as unknown;
     const decodedGroup = (rawGroup && typeof rawGroup === 'object')
       ? (rawGroup as Record<string, unknown>)
       : {};
-    const relayCandidates =
-      decodedGroup?.['relays'] ??
-      decodedGroup?.['relayUrls'] ??
-      decodedGroup?.['relay_urls'];
-    groupRelays = sanitizeRelayList(relayCandidates);
+    decodedRelaySource = decodedGroup;
   } catch (error) {
     console.warn('[EchoBridge] Failed to decode group relay list:', error);
   }
 
   // Optional single-relay override for debugging / CI sync
   const envRelay = (process.env.IGLOO_TEST_RELAY ?? '').trim();
-  // Normalize all candidates before comparison to avoid mismatches like
-  // "example.com" vs "wss://example.com" and prevent duplicates.
-  const normalizedDefaultRelays = DEFAULT_ECHO_RELAYS.map(normalizeRelay);
-  const normalizedEnvRelay = envRelay ? normalizeRelay(envRelay) : null;
-  if (normalizedEnvRelay && !normalizedDefaultRelays.includes(normalizedEnvRelay)) {
-    normalizedDefaultRelays.push(normalizedEnvRelay);
-  }
-  const normalizedGroupRelays = groupRelays.map(normalizeRelay);
-
-  const defaultSet = new Set(normalizedDefaultRelays);
-  const extraRelays = normalizedGroupRelays.filter(relay => !defaultSet.has(relay));
-  // Combined set if needed in the future; not required for the two-listener strategy.
+  const relayPlan = computeRelayPlan({
+    groupCredential,
+    decodedGroup: decodedRelaySource,
+    envRelay,
+    baseRelays: DEFAULT_ECHO_RELAYS
+  });
 
   const notifyEcho = (shareIndex: number, shareCredential: string, challenge?: string | null) => {
     // Use a collision-safe tuple key to avoid aliasing on ':' or other separators.
@@ -178,22 +145,53 @@ const startEchoMonitor = async (
       })
     : undefined;
 
-  const defaultListener = startListeningForAllEchoes(
-    groupCredential,
-    shareCredentials,
-    (subsetIndex: number, shareCredential: string, details?: unknown) => {
-      if (disposed) return;
-      handleCoreCallback(subsetIndex, shareCredential, details);
-    },
-    {
-      relays: normalizedDefaultRelays,
-      eventConfig: { enableLogging: debugEnabled, customLogger: debugLogger }
-    }
-  );
-  listeners.push(defaultListener);
+const relayTargets: string[][] = [];
+const seenTargets = new Set<string>();
 
-  if (extraRelays.length > 0) {
-    const groupListener = startListeningForAllEchoes(
+const relayTargetKey = (relays: string[]): string => {
+  const canonicalPieces = relays.map(relay => {
+    try {
+      const parsed = new URL(relay);
+      const protocol = parsed.protocol.toLowerCase();
+      const hostname = parsed.hostname.toLowerCase();
+      const port = parsed.port ? `:${parsed.port}` : '';
+      return `${protocol}//${hostname}${port}${parsed.pathname}${parsed.search}${parsed.hash}`;
+    } catch {
+      const match = relay.match(/^(wss?):\/\/([^/?#]+)(.*)$/);
+      if (match) {
+        const scheme = match[1].toLowerCase();
+        const authority = match[2].toLowerCase();
+        const pathAndMore = match[3] ?? '';
+        return `${scheme}://${authority}${pathAndMore}`;
+      }
+      return relay;
+    }
+  });
+  canonicalPieces.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return canonicalPieces.join('|');
+};
+
+const registerTarget = (relays: string[]) => {
+  if (relays.length === 0) return;
+  const key = relayTargetKey(relays);
+  if (seenTargets.has(key)) return;
+  seenTargets.add(key);
+  relayTargets.push(relays);
+};
+
+  if (relayPlan.envRelays.length > 0) {
+    registerTarget(relayPlan.envRelays);
+  } else {
+    registerTarget(relayPlan.defaultRelays);
+    registerTarget(relayPlan.groupExtras);
+  }
+
+  if (relayTargets.length === 0 && relayPlan.relays.length > 0) {
+    registerTarget(relayPlan.relays);
+  }
+
+  for (const relays of relayTargets) {
+    const listener = startListeningForAllEchoes(
       groupCredential,
       shareCredentials,
       (subsetIndex: number, shareCredential: string, details?: unknown) => {
@@ -201,11 +199,11 @@ const startEchoMonitor = async (
         handleCoreCallback(subsetIndex, shareCredential, details);
       },
       {
-        relays: extraRelays,
+        relays,
         eventConfig: { enableLogging: debugEnabled, customLogger: debugLogger }
       }
     );
-    listeners.push(groupListener);
+    listeners.push(listener);
   }
 
   coreListener = {
