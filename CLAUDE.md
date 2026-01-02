@@ -71,6 +71,7 @@ src/
 │   ├── SaveShare.tsx         # Password-encrypt and save shares
 │   ├── ShareList.tsx         # Detect and list saved shares
 │   ├── LoadShare.tsx         # Decrypt and load share into memory
+│   ├── AddShare.tsx          # Import existing share from another device
 │   ├── Signer.tsx            # Start signing node, handle requests
 │   ├── EventLog.tsx          # Display signing events
 │   ├── Recover.tsx           # Reconstruct nsec from threshold shares
@@ -81,6 +82,8 @@ src/
 │   ├── encryption.ts         # PBKDF2 password derivation for share files
 │   ├── filesystem.ts         # Electron app data path utilities
 │   ├── validation.ts         # Input validation helpers
+│   ├── echoRelays.ts         # Relay planning and normalization utilities
+│   ├── signer-keepalive.ts   # Connection persistence and auto-reconnect
 │   └── utils.ts              # General utilities, cn() for Tailwind
 ├── types/
 │   └── index.ts              # Shared TypeScript types
@@ -115,12 +118,13 @@ src/
 ### State Management
 
 App-level state in `App.tsx` tracks:
-- `currentView`: Which screen is active
-- `keyset`: Temporary in-memory keyset (cleared after saving shares)
-- `loadedShare`: Currently decrypted share for signing
-- `shares`: List of available shares from file system
+- `showingCreate`, `showingRecover`, `showingAddShare`: Boolean flags for screen routing
+- `keysetData`: Temporary in-memory keyset (cleared after saving shares)
+- `signerData`: Currently decrypted share and metadata for signing
+- `hasShares`: Whether any shares exist in file system
+- `activeTab`: Current tab selection (signer/recovery)
 
-Components communicate via props and callbacks; no Redux or external state library.
+Components communicate via props and callbacks; no Redux or external state library. The `Signer` component exposes a ref handle (`SignerHandle`) to allow `App.tsx` to stop the signer when navigating away.
 
 ### Cryptographic Operations (via @frostr/igloo-core)
 
@@ -152,6 +156,22 @@ Shares are stored as encrypted JSON in `<appData>/igloo/shares/`:
 ```
 
 Encryption: PBKDF2 with 600,000 iterations (v1 shares), user-provided password, random salt. Legacy shares (no version field) use 32 iterations.
+
+### Relay Configuration
+
+Relays are configured via `<appData>/igloo/relays.json`:
+```json
+{
+  "relays": ["wss://relay1.example.com", "wss://relay2.example.com"]
+}
+```
+
+The `computeRelayPlan()` function in `echoRelays.ts` merges relays from multiple sources with priority:
+1. Environment variable (`IGLOO_RELAY`)
+2. Explicit user-provided relays
+3. Configured relays from `relays.json`
+4. Default relays from `@frostr/igloo-core`
+5. Group credential embedded relays
 
 ## Testing Strategy
 

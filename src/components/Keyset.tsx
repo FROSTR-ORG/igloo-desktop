@@ -23,6 +23,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     shareIndex: null
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showGroupQrCode, setShowGroupQrCode] = useState(false);
   const [showQrCode, setShowQrCode] = useState<{
     show: boolean, 
     shareData: string | null,
@@ -293,6 +294,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                   <Button
                     variant="ghost"
                     size="sm"
+                    onClick={() => setShowGroupQrCode(true)}
+                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                  >
+                    <QrCode className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
                     onClick={() => toggleExpanded('group')}
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                   >
@@ -530,6 +539,32 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 }`}
               >
                 {showQrCode.status === 'success' ? 'Done' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGroupQrCode && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 className="text-xl font-semibold text-blue-200 mb-4">Group Credential QR Code</h3>
+            <div className="flex justify-center bg-white p-6 rounded-lg">
+              <QRCodeSVG
+                value={groupCredential}
+                size={250}
+                level="H"
+              />
+            </div>
+            <p className="mt-4 text-sm text-gray-400 text-center">
+              Share this QR code with other signers in your group
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => setShowGroupQrCode(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-blue-100"
+              >
+                Close
               </Button>
             </div>
           </div>

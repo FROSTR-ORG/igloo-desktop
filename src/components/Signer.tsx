@@ -14,6 +14,7 @@ import {
   normalizePubkey
 } from "@frostr/igloo-core"
 import { Copy, Check, X, HelpCircle, ChevronDown, ChevronRight, User } from "lucide-react"
+import { QRCodeSVG } from 'qrcode.react'
 import type { SignatureEntry, ECDHPackage, SignSessionPackage, BifrostNode } from '@frostr/bifrost'
 import { EventLog, type LogEntryData } from "./EventLog"
 import { Input } from "@/components/ui/input"
@@ -1092,7 +1093,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           </div>
 
           {expandedItems['group'] && groupCredential && isGroupValid && (
-            <div className="mt-2">
+            <div className="mt-2 space-y-4">
               {decodedGroupData ? (
                 renderDecodedInfo(decodedGroupData, groupCredential)
               ) : (
@@ -1100,6 +1101,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   Failed to decode group credential
                 </div>
               )}
+              <div className="flex flex-col items-center bg-white p-4 rounded-lg">
+                <QRCodeSVG value={groupCredential} size={200} level="H" />
+                <p className="mt-2 text-xs text-gray-600">Group Credential</p>
+              </div>
             </div>
           )}
 
@@ -1162,7 +1167,7 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
           </div>
 
           {expandedItems['share'] && signerSecret && isShareValid && (
-            <div className="mt-2">
+            <div className="mt-2 space-y-4">
               {decodedShareData ? (
                 renderDecodedInfo(decodedShareData, signerSecret)
               ) : (
@@ -1170,6 +1175,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
                   Failed to decode share credential
                 </div>
               )}
+              <div className="flex flex-col items-center bg-white p-4 rounded-lg">
+                <QRCodeSVG value={signerSecret} size={200} level="H" />
+                <p className="mt-2 text-xs text-gray-600">Share Credential</p>
+              </div>
             </div>
           )}
 
