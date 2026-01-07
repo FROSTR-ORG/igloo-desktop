@@ -202,6 +202,13 @@ export const computeRelayPlan = ({
     relays = dedupe([...explicit, ...defaults, ...group]);
   }
 
+  // SECURITY: Ensure we always have at least one relay to prevent silent failures
+  // If all relay sources are empty, fall back to hardcoded defaults from @frostr/igloo-core
+  if (relays.length === 0) {
+    console.warn('[echoRelays] No relays configured from any source, using hardcoded fallbacks');
+    relays = normalizeList(DEFAULT_ECHO_RELAYS);
+  }
+
   const defaultKeySet = new Set(defaults.map(dedupeKey));
   const groupExtras = group.filter(relay => !defaultKeySet.has(dedupeKey(relay)));
 

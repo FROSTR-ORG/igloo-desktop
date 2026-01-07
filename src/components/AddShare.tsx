@@ -9,6 +9,7 @@ import { Loader2, ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import type { DecodedGroup, DecodedShare, IglooShare } from '@/types';
 import { secp256k1 } from '@noble/curves/secp256k1';
+import { VALIDATION_LIMITS, sanitizeUserError } from '@/lib/validation';
 
 interface AddShareProps {
   onComplete: () => void;
@@ -123,9 +124,17 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
 
   const evaluateShareName = useCallback(
     (value: string) => {
-      if (!value.trim()) {
+      const trimmed = value.trim();
+
+      if (trimmed.length === 0) {
         setIsNameValid(false);
         setNameError('Share name is required');
+        return false;
+      }
+
+      if (trimmed.length > VALIDATION_LIMITS.NAME_MAX) {
+        setIsNameValid(false);
+        setNameError(`Share name must be ${VALIDATION_LIMITS.NAME_MAX} characters or less`);
         return false;
       }
 
@@ -185,7 +194,8 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       setGroupError(undefined);
     } catch (error) {
       setIsGroupValid(false);
-      setGroupError('Failed to decode group: ' + (error instanceof Error ? error.message : String(error)));
+      // Sanitize error to avoid exposing internal implementation details
+      setGroupError('Failed to decode group: ' + sanitizeUserError(error));
       setDecodedGroup(null);
     }
   };
@@ -235,7 +245,8 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       setShareError(undefined);
     } catch (error) {
       setIsShareValid(false);
-      setShareError('Failed to decode share: ' + (error instanceof Error ? error.message : String(error)));
+      // Sanitize error to avoid exposing internal implementation details
+      setShareError('Failed to decode share: ' + sanitizeUserError(error));
       setDecodedShare(null);
     }
   };
@@ -251,9 +262,12 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
     if (!value.trim()) {
       setIsPasswordValid(false);
       setPasswordError('Password is required');
-    } else if (value.length < 8) {
+    } else if (value.length < VALIDATION_LIMITS.PASSWORD_MIN) {
       setIsPasswordValid(false);
-      setPasswordError('Password must be at least 8 characters');
+      setPasswordError(`Password must be at least ${VALIDATION_LIMITS.PASSWORD_MIN} characters`);
+    } else if (value.length > VALIDATION_LIMITS.PASSWORD_MAX) {
+      setIsPasswordValid(false);
+      setPasswordError(`Password must be ${VALIDATION_LIMITS.PASSWORD_MAX} characters or less`);
     } else {
       setIsPasswordValid(true);
       setPasswordError(undefined);

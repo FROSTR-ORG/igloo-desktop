@@ -207,9 +207,8 @@ describe('User Input Validation and Error Handling', () => {
     it('should validate WebSocket relay URLs', () => {
       const validRelayUrls = [
         'wss://relay.example.com',
-        'ws://localhost:8080',
         'wss://nostr-relay.com/relay',
-        'ws://192.168.1.100:7777'
+        'wss://203.0.113.50:7777',     // Public IP addresses are allowed
       ];
 
       const invalidRelayUrls = [
@@ -219,6 +218,13 @@ describe('User Input Validation and Error Handling', () => {
         'wss://',                     // incomplete
         'not-a-url',                  // not a URL
         'ftp://relay.com',            // wrong protocol
+        // SSRF Protection: localhost and private IPs are blocked
+        'ws://localhost:8080',        // localhost blocked
+        'wss://localhost:443',        // localhost blocked
+        'ws://192.168.1.100:7777',    // private IP (192.168.0.0/16)
+        'wss://10.0.0.1:443',         // private IP (10.0.0.0/8)
+        'wss://172.16.0.1:443',       // private IP (172.16.0.0/12)
+        'wss://127.0.0.1:8080',       // loopback
       ];
 
       validRelayUrls.forEach(url => {
