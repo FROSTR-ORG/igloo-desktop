@@ -4,6 +4,7 @@ import { derive_secret_async, encrypt_payload } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
+import { VALIDATION_LIMITS } from '@/lib/validation';
 
 interface SaveShareProps {
   onSave?: (password: string, salt: string, encryptedShare: string) => void;
@@ -30,19 +31,22 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt 
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
-    
+
     // Validate password
     if (!value.trim()) {
       setIsPasswordValid(false);
       setPasswordError('Password is required');
-    } else if (value.length < 8) {
+    } else if (value.length < VALIDATION_LIMITS.PASSWORD_MIN) {
       setIsPasswordValid(false);
-      setPasswordError('Password must be at least 8 characters');
+      setPasswordError(`Password must be at least ${VALIDATION_LIMITS.PASSWORD_MIN} characters`);
+    } else if (value.length > VALIDATION_LIMITS.PASSWORD_MAX) {
+      setIsPasswordValid(false);
+      setPasswordError(`Password must be ${VALIDATION_LIMITS.PASSWORD_MAX} characters or less`);
     } else {
       setIsPasswordValid(true);
       setPasswordError(undefined);
     }
-    
+
     // Re-validate confirm password if it has a value
     if (confirmPassword) {
       validateConfirmPassword(value, confirmPassword);
