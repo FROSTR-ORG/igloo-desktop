@@ -15,6 +15,7 @@ import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho, DEFAU
 import { clientShareManager } from '@/lib/clientShareManager';
 import { derive_secret_async, encrypt_payload } from '@/lib/encryption';
 import { secp256k1 } from '@noble/curves/secp256k1';
+import { mockElectronAPI } from '../setup';
 
 const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGroup>;
 const mockDecodeGroup = decodeGroup as jest.MockedFunction<typeof decodeGroup>;
@@ -74,6 +75,20 @@ describe('AddShare', () => {
     mockDeriveSecretAsync.mockResolvedValue('mock-secret');
     mockEncryptPayload.mockReturnValue('mock-encrypted');
     mockSendEcho.mockResolvedValue(true);
+
+    // Mock relay plan computation via IPC
+    const expectedRelays = Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...(mockDecodedGroup.relays ?? [])]));
+    (mockElectronAPI.computeRelayPlan as jest.Mock).mockResolvedValue({
+      ok: true,
+      relayPlan: {
+        relays: expectedRelays,
+        envRelays: [],
+        defaultRelays: DEFAULT_ECHO_RELAYS,
+        groupRelays: mockDecodedGroup.relays ?? [],
+        explicitRelays: [],
+        groupExtras: []
+      }
+    });
   });
 
   it('renders step 1 (group credential input) initially', () => {
@@ -279,6 +294,19 @@ describe('AddShare', () => {
     const expectedRelays = Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...(mockDecodedGroup.relays ?? [])]));
 
     await waitFor(() => {
+      // Verify relay plan was computed via IPC
+      expect(mockElectronAPI.computeRelayPlan).toHaveBeenCalledTimes(1);
+      expect(mockElectronAPI.computeRelayPlan).toHaveBeenCalledWith({
+        groupCredential: 'bfgroup1test',
+        decodedGroup: expect.objectContaining({
+          threshold: mockDecodedGroup.threshold,
+          commits: mockDecodedGroup.commits
+        }),
+        explicitRelays: null,
+        envRelay: null
+      });
+
+      // Verify echo was sent with computed relays
       expect(mockSendEcho).toHaveBeenCalledTimes(1);
       expect(mockSendEcho).toHaveBeenCalledWith(
         'bfgroup1test',

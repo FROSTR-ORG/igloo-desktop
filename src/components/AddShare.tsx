@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho } from '@frostr/igloo-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { derive_secret_async, encrypt_payload, CURRENT_SHARE_VERSION } from '@/lib/encryption';
-import { computeRelayPlan } from '@/lib/echoRelays';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -386,12 +385,20 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
 
           const legacyGroup = decodedGroup as LegacyDecodedGroup;
 
-          const relayPlan = computeRelayPlan({
+          // Compute relay plan via IPC (main process has access to Node.js APIs)
+          // Cast decodedGroup for IPC serialization - the main process only needs the object shape
+          const relayPlanResult = await window.electronAPI.computeRelayPlan({
             groupCredential,
-            decodedGroup: legacyGroup,
-            envRelay: typeof process !== 'undefined' ? process.env.IGLOO_TEST_RELAY : undefined
+            decodedGroup: legacyGroup as unknown as Record<string, unknown>,
+            explicitRelays: null,
+            envRelay: null // Environment variables are only accessible in main process
           });
-          const relays = relayPlan.relays;
+
+          if (!relayPlanResult.ok || !relayPlanResult.relayPlan) {
+            throw new Error(relayPlanResult.message || 'Failed to compute relay plan');
+          }
+
+          const relays = relayPlanResult.relayPlan.relays;
 
           // Enable verbose echo logging only when explicitly requested and when
           // a Node-like `process` global is available (renderer may not have it).
