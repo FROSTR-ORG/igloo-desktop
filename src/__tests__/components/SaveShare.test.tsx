@@ -221,7 +221,7 @@ describe('SaveShare Component', () => {
 
       // Make the encryption take some time
       const { derive_secret_async } = require('@/lib/encryption');
-      derive_secret_async.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(new Uint8Array(32)), 100)));
+      derive_secret_async.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('a'.repeat(64)), 100)));
 
       render(
         <SaveShare
