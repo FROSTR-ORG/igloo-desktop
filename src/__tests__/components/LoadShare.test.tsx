@@ -34,7 +34,8 @@ describe('LoadShare Component', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    mockDeriveSecretAsync.mockResolvedValue(new Uint8Array(32));
+    // derive_secret_async returns a hex string (32 bytes = 64 hex chars), not Uint8Array
+    mockDeriveSecretAsync.mockResolvedValue('a'.repeat(64));
     mockDecryptPayload.mockReturnValue('bfshare1mockdecryptedshare');
   });
 
@@ -371,7 +372,7 @@ describe('LoadShare Component', () => {
       const user = userEvent.setup();
 
       // Make decryption slow
-      mockDeriveSecretAsync.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(new Uint8Array(32)), 200)));
+      mockDeriveSecretAsync.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('a'.repeat(64)), 200)));
 
       render(
         <LoadShare
@@ -427,7 +428,7 @@ describe('LoadShare Component', () => {
       const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
 
       // Make decryption slow enough that we can unmount during it
-      mockDeriveSecretAsync.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve(new Uint8Array(32)), 100)));
+      mockDeriveSecretAsync.mockImplementation(() => new Promise(resolve => setTimeout(() => resolve('a'.repeat(64)), 100)));
 
       const { unmount } = render(
         <LoadShare
