@@ -207,6 +207,10 @@ export const computeRelayPlan = ({
   if (relays.length === 0) {
     console.warn('[echoRelays] No relays configured from any source, using hardcoded fallbacks');
     relays = normalizeList(DEFAULT_ECHO_RELAYS);
+
+    if (relays.length === 0) {
+      throw new Error('[echoRelays] Unable to configure any relay - all sources exhausted including hardcoded defaults');
+    }
   }
 
   const defaultKeySet = new Set(defaults.map(dedupeKey));
