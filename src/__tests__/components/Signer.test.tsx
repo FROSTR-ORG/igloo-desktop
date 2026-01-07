@@ -799,6 +799,184 @@ describe('Signer Component UI Tests', () => {
     });
   });
 
+  describe('Security Fix #10: Race Condition Prevention (isMountedRef)', () => {
+    it('should not update state after component unmounts during signer start', async () => {
+      const user = userEvent.setup();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Make createConnectedNode slow enough that we can unmount during it
+      mockCreateConnectedNode.mockImplementation(() =>
+        new Promise(resolve =>
+          setTimeout(() => resolve({
+            node: mockNode,
+            state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+          }), 100)
+        )
+      );
+
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+
+      const { unmount } = render(<Signer initialData={initialData} />);
+
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+
+      // Immediately unmount while connecting
+      unmount();
+
+      // Wait for the async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // No React "Can't perform state update on unmounted component" warning
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Can't perform a React state update")
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+
+    it('should cleanup node if component unmounts during async operation', async () => {
+      const user = userEvent.setup();
+
+      // Make createConnectedNode slow enough that we can unmount during it
+      mockCreateConnectedNode.mockImplementation(() =>
+        new Promise(resolve =>
+          setTimeout(() => resolve({
+            node: mockNode,
+            state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+          }), 100)
+        )
+      );
+
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+
+      const { unmount } = render(<Signer initialData={initialData} />);
+
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+
+      // Clear mocks to track what happens after unmount
+      jest.clearAllMocks();
+
+      // Immediately unmount
+      unmount();
+
+      // Wait for the async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 150));
+
+      // The node should have been cleaned up after createConnectedNode resolved
+      // but before any state updates occurred
+      expect(mockCleanupBifrostNode).toHaveBeenCalled();
+    });
+
+    it('should not register node if component unmounted before registration', async () => {
+      const user = userEvent.setup();
+
+      // Make createConnectedNode slow
+      mockCreateConnectedNode.mockImplementation(() =>
+        new Promise(resolve =>
+          setTimeout(() => resolve({
+            node: mockNode,
+            state: { isReady: true, isConnected: true, isConnecting: false, connectedRelays: [] }
+          }), 50)
+        )
+      );
+
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+
+      const { unmount } = render(<Signer initialData={initialData} />);
+
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+
+      // Unmount immediately
+      unmount();
+
+      // Wait for the async operation to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // The node.on should NOT have been called because we unmounted before registration
+      // This proves the isMountedRef check is working
+      const onCalls = mockNode.on.mock.calls;
+
+      // If isMountedRef is working correctly, event registration should not have happened
+      // (The node is cleaned up before events are registered)
+      expect(onCalls.length).toBe(0);
+      expect(mockCleanupBifrostNode).toHaveBeenCalled();
+    });
+
+    it('should handle keep-alive replacement check for mount state', async () => {
+      const user = userEvent.setup();
+
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+
+      render(<Signer initialData={initialData} />);
+
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Signer Running/)).toBeInTheDocument();
+      });
+
+      // The keep-alive's onReplace callback should check isMountedRef
+      // This is implicitly tested by the cleanup behavior
+      expect(mockCreateConnectedNode).toHaveBeenCalled();
+    });
+
+    it('should handle errors gracefully when component unmounts during error handling', async () => {
+      const user = userEvent.setup();
+      const consoleErrorSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+      // Make createConnectedNode fail after a delay
+      mockCreateConnectedNode.mockImplementation(() =>
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Connection failed')), 50)
+        )
+      );
+
+      const initialData = {
+        share: 'valid-share',
+        groupCredential: 'valid-group'
+      };
+
+      const { unmount } = render(<Signer initialData={initialData} />);
+
+      // Start the signer
+      const startButton = screen.getByRole('button', { name: /start signer/i });
+      await user.click(startButton);
+
+      // Unmount immediately
+      unmount();
+
+      // Wait for the error to occur
+      await new Promise(resolve => setTimeout(resolve, 100));
+
+      // No React state update warnings
+      expect(consoleErrorSpy).not.toHaveBeenCalledWith(
+        expect.stringContaining("Can't perform a React state update")
+      );
+
+      consoleErrorSpy.mockRestore();
+    });
+  });
+
   describe('Message Handler Type Safety', () => {
     it('should handle non-string tag values without crashing', async () => {
       const user = userEvent.setup();

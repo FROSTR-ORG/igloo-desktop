@@ -7,7 +7,9 @@ import { Loader2 } from 'lucide-react';
 import { VALIDATION_LIMITS } from '@/lib/validation';
 
 interface SaveShareProps {
-  onSave?: (password: string, salt: string, encryptedShare: string) => void;
+  // SECURITY: onSave callback does NOT receive password - only the encrypted result
+  // This prevents unnecessary password exposure in memory after encryption is complete
+  onSave?: (salt: string, encryptedShare: string) => void;
   onCancel?: () => void;
   shareToEncrypt?: string;
 }
@@ -93,8 +95,9 @@ const SaveShare: React.FC<SaveShareProps> = ({ onSave, onCancel, shareToEncrypt 
       const encryptedShare = encrypt_payload(secret, shareToEncrypt);
       
       // Call the onSave prop if provided
+      // SECURITY: Password is intentionally NOT passed to callback - only the encrypted result
       if (onSave) {
-        onSave(password, salt, encryptedShare);
+        onSave(salt, encryptedShare);
       }
       
       // Reset form

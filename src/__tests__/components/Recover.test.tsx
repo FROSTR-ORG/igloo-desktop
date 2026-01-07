@@ -1,11 +1,19 @@
 import React from 'react';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import Recover from '@/components/Recover';
 import { validateShare, validateGroup, decodeGroup, decodeShare, recoverSecretKeyFromCredentials } from '@frostr/igloo-core';
 
 // Mock the igloo-core functions
 jest.mock('@frostr/igloo-core');
+
+// Mock clipboard API
+const mockClipboardWriteText = jest.fn().mockResolvedValue(undefined);
+Object.assign(navigator, {
+  clipboard: {
+    writeText: mockClipboardWriteText,
+  },
+});
 
 const mockValidateShare = validateShare as jest.MockedFunction<typeof validateShare>;
 const mockValidateGroup = validateGroup as jest.MockedFunction<typeof validateGroup>;
@@ -201,7 +209,10 @@ describe('Recover Component', () => {
 
       await waitFor(() => {
         expect(screen.getByText(/Successfully recovered NSEC/i)).toBeInTheDocument();
-        expect(screen.getByText('nsec1mockrecoveredkey')).toBeInTheDocument();
+        // SECURITY FIX #43: NSEC is now masked by default - only first 8 chars shown
+        expect(screen.getByText(/nsec1moc/)).toBeInTheDocument();
+        // Full NSEC should NOT be visible when masked
+        expect(screen.queryByText('nsec1mockrecoveredkey')).not.toBeInTheDocument();
       });
     });
   });
@@ -286,6 +297,345 @@ describe('Recover Component', () => {
         expect(screen.getByText(/Error recovering NSEC/i)).toBeInTheDocument();
         expect(screen.getByText(/Recovery failed/i)).toBeInTheDocument();
       });
+    });
+  });
+
+  describe('Security Fix #42: DEBUG_AUTO_POPULATE Disabled', () => {
+    it('should not log sensitive share data when DEBUG_AUTO_POPULATE is false', async () => {
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation(() => {});
+
+      mockValidateShare.mockReturnValue({ isValid: true });
+      mockDecodeShare.mockReturnValue({
+        idx: 1,
+        seckey: 'secret-key-data',
+        binder_sn: 'binder-sn-data',
+        hidden_sn: 'hidden-sn-data',
+      });
+      mockValidateGroup.mockReturnValue({ isValid: true });
+      mockDecodeGroup.mockReturnValue({
+        threshold: 2,
+        group_pk: 'mock-group-pk',
+        commits: [
+          { idx: 1, pubkey: 'pk1', hidden_pn: 'hn1', binder_pn: 'bn1' },
+          { idx: 2, pubkey: 'pk2', hidden_pn: 'hn2', binder_pn: 'bn2' },
+        ],
+      });
+
+      render(<Recover mode="standalone" />);
+
+      const groupInput = screen.getByPlaceholderText(/Enter bfgroup1/i);
+      fireEvent.change(groupInput, { target: { value: 'bfgroup1mockvalidgroup' } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Recovery Requirements/i)).toBeInTheDocument();
+      });
+
+      const shareInputs = screen.getAllByPlaceholderText(/Enter share/i);
+      fireEvent.change(shareInputs[0], { target: { value: 'bfshare1mockshare1' } });
+
+      // Wait for any async logging that might happen
+      await waitFor(() => {
+        expect(mockValidateShare).toHaveBeenCalled();
+      });
+
+      // SECURITY: With DEBUG_AUTO_POPULATE = false, no sensitive data should be logged
+      // Check that no log contains sensitive decoded share data
+      const sensitivePatterns = [
+        'secret-key-data',
+        'Share decoded',
+        'Found matching group',
+        'Checking for stored shares',
+        'Found recent share',
+        'Decoded share',
+      ];
+
+      consoleSpy.mock.calls.forEach(call => {
+        const logMessage = call.join(' ');
+        sensitivePatterns.forEach(pattern => {
+          expect(logMessage).not.toContain(pattern);
+        });
+      });
+
+      consoleSpy.mockRestore();
+    });
+
+    it('should not auto-populate from storage in standalone mode (debug-independent)', async () => {
+      render(<Recover mode="standalone" />);
+
+      // In standalone mode, inputs should remain empty regardless of DEBUG flag
+      await waitFor(() => {
+        const groupInput = screen.getByPlaceholderText(/Enter bfgroup1/i);
+        expect(groupInput).toHaveValue('');
+      });
+    });
+  });
+
+  describe('Security Fix #43: Secure NSEC Display', () => {
+    // Helper to set up a successful recovery
+    const setupSuccessfulRecovery = async () => {
+      mockValidateGroup.mockReturnValue({ isValid: true });
+      mockDecodeGroup.mockReturnValue({
+        threshold: 2,
+        group_pk: 'mock-group-pk',
+        commits: [
+          { idx: 1, pubkey: 'pk1', hidden_pn: 'hn1', binder_pn: 'bn1' },
+          { idx: 2, pubkey: 'pk2', hidden_pn: 'hn2', binder_pn: 'bn2' },
+        ],
+      });
+      mockValidateShare.mockReturnValue({ isValid: true });
+      mockDecodeShare.mockReturnValue({
+        idx: 1,
+        seckey: 'mockseckey',
+        binder_sn: 'mockbinder',
+        hidden_sn: 'mockhidden',
+      });
+      mockRecoverSecretKey.mockReturnValue('nsec1abcdefghijklmnopqrstuvwxyz123456789');
+
+      render(<Recover mode="standalone" />);
+
+      const groupInput = screen.getByPlaceholderText(/Enter bfgroup1/i);
+      fireEvent.change(groupInput, { target: { value: 'bfgroup1mockvalidgroup' } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Recovery Requirements/i)).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByText(/Add Share Input/i);
+      fireEvent.click(addButton);
+
+      const shareInputs = screen.getAllByPlaceholderText(/Enter share/i);
+      fireEvent.change(shareInputs[0], { target: { value: 'bfshare1mockshare1' } });
+      fireEvent.change(shareInputs[1], { target: { value: 'bfshare1mockshare2' } });
+
+      await waitFor(() => {
+        const recoverButton = screen.getByRole('button', { name: /Recover NSEC/i });
+        expect(recoverButton).not.toBeDisabled();
+      });
+
+      const recoverButton = screen.getByRole('button', { name: /Recover NSEC/i });
+      fireEvent.click(recoverButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Successfully recovered NSEC/i)).toBeInTheDocument();
+      });
+    };
+
+    it('should display NSEC masked by default (only first 8 chars visible)', async () => {
+      await setupSuccessfulRecovery();
+
+      // Should show masked version with dots
+      expect(screen.getByText(/nsec1abc/)).toBeInTheDocument();
+      expect(screen.getByText(/•{40}/)).toBeInTheDocument();
+
+      // Full NSEC should NOT be visible
+      expect(screen.queryByText('nsec1abcdefghijklmnopqrstuvwxyz123456789')).not.toBeInTheDocument();
+    });
+
+    it('should show security warning when NSEC is displayed', async () => {
+      await setupSuccessfulRecovery();
+
+      expect(screen.getByText(/Security Warning/i)).toBeInTheDocument();
+      expect(screen.getByText(/auto-clear in 60 seconds/i)).toBeInTheDocument();
+      expect(screen.getByText(/Do not screenshot/i)).toBeInTheDocument();
+    });
+
+    it('should have Copy to Clipboard button', async () => {
+      await setupSuccessfulRecovery();
+
+      const copyButton = screen.getByRole('button', { name: /Copy to Clipboard/i });
+      expect(copyButton).toBeInTheDocument();
+    });
+
+    it('should copy NSEC to clipboard when Copy button clicked', async () => {
+      await setupSuccessfulRecovery();
+
+      const copyButton = screen.getByRole('button', { name: /Copy to Clipboard/i });
+      fireEvent.click(copyButton);
+
+      await waitFor(() => {
+        expect(mockClipboardWriteText).toHaveBeenCalledWith('nsec1abcdefghijklmnopqrstuvwxyz123456789');
+      });
+
+      // Should show "Copied!" feedback
+      await waitFor(() => {
+        expect(screen.getByText(/Copied!/i)).toBeInTheDocument();
+      });
+    });
+
+    it('should show error feedback when clipboard copy fails', async () => {
+      // Make clipboard fail
+      mockClipboardWriteText.mockRejectedValueOnce(new Error('Clipboard access denied'));
+
+      await setupSuccessfulRecovery();
+
+      const copyButton = screen.getByRole('button', { name: /Copy to Clipboard/i });
+      fireEvent.click(copyButton);
+
+      // Should show error message
+      await waitFor(() => {
+        expect(screen.getByText(/Failed to copy/i)).toBeInTheDocument();
+      });
+
+      // Should NOT show "Copied!" feedback
+      expect(screen.queryByText(/Copied!/i)).not.toBeInTheDocument();
+    });
+
+    it('should have Reveal/Hide toggle button', async () => {
+      await setupSuccessfulRecovery();
+
+      const revealButton = screen.getByRole('button', { name: /Reveal/i });
+      expect(revealButton).toBeInTheDocument();
+    });
+
+    it('should reveal full NSEC when Reveal button clicked', async () => {
+      await setupSuccessfulRecovery();
+
+      const revealButton = screen.getByRole('button', { name: /Reveal/i });
+      fireEvent.click(revealButton);
+
+      await waitFor(() => {
+        // Full NSEC should now be visible
+        expect(screen.getByText('nsec1abcdefghijklmnopqrstuvwxyz123456789')).toBeInTheDocument();
+        // Hide button should appear
+        expect(screen.getByRole('button', { name: /Hide/i })).toBeInTheDocument();
+      });
+    });
+
+    it('should hide NSEC when Hide button clicked after reveal', async () => {
+      await setupSuccessfulRecovery();
+
+      // First reveal
+      const revealButton = screen.getByRole('button', { name: /Reveal/i });
+      fireEvent.click(revealButton);
+
+      await waitFor(() => {
+        expect(screen.getByText('nsec1abcdefghijklmnopqrstuvwxyz123456789')).toBeInTheDocument();
+      });
+
+      // Then hide
+      const hideButton = screen.getByRole('button', { name: /Hide/i });
+      fireEvent.click(hideButton);
+
+      await waitFor(() => {
+        // Full NSEC should be hidden again
+        expect(screen.queryByText('nsec1abcdefghijklmnopqrstuvwxyz123456789')).not.toBeInTheDocument();
+        // Masked version should show
+        expect(screen.getByText(/nsec1abc/)).toBeInTheDocument();
+      });
+    });
+
+    it('should have Clear button to remove NSEC from memory', async () => {
+      await setupSuccessfulRecovery();
+
+      const clearButton = screen.getByRole('button', { name: /Clear/i });
+      expect(clearButton).toBeInTheDocument();
+    });
+
+    it('should clear NSEC when Clear button clicked', async () => {
+      await setupSuccessfulRecovery();
+
+      const clearButton = screen.getByRole('button', { name: /Clear/i });
+      fireEvent.click(clearButton);
+
+      await waitFor(() => {
+        // NSEC display area should be gone
+        expect(screen.queryByText(/nsec1abc/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/Security Warning/i)).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', { name: /Copy to Clipboard/i })).not.toBeInTheDocument();
+      });
+    });
+
+    it('should auto-clear NSEC after timeout', async () => {
+      jest.useFakeTimers();
+
+      await setupSuccessfulRecovery();
+
+      // NSEC should be visible
+      expect(screen.getByText(/nsec1abc/)).toBeInTheDocument();
+
+      // Fast-forward 60 seconds
+      act(() => {
+        jest.advanceTimersByTime(60000);
+      });
+
+      await waitFor(() => {
+        // NSEC should be cleared
+        expect(screen.queryByText(/nsec1abc/)).not.toBeInTheDocument();
+        // Should show message about auto-clear
+        expect(screen.getByText(/NSEC has been cleared from memory/i)).toBeInTheDocument();
+      });
+
+      jest.useRealTimers();
+    });
+
+    it('should clean up timeout on unmount', async () => {
+      jest.useFakeTimers();
+      const clearTimeoutSpy = jest.spyOn(global, 'clearTimeout');
+
+      mockValidateGroup.mockReturnValue({ isValid: true });
+      mockDecodeGroup.mockReturnValue({
+        threshold: 2,
+        group_pk: 'mock-group-pk',
+        commits: [
+          { idx: 1, pubkey: 'pk1', hidden_pn: 'hn1', binder_pn: 'bn1' },
+          { idx: 2, pubkey: 'pk2', hidden_pn: 'hn2', binder_pn: 'bn2' },
+        ],
+      });
+      mockValidateShare.mockReturnValue({ isValid: true });
+      mockDecodeShare.mockReturnValue({
+        idx: 1,
+        seckey: 'mockseckey',
+        binder_sn: 'mockbinder',
+        hidden_sn: 'mockhidden',
+      });
+      mockRecoverSecretKey.mockReturnValue('nsec1test');
+
+      const { unmount } = render(<Recover mode="standalone" />);
+
+      const groupInput = screen.getByPlaceholderText(/Enter bfgroup1/i);
+      fireEvent.change(groupInput, { target: { value: 'bfgroup1mockvalidgroup' } });
+
+      await waitFor(() => {
+        expect(screen.getByText(/Recovery Requirements/i)).toBeInTheDocument();
+      });
+
+      const addButton = screen.getByText(/Add Share Input/i);
+      fireEvent.click(addButton);
+
+      const shareInputs = screen.getAllByPlaceholderText(/Enter share/i);
+      fireEvent.change(shareInputs[0], { target: { value: 'bfshare1mockshare1' } });
+      fireEvent.change(shareInputs[1], { target: { value: 'bfshare1mockshare2' } });
+
+      await waitFor(() => {
+        const recoverButton = screen.getByRole('button', { name: /Recover NSEC/i });
+        expect(recoverButton).not.toBeDisabled();
+      });
+
+      const recoverButton = screen.getByRole('button', { name: /Recover NSEC/i });
+      fireEvent.click(recoverButton);
+
+      await waitFor(() => {
+        expect(screen.getByText(/Successfully recovered NSEC/i)).toBeInTheDocument();
+      });
+
+      // Unmount component
+      unmount();
+
+      // Verify clearTimeout was called for cleanup
+      expect(clearTimeoutSpy).toHaveBeenCalled();
+
+      clearTimeoutSpy.mockRestore();
+      jest.useRealTimers();
+    });
+
+    it('should NOT expose NSEC in DOM when masked', async () => {
+      await setupSuccessfulRecovery();
+
+      // Get the entire document body HTML
+      const bodyHtml = document.body.innerHTML;
+
+      // The full NSEC should NOT appear anywhere in the DOM when masked
+      expect(bodyHtml).not.toContain('nsec1abcdefghijklmnopqrstuvwxyz123456789');
     });
   });
 });

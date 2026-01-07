@@ -248,6 +248,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
   const cleanupListenersRef = useRef<(() => void)[]>([]);
   const keepAliveRef = useRef<SignerKeepAliveHandle | null>(null);
   const isSignerRunningRef = useRef(false);
+  // SECURITY: Track mount state to prevent state updates on unmounted component (race condition fix)
+  const isMountedRef = useRef(true);
 
   const updateSignerRunning = useCallback((running: boolean) => {
     isSignerRunningRef.current = running;
@@ -612,8 +614,12 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
 
   // Add effect to cleanup on unmount
   useEffect(() => {
+    // SECURITY: Mark as mounted when effect runs (handles React 18 StrictMode)
+    isMountedRef.current = true;
     // Cleanup function that runs when component unmounts
     return () => {
+      // SECURITY: Mark as unmounted FIRST to prevent any pending state updates
+      isMountedRef.current = false;
       if (nodeRef.current) {
         addLog('info', 'Signer stopped due to page navigation');
       }
@@ -888,8 +894,24 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         relays: relayUrls
       });
 
+      // SECURITY: Check if component unmounted during async operation
+      if (!isMountedRef.current) {
+        // Component unmounted - cleanup the node we just created and bail out
+        try {
+          cleanupBifrostNode(result.node);
+        } catch {
+          // Ignore cleanup errors during unmount
+        }
+        return;
+      }
+
       registerNode(result.node);
       await applySavedPoliciesToNode(result.node, sharePolicyRef.current);
+
+      // SECURITY: Check mount state again after second async operation
+      if (!isMountedRef.current) {
+        return;
+      }
 
       // Use the enhanced state info from createConnectedNode
       if (result.state.isReady) {
@@ -917,7 +939,8 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         });
 
         keepAlive.onReplace(({ next, previous }) => {
-          if (!isSignerRunningRef.current) {
+          // SECURITY: Check both signer running state AND mount state
+          if (!isSignerRunningRef.current || !isMountedRef.current) {
             return;
           }
           addLog('bifrost', 'Keep-alive replaced signer node', {
@@ -949,6 +972,10 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
         });
       }
     } catch (error) {
+      // SECURITY: Check mount state before updating state in error handler
+      if (!isMountedRef.current) {
+        return;
+      }
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       addLog('error', 'Failed to start signer', { error: errorMessage });
       cleanupNode();
