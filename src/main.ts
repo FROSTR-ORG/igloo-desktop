@@ -145,39 +145,40 @@ const startEchoMonitor = async (
       })
     : undefined;
 
-const relayTargets: string[][] = [];
-const seenTargets = new Set<string>();
+  // Relay target tracking - scoped to this monitor instance to avoid cross-contamination
+  const relayTargets: string[][] = [];
+  const seenTargets = new Set<string>();
 
-const relayTargetKey = (relays: string[]): string => {
-  const canonicalPieces = relays.map(relay => {
-    try {
-      const parsed = new URL(relay);
-      const protocol = parsed.protocol.toLowerCase();
-      const hostname = parsed.hostname.toLowerCase();
-      const port = parsed.port ? `:${parsed.port}` : '';
-      return `${protocol}//${hostname}${port}${parsed.pathname}${parsed.search}${parsed.hash}`;
-    } catch {
-      const match = relay.match(/^(wss?):\/\/([^/?#]+)(.*)$/);
-      if (match) {
-        const scheme = match[1].toLowerCase();
-        const authority = match[2].toLowerCase();
-        const pathAndMore = match[3] ?? '';
-        return `${scheme}://${authority}${pathAndMore}`;
+  const relayTargetKey = (relays: string[]): string => {
+    const canonicalPieces = relays.map(relay => {
+      try {
+        const parsed = new URL(relay);
+        const protocol = parsed.protocol.toLowerCase();
+        const hostname = parsed.hostname.toLowerCase();
+        const port = parsed.port ? `:${parsed.port}` : '';
+        return `${protocol}//${hostname}${port}${parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch {
+        const match = relay.match(/^(wss?):\/\/([^/?#]+)(.*)$/);
+        if (match) {
+          const scheme = match[1].toLowerCase();
+          const authority = match[2].toLowerCase();
+          const pathAndMore = match[3] ?? '';
+          return `${scheme}://${authority}${pathAndMore}`;
+        }
+        return relay;
       }
-      return relay;
-    }
-  });
-  canonicalPieces.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
-  return canonicalPieces.join('|');
-};
+    });
+    canonicalPieces.sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+    return canonicalPieces.join('|');
+  };
 
-const registerTarget = (relays: string[]) => {
-  if (relays.length === 0) return;
-  const key = relayTargetKey(relays);
-  if (seenTargets.has(key)) return;
-  seenTargets.add(key);
-  relayTargets.push(relays);
-};
+  const registerTarget = (relays: string[]) => {
+    if (relays.length === 0) return;
+    const key = relayTargetKey(relays);
+    if (seenTargets.has(key)) return;
+    seenTargets.add(key);
+    relayTargets.push(relays);
+  };
 
   if (relayPlan.envRelays.length > 0) {
     registerTarget(relayPlan.envRelays);
@@ -231,8 +232,11 @@ function createWindow() {
     width: 1000,
     height: 700,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      // SECURITY: These settings are critical for app security
+      nodeIntegration: false,      // Prevent renderer from accessing Node.js APIs directly
+      contextIsolation: true,      // Isolate renderer context from preload script
+      sandbox: true,               // Enable Chromium sandbox for additional security
+      preload: path.join(__dirname, 'preload.js'),  // Safe IPC bridge via contextBridge
     },
     icon: path.join(__dirname, '..', 'src', 'assets', 'frostr-logo-transparent.png')
   });
@@ -304,12 +308,76 @@ app.whenReady().then(() => {
 
   ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: string) => {
     try {
+      if (typeof shareId !== 'string' || shareId.trim().length === 0) {
+        console.warn('[ShareManager] open-share-location rejected: invalid shareId');
+        return { ok: false };
+      }
       const filePath = shareManager.getSharePath(shareId);
       await shell.showItemInFolder(filePath);
       return { ok: true };
     } catch (error) {
       console.error('Failed to open share location:', error);
       return { ok: false };
+    }
+  });
+
+  type ComputeRelayPlanArgs = {
+    groupCredential?: unknown;
+    decodedGroup?: unknown;
+    explicitRelays?: unknown;
+    envRelay?: unknown;
+  };
+
+  ipcMain.handle('compute-relay-plan', async (_event: IpcMainInvokeEvent, args: ComputeRelayPlanArgs) => {
+    try {
+      const {
+        groupCredential,
+        decodedGroup,
+        explicitRelays,
+        envRelay
+      } = args ?? {};
+
+      const normalizedGroupCredential = typeof groupCredential === 'string' && groupCredential.trim().length > 0
+        ? groupCredential.trim()
+        : null;
+
+      const normalizedDecodedGroup = decodedGroup && typeof decodedGroup === 'object'
+        ? (decodedGroup as Record<string, unknown>)
+        : null;
+
+      const normalizedExplicitRelays = Array.isArray(explicitRelays)
+        ? explicitRelays.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
+        : null;
+
+      // Fall back to reading IGLOO_RELAY from main process environment
+      // (renderer can't access process.env due to sandbox/contextIsolation)
+      const normalizedEnvRelay = typeof envRelay === 'string' && envRelay.trim().length > 0
+        ? envRelay.trim()
+        : (process.env.IGLOO_RELAY?.trim() || null);
+
+      const relayPlan = computeRelayPlan({
+        groupCredential: normalizedGroupCredential ?? undefined,
+        decodedGroup: normalizedDecodedGroup ?? undefined,
+        explicitRelays: normalizedExplicitRelays ?? undefined,
+        envRelay: normalizedEnvRelay ?? undefined,
+        baseRelays: DEFAULT_ECHO_RELAYS
+      });
+
+      return {
+        ok: true,
+        relayPlan: {
+          relays: relayPlan.relays,
+          envRelays: relayPlan.envRelays,
+          defaultRelays: relayPlan.defaultRelays,
+          groupRelays: relayPlan.groupRelays,
+          explicitRelays: relayPlan.explicitRelays,
+          groupExtras: relayPlan.groupExtras
+        }
+      };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error('[RelayPlan] Failed to compute relay plan:', error);
+      return { ok: false, reason: 'computation-failed', message };
     }
   });
 

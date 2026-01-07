@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { decodeGroup, decodeShare } from "@frostr/igloo-core";
-import { ipcRenderer } from 'electron';
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CURRENT_SHARE_VERSION } from '@/lib/encryption';
@@ -189,7 +188,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     if (!decodedGroup || shareCredentials.length === 0) {
       if (echoListenerIdRef.current) {
         const listenerId = echoListenerIdRef.current;
-        void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+        void window.electronAPI.echoStop({ listenerId }).catch(() => {
           /* noop */
         });
         echoListenerIdRef.current = null;
@@ -200,10 +199,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     const listenerId = `keyset-${groupCredential}`;
     echoListenerIdRef.current = listenerId;
 
-    const handleIpcEcho = (
-      _event: unknown,
-      payload: { listenerId: string; shareIndex: number; shareCredential?: string; challenge?: string | null }
-    ) => {
+    // Set up echo received listener via preload API
+    const cleanupEchoListener = window.electronAPI.onEchoReceived((payload) => {
       if (!payload || payload.listenerId !== listenerId) {
         return;
       }
@@ -212,12 +209,18 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         handledEchoSharesRef.current.add(payload.shareIndex);
         handleEchoReceived(payload.shareIndex);
       }
-    };
+    });
 
-    ipcRenderer.on('echo-received', handleIpcEcho as never);
+    // Set up echo error listener to handle errors during monitoring
+    const cleanupErrorListener = window.electronAPI.onEchoError((payload) => {
+      if (!payload || payload.listenerId !== listenerId) {
+        return;
+      }
+      console.error('Echo monitoring error:', payload.message || payload.reason);
+    });
 
-    void ipcRenderer
-      .invoke('echo-start', {
+    void window.electronAPI
+      .echoStart({
         listenerId,
         groupCredential,
         shareCredentials,
@@ -227,8 +230,9 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       });
 
     return () => {
-      ipcRenderer.removeListener('echo-received', handleIpcEcho as never);
-      void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+      cleanupEchoListener();
+      cleanupErrorListener();
+      void window.electronAPI.echoStop({ listenerId }).catch(() => {
         /* noop */
       });
       echoListenerIdRef.current = null;

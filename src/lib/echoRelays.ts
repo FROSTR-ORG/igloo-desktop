@@ -9,19 +9,24 @@ type RelayCandidateSource = {
   relay_urls?: unknown;
 };
 
+/**
+ * Normalizes relay URLs to use secure WebSocket protocol (wss://).
+ *
+ * All relay connections MUST use TLS - this is enforced by CSP (connect-src 'self' wss:).
+ * Insecure ws:// and http:// URLs are auto-upgraded to wss:// to prevent silent failures.
+ */
 const normalizeRelayUrl = (raw: string): string => {
   const trimmed = String(raw ?? '').trim();
   if (!trimmed) return trimmed;
 
+  // Auto-upgrade ws:// to wss:// (CSP blocks insecure WebSocket connections)
   if (/^wss?:\/\//i.test(trimmed)) {
-    return trimmed.replace(/^wss?:\/\//i, scheme => scheme.toLowerCase());
+    return trimmed.replace(/^wss?:\/\//i, 'wss://');
   }
 
+  // Convert http/https to wss:// (always secure, CSP requires it)
   if (/^https?:\/\//i.test(trimmed)) {
-    return trimmed.replace(
-      /^(https?):\/\//i,
-      (_match, protocol: string) => (protocol.toLowerCase() === 'https' ? 'wss://' : 'ws://')
-    );
+    return trimmed.replace(/^https?:\/\//i, 'wss://');
   }
 
   return `wss://${trimmed}`;

@@ -9,8 +9,35 @@ global.TextDecoder = TextDecoder as typeof globalThis.TextDecoder;
 import { setupBuffMock } from './__mocks__/buff.mock';
 setupBuffMock();
 
-// Mock Electron globally for all tests
+// Mock the new secure electronAPI (exposed via preload script with contextBridge)
+const mockElectronAPI = {
+  // Share management
+  getShares: jest.fn(),
+  saveShare: jest.fn(),
+  deleteShare: jest.fn(),
+  openShareLocation: jest.fn(),
+
+  // Relay planning
+  computeRelayPlan: jest.fn(),
+
+  // Echo listener management
+  echoStart: jest.fn(),
+  echoStop: jest.fn(),
+
+  // Echo event listeners - returns cleanup function
+  onEchoReceived: jest.fn(() => jest.fn()),
+  onEchoError: jest.fn(() => jest.fn()),
+};
+
+// Set up the global window.electronAPI mock
 global.window = Object.create(window);
+Object.defineProperty(window, 'electronAPI', {
+  value: mockElectronAPI,
+  writable: true,
+  configurable: true,
+});
+
+// Legacy mock for backwards compatibility with older tests
 const mockIpcRenderer = {
   invoke: jest.fn(),
   on: jest.fn(),
@@ -18,16 +45,12 @@ const mockIpcRenderer = {
   removeAllListeners: jest.fn(),
 };
 
-Object.defineProperty(window, 'electron', {
-  value: {
-    ipcRenderer: mockIpcRenderer,
-  },
-  writable: true,
-});
-
 // Mock modules that cause issues in test environment
 jest.mock('electron', () => ({
   ipcRenderer: mockIpcRenderer,
+  contextBridge: {
+    exposeInMainWorld: jest.fn(),
+  },
   app: {
     getPath: jest.fn().mockReturnValue('/mock/app/data'),
   },
@@ -165,4 +188,4 @@ export const mockValidationResults = {
 };
 
 // Export for use in tests
-export { mockIpcRenderer }; 
+export { mockIpcRenderer, mockElectronAPI }; 
