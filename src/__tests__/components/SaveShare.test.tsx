@@ -6,7 +6,8 @@ import '@testing-library/jest-dom';
 
 // Mock encryption functions
 jest.mock('@/lib/encryption', () => ({
-  derive_secret_async: jest.fn().mockResolvedValue(new Uint8Array(32)),
+  // derive_secret_async returns a hex string (32 bytes = 64 hex chars), not Uint8Array
+  derive_secret_async: jest.fn().mockResolvedValue('a'.repeat(64)),
   encrypt_payload: jest.fn().mockReturnValue('encrypted-share-data'),
 }));
 
