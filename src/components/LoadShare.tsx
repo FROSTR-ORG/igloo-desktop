@@ -11,7 +11,7 @@ import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import type { SharePolicy } from '@/types';
-import { VALIDATION_LIMITS } from '@/lib/validation';
+import { VALIDATION_LIMITS, sanitizeUserError } from '@/lib/validation';
 
 interface LoadShareProps {
   share: {
@@ -123,7 +123,8 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
         return;
       }
       setIsPasswordValid(false);
-      setPasswordError('Failed to decrypt share: ' + (err instanceof Error ? err.message : String(err)));
+      // SECURITY: Sanitize error to prevent leaking crypto implementation details
+      setPasswordError('Failed to decrypt share: ' + sanitizeUserError(err));
       setIsSubmitting(false);
     }
   };

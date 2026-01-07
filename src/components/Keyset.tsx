@@ -52,7 +52,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setShowSaveDialog({ show: true, shareIndex });
   };
 
-  const handleSaveComplete = async (password: string, salt: string, encryptedShare: string) => {
+  // SECURITY: Callback receives only salt and encrypted share - password is kept local to SaveShare
+  const handleSaveComplete = async (salt: string, encryptedShare: string) => {
     if (showSaveDialog.shareIndex === null) return;
 
     const decodedShare = decodedShares[showSaveDialog.shareIndex];
