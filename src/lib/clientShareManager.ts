@@ -1,9 +1,9 @@
-import { ipcRenderer } from 'electron';
 import { decodeShare } from '@frostr/igloo-core';
 import type { IglooShare } from '@/types';
 
 // Debug helper for group auto-population
-const DEBUG_GROUP_AUTO = true;
+// Set to true locally for debugging share lookups (do not commit as true)
+const DEBUG_GROUP_AUTO = false;
 
 // Re-export for backward compatibility
 export type { IglooShare };
@@ -11,7 +11,7 @@ export type { IglooShare };
 class ClientShareManager {
   async getShares(): Promise<IglooShare[] | false> {
     try {
-      const shares = await ipcRenderer.invoke('get-shares');
+      const shares = await window.electronAPI.getShares() as IglooShare[] | false;
       if (DEBUG_GROUP_AUTO) {
         console.log('Retrieved shares:', shares);
       }
@@ -67,7 +67,7 @@ class ClientShareManager {
 
   async saveShare(share: IglooShare): Promise<boolean> {
     try {
-      return await ipcRenderer.invoke('save-share', share);
+      return await window.electronAPI.saveShare(share);
     } catch (error) {
       console.error('Failed to save share:', error);
       return false;
@@ -76,7 +76,7 @@ class ClientShareManager {
 
   async deleteShare(shareId: string): Promise<boolean> {
     try {
-      return await ipcRenderer.invoke('delete-share', shareId);
+      return await window.electronAPI.deleteShare(shareId);
     } catch (error) {
       console.error('Failed to delete share:', error);
       return false;
@@ -85,7 +85,10 @@ class ClientShareManager {
 
   async openShareLocation(shareId: string): Promise<void> {
     try {
-      await ipcRenderer.invoke('open-share-location', shareId);
+      const result = await window.electronAPI.openShareLocation(shareId);
+      if (!result.ok) {
+        console.error('Failed to open share location: operation rejected');
+      }
     } catch (error) {
       console.error('Failed to open share location:', error);
     }
