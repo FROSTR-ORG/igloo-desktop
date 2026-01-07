@@ -5,6 +5,7 @@ import { InputWithValidation } from "@/components/ui/input-with-validation"
 import { Tooltip } from "@/components/ui/tooltip"
 import { clientShareManager } from "@/lib/clientShareManager"
 import { HelpCircle } from "lucide-react"
+import { VALIDATION_LIMITS } from "@/lib/validation"
 
 interface RecoverProps {
   initialShare?: string;
@@ -312,6 +313,17 @@ const Recover: React.FC<RecoverProps> = ({
 
   // Handle adding more share inputs
   const addShareInput = () => {
+    // Validate currentThreshold is a valid positive integer within bounds
+    if (
+      typeof currentThreshold !== 'number' ||
+      !Number.isInteger(currentThreshold) ||
+      currentThreshold < VALIDATION_LIMITS.THRESHOLD_MIN ||
+      currentThreshold > VALIDATION_LIMITS.THRESHOLD_MAX
+    ) {
+      // Invalid threshold - don't allow adding more inputs
+      return;
+    }
+
     if (sharesInputs.length < currentThreshold) {
       setSharesInputs([...sharesInputs, ""]);
       setSharesValidity([...sharesValidity, { isValid: false }]);
@@ -337,7 +349,7 @@ const Recover: React.FC<RecoverProps> = ({
     const validation = validateShare(value);
     
     // Additional validation - try to decode with bifrost if the basic validation passes
-    if (validation.isValid && value.trim()) {
+    if (validation.isValid && value.trim().length > 0) {
       try {
         // If this doesn't throw, it's a valid share
         const decodedShare = decodeShare(value);
@@ -407,7 +419,7 @@ const Recover: React.FC<RecoverProps> = ({
     const validation = validateGroup(value);
     
     // Try deeper validation with bifrost decoder if basic validation passes
-    if (validation.isValid && value.trim()) {
+    if (validation.isValid && value.trim().length > 0) {
       try {
         // If this doesn't throw, it's a valid group
         const decodedGroup = decodeGroup(value);
