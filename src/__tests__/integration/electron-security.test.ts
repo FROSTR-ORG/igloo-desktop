@@ -302,6 +302,32 @@ describe('Error Sanitization', () => {
   });
 });
 
+describe('Navigation Security', () => {
+  let mainTsContent: string;
+
+  beforeAll(() => {
+    const mainTsPath = path.join(__dirname, '../../main.ts');
+    mainTsContent = fs.readFileSync(mainTsPath, 'utf-8');
+  });
+
+  it('should block navigation to external URLs', () => {
+    // Verify will-navigate handler exists
+    expect(mainTsContent).toMatch(/webContents\.on\(\s*['"]will-navigate['"]/);
+    // Verify it blocks non-file URLs
+    expect(mainTsContent).toMatch(/!url\.startsWith\(['"]file:\/\/['"]\)/);
+    expect(mainTsContent).toMatch(/event\.preventDefault\(\)/);
+  });
+
+  it('should handle window open requests securely', () => {
+    // Verify setWindowOpenHandler exists
+    expect(mainTsContent).toMatch(/setWindowOpenHandler/);
+    // Verify it opens external links in system browser
+    expect(mainTsContent).toMatch(/shell\.openExternal\(url\)/);
+    // Verify it denies creating new windows
+    expect(mainTsContent).toMatch(/return\s*\{\s*action:\s*['"]deny['"]\s*\}/);
+  });
+});
+
 describe('File Permission Security', () => {
   let shareManagerContent: string;
 

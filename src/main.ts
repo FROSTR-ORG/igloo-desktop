@@ -355,6 +355,27 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     win.webContents.openDevTools();
   }
+
+  // SECURITY: Prevent navigation to external URLs
+  // This prevents the app window from being redirected to malicious sites
+  win.webContents.on('will-navigate', (event, url) => {
+    // Allow navigation to local files only (the app's own pages)
+    if (!url.startsWith('file://')) {
+      event.preventDefault();
+      console.warn('[Security] Blocked navigation to external URL:', url);
+    }
+  });
+
+  // SECURITY: Handle new window requests (e.g., target="_blank" links)
+  // Open external links in the system browser, don't create new Electron windows
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    // Open in system browser
+    if (url.startsWith('https://') || url.startsWith('http://')) {
+      shell.openExternal(url);
+    }
+    // Deny creating new Electron windows
+    return { action: 'deny' };
+  });
 }
 
 app.whenReady().then(() => {
