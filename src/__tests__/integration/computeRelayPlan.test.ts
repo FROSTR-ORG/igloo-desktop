@@ -28,33 +28,31 @@ describe('compute-relay-plan IPC Handler', () => {
       expect(mainTsContent).toMatch(/ipcMain\.handle\(\s*['"]compute-relay-plan['"]/);
     });
 
-    it('should define ComputeRelayPlanArgs type with expected properties', () => {
-      expect(mainTsContent).toMatch(/type\s+ComputeRelayPlanArgs\s*=\s*\{/);
-      expect(mainTsContent).toMatch(/groupCredential\?:\s*unknown/);
-      expect(mainTsContent).toMatch(/decodedGroup\?:\s*unknown/);
-      expect(mainTsContent).toMatch(/explicitRelays\?:\s*unknown/);
-      expect(mainTsContent).toMatch(/envRelay\?:\s*unknown/);
+    it('should define RelayPlanArgsSchema with Zod validation', () => {
+      // Now uses Zod schema instead of manual type with unknown properties
+      expect(mainTsContent).toMatch(/RelayPlanArgsSchema\s*=\s*z\.object/);
+      expect(mainTsContent).toMatch(/groupCredential:.*\.optional\(\)/);
+      expect(mainTsContent).toMatch(/decodedGroup:.*\.optional\(\)/);
+      expect(mainTsContent).toMatch(/explicitRelays:.*\.optional\(\)/);
+      expect(mainTsContent).toMatch(/envRelay:.*\.optional\(\)/);
     });
 
     it('should fall back to process.env.IGLOO_RELAY when envRelay not provided', () => {
       // Verify the env var fallback logic is present
       expect(mainTsContent).toMatch(/process\.env\.IGLOO_RELAY/);
-      // Verify the fallback pattern: use envRelay arg if provided, otherwise check process.env
-      expect(mainTsContent).toMatch(
-        /typeof envRelay === ['"]string['"].*process\.env\.IGLOO_RELAY/s
-      );
+      // Verify the fallback pattern in the handler
+      expect(mainTsContent).toMatch(/envRelay\?\.trim\(\)\s*\|\|\s*process\.env\.IGLOO_RELAY/);
     });
 
     it('should normalize input strings by trimming whitespace', () => {
-      // Verify trim() is called on string inputs
-      expect(mainTsContent).toMatch(/groupCredential\.trim\(\)/);
-      expect(mainTsContent).toMatch(/envRelay\.trim\(\)/);
+      // Verify trim() is called on string inputs after Zod validation
+      expect(mainTsContent).toMatch(/groupCredential\?\.trim\(\)/);
+      expect(mainTsContent).toMatch(/envRelay\?\.trim\(\)/);
     });
 
     it('should filter explicitRelays array to only valid strings', () => {
-      // Verify the relay filtering logic
-      expect(mainTsContent).toMatch(/explicitRelays\.filter\(/);
-      expect(mainTsContent).toMatch(/typeof r === ['"]string['"]/);
+      // Zod schema validates the array, then we filter empty strings after trimming
+      expect(mainTsContent).toMatch(/explicitRelays\?\.filter\(r\s*=>\s*r\.trim\(\)\.length\s*>\s*0\)/);
     });
 
     it('should return structured result with ok flag', () => {

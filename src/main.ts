@@ -2,6 +2,7 @@ import type { IpcMainInvokeEvent } from 'electron';
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { z } from 'zod';
 import { ShareManager, getAllShares } from './lib/shareManager.js';
 import { computeRelayPlan } from './lib/echoRelays.js';
 import {
@@ -10,6 +11,107 @@ import {
   startListeningForAllEchoes,
 } from '@frostr/igloo-core';
 import { SimplePool } from 'nostr-tools';
+
+// =============================================================================
+// IPC Input Validation Schemas
+// =============================================================================
+// SECURITY: These schemas enforce strict input validation with length limits
+// to prevent DoS attacks and ensure data integrity across the IPC boundary.
+
+/** Share ID: alphanumeric with dots, underscores, hyphens; max 255 chars */
+const ShareIdSchema = z.string()
+  .min(1, 'Share ID is required')
+  .max(255, 'Share ID exceeds maximum length')
+  .regex(/^[A-Za-z0-9._-]+$/, 'Share ID contains invalid characters');
+
+/** Hex string validation for salt (min 32 chars = 16 bytes) */
+const HexSaltSchema = z.string()
+  .min(32, 'Salt must be at least 32 hex characters')
+  .max(128, 'Salt exceeds maximum length')
+  .regex(/^[0-9a-fA-F]+$/, 'Salt must be a valid hex string');
+
+/** Relay URL: reasonable length limit */
+const RelayUrlSchema = z.string().max(500, 'Relay URL exceeds maximum length');
+
+/** Share credential: base64url encoded, reasonable max for FROST shares */
+const ShareCredentialSchema = z.string()
+  .min(1, 'Share credential is required')
+  .max(5000, 'Share credential exceeds maximum length');
+
+/** Group credential: encoded group key data */
+const GroupCredentialSchema = z.string()
+  .min(1, 'Group credential is required')
+  .max(5000, 'Group credential exceeds maximum length');
+
+/** Schema for save-share IPC handler */
+const SaveShareSchema = z.object({
+  id: ShareIdSchema,
+  name: z.string()
+    .min(1, 'Name is required')
+    .max(255, 'Name exceeds maximum length'),
+  share: z.string()
+    .min(1, 'Share data is required')
+    .max(10000, 'Share data exceeds maximum length'),
+  salt: HexSaltSchema,
+  groupCredential: GroupCredentialSchema,
+  savedAt: z.string().optional(),
+  metadata: z.object({
+    binder_sn: z.string().max(20).optional(),
+    version: z.number().optional(),
+  }).optional(),
+});
+
+/** Schema for compute-relay-plan IPC handler */
+const RelayPlanArgsSchema = z.object({
+  groupCredential: GroupCredentialSchema.optional(),
+  decodedGroup: z.record(z.unknown()).optional(),
+  explicitRelays: z.array(RelayUrlSchema).max(50, 'Too many relays').optional(),
+  envRelay: z.string().max(500).optional(),
+});
+
+/** Schema for echo-start IPC handler */
+const EchoStartArgsSchema = z.object({
+  listenerId: z.string()
+    .min(1, 'Listener ID is required')
+    .max(100, 'Listener ID exceeds maximum length'),
+  groupCredential: GroupCredentialSchema,
+  shareCredentials: z.array(ShareCredentialSchema)
+    .min(1, 'At least one share credential is required')
+    .max(100, 'Too many share credentials'),
+  relays: z.array(RelayUrlSchema).max(50).optional(),
+});
+
+/** Schema for echo-stop IPC handler */
+const EchoStopArgsSchema = z.object({
+  listenerId: z.string()
+    .min(1, 'Listener ID is required')
+    .max(100, 'Listener ID exceeds maximum length'),
+});
+
+// =============================================================================
+// Error Sanitization
+// =============================================================================
+
+/**
+ * Sanitize error messages to prevent leaking sensitive file paths.
+ * SECURITY: Replaces absolute paths with placeholders, preserving only filenames.
+ *
+ * Handles both quoted paths (from Node.js errors) and unquoted paths.
+ * Quoted paths can contain spaces (e.g., macOS "Application Support").
+ * Unquoted paths stop at whitespace since boundaries are ambiguous.
+ */
+function sanitizeErrorForLog(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    // Quoted Unix paths: '/path/with spaces/file.txt' -> '<path>/file.txt'
+    .replace(/(['"])(\/(?:[^\/]+\/)+)([^\/'"]*)\1/g, '$1<path>/$3$1')
+    // Unquoted Unix paths: /path/to/file.txt -> <path>/file.txt
+    .replace(/\/(?:[^\/\s:]+\/)+([^\/\s:]+)/g, '<path>/$1')
+    // Quoted Windows paths: "C:\path\with spaces\file.txt" -> "<path>\file.txt"
+    .replace(/(['"])([A-Za-z]:\\(?:[^\\]+\\)+)([^\\'"]*)(\1)/g, '$1<path>\\$3$1')
+    // Unquoted Windows paths: C:\path\to\file.txt -> <path>\file.txt
+    .replace(/[A-Za-z]:\\(?:[^\\:\s]+\\)+([^\\:\s]+)/g, '<path>\\$1');
+}
 // import type { BifrostNode } from '@frostr/igloo-core';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -266,100 +368,77 @@ app.whenReady().then(() => {
     return getAllShares();
   });
   
-  ipcMain.handle('save-share', async (_event: IpcMainInvokeEvent, share: Parameters<ShareManager['saveShare']>[0]) => {
+  ipcMain.handle('save-share', async (_event: IpcMainInvokeEvent, share: unknown) => {
     try {
-      if (!share || typeof share !== 'object') {
-        console.warn('[ShareManager] save-share rejected: invalid payload type');
+      // SECURITY: Validate input with Zod schema (includes length limits)
+      const parseResult = SaveShareSchema.safeParse(share);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map(i => i.message).join(', ');
+        console.warn('[ShareManager] save-share rejected: validation failed', { issues });
         return false;
       }
-      const s = (share as unknown) as Record<string, unknown>;
-      const required = {
-        id: s.id,
-        name: s.name,
-        share: s.share,
-        salt: s.salt,
-        groupCredential: s.groupCredential,
-      } as Record<string, unknown>;
-      for (const [key, value] of Object.entries(required)) {
-        if (typeof value !== 'string' || value.trim().length === 0) {
-          console.warn('[ShareManager] save-share rejected: missing/invalid field', { field: key });
-          return false;
-        }
-      }
-      return shareManager.saveShare(share);
+      return shareManager.saveShare(parseResult.data);
     } catch (err) {
-      console.error('[ShareManager] save-share failed:', err);
+      console.error('[ShareManager] save-share failed:', sanitizeErrorForLog(err));
       return false;
     }
   });
   
-  ipcMain.handle('delete-share', async (_event: IpcMainInvokeEvent, shareId: string) => {
+  ipcMain.handle('delete-share', async (_event: IpcMainInvokeEvent, shareId: unknown) => {
     try {
-      if (typeof shareId !== 'string' || shareId.trim().length === 0) {
-        console.warn('[ShareManager] delete-share rejected: invalid shareId');
+      // SECURITY: Validate share ID with Zod schema (includes length/format limits)
+      const parseResult = ShareIdSchema.safeParse(shareId);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map(i => i.message).join(', ');
+        console.warn('[ShareManager] delete-share rejected: validation failed', { issues });
         return false;
       }
-      return shareManager.deleteShare(shareId.trim());
+      return shareManager.deleteShare(parseResult.data);
     } catch (err) {
-      console.error('[ShareManager] delete-share failed:', err);
+      console.error('[ShareManager] delete-share failed:', sanitizeErrorForLog(err));
       return false;
     }
   });
 
-  ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: string) => {
+  ipcMain.handle('open-share-location', async (_event: IpcMainInvokeEvent, shareId: unknown) => {
     try {
-      if (typeof shareId !== 'string' || shareId.trim().length === 0) {
-        console.warn('[ShareManager] open-share-location rejected: invalid shareId');
+      // SECURITY: Validate share ID with Zod schema (includes length/format limits)
+      const parseResult = ShareIdSchema.safeParse(shareId);
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map(i => i.message).join(', ');
+        console.warn('[ShareManager] open-share-location rejected: validation failed', { issues });
         return { ok: false };
       }
-      const filePath = shareManager.getSharePath(shareId);
+      const filePath = shareManager.getSharePath(parseResult.data);
       await shell.showItemInFolder(filePath);
       return { ok: true };
     } catch (error) {
-      console.error('Failed to open share location:', error);
+      console.error('[ShareManager] open-share-location failed:', sanitizeErrorForLog(error));
       return { ok: false };
     }
   });
 
-  type ComputeRelayPlanArgs = {
-    groupCredential?: unknown;
-    decodedGroup?: unknown;
-    explicitRelays?: unknown;
-    envRelay?: unknown;
-  };
-
-  ipcMain.handle('compute-relay-plan', async (_event: IpcMainInvokeEvent, args: ComputeRelayPlanArgs) => {
+  ipcMain.handle('compute-relay-plan', async (_event: IpcMainInvokeEvent, args: unknown) => {
     try {
-      const {
-        groupCredential,
-        decodedGroup,
-        explicitRelays,
-        envRelay
-      } = args ?? {};
+      // SECURITY: Validate input with Zod schema (includes length limits)
+      const parseResult = RelayPlanArgsSchema.safeParse(args ?? {});
+      if (!parseResult.success) {
+        const issues = parseResult.error.issues.map(i => i.message).join(', ');
+        console.warn('[RelayPlan] compute-relay-plan rejected: validation failed', { issues });
+        return { ok: false, reason: 'validation-failed', message: issues };
+      }
 
-      const normalizedGroupCredential = typeof groupCredential === 'string' && groupCredential.trim().length > 0
-        ? groupCredential.trim()
-        : null;
-
-      const normalizedDecodedGroup = decodedGroup && typeof decodedGroup === 'object'
-        ? (decodedGroup as Record<string, unknown>)
-        : null;
-
-      const normalizedExplicitRelays = Array.isArray(explicitRelays)
-        ? explicitRelays.filter((r): r is string => typeof r === 'string' && r.trim().length > 0)
-        : null;
+      const { groupCredential, decodedGroup, explicitRelays, envRelay } = parseResult.data;
 
       // Fall back to reading IGLOO_RELAY from main process environment
       // (renderer can't access process.env due to sandbox/contextIsolation)
-      const normalizedEnvRelay = typeof envRelay === 'string' && envRelay.trim().length > 0
-        ? envRelay.trim()
-        : (process.env.IGLOO_RELAY?.trim() || null);
+      const normalizedEnvRelay = envRelay?.trim() || process.env.IGLOO_RELAY?.trim() || undefined;
 
       const relayPlan = computeRelayPlan({
-        groupCredential: normalizedGroupCredential ?? undefined,
-        decodedGroup: normalizedDecodedGroup ?? undefined,
-        explicitRelays: normalizedExplicitRelays ?? undefined,
-        envRelay: normalizedEnvRelay ?? undefined,
+        groupCredential: groupCredential?.trim() || undefined,
+        decodedGroup: decodedGroup ?? undefined,
+        explicitRelays: explicitRelays?.filter(r => r.trim().length > 0) ?? undefined,
+        envRelay: normalizedEnvRelay,
         baseRelays: DEFAULT_ECHO_RELAYS
       });
 
@@ -375,46 +454,38 @@ app.whenReady().then(() => {
         }
       };
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      console.error('[RelayPlan] Failed to compute relay plan:', error);
-      return { ok: false, reason: 'computation-failed', message };
+      console.error('[RelayPlan] Failed to compute relay plan:', sanitizeErrorForLog(error));
+      return { ok: false, reason: 'computation-failed', message: 'Failed to compute relay plan' };
     }
   });
 
-  type EchoStartArgs = {
-    listenerId?: unknown;
-    groupCredential?: unknown;
-    shareCredentials?: unknown;
-  };
-
-  ipcMain.handle('echo-start', async (event: IpcMainInvokeEvent, args: EchoStartArgs) => {
-    const { listenerId, groupCredential, shareCredentials } = args ?? {};
-
-    if (typeof listenerId !== 'string' || listenerId.trim().length === 0) {
-      return { ok: false, reason: 'invalid-listener-id' };
+  ipcMain.handle('echo-start', async (event: IpcMainInvokeEvent, args: unknown) => {
+    // SECURITY: Validate input with Zod schema (includes length limits)
+    const parseResult = EchoStartArgsSchema.safeParse(args);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.map(i => i.message).join(', ');
+      console.warn('[EchoBridge] echo-start rejected: validation failed', { issues });
+      return { ok: false, reason: 'validation-failed', message: issues };
     }
 
-    if (typeof groupCredential !== 'string' || groupCredential.trim().length === 0) {
-      return { ok: false, reason: 'invalid-group' };
-    }
+    const { listenerId, groupCredential, shareCredentials } = parseResult.data;
 
+    // Clean up existing listener if any
     if (activeEchoListeners.has(listenerId)) {
       const existing = activeEchoListeners.get(listenerId);
       try {
         existing?.cleanup?.();
       } catch (err) {
-        console.warn('[EchoBridge] Failed to cleanup existing listener during start', { listenerId, err });
+        console.warn('[EchoBridge] Failed to cleanup existing listener during start', { listenerId });
       } finally {
         activeEchoListeners.delete(listenerId);
       }
     }
 
-    const normalizedShares = Array.isArray(shareCredentials)
-      ? (shareCredentials
-          .filter((credential): credential is string => typeof credential === 'string')
-          .map(credential => credential.trim())
-          .filter(credential => credential.length > 0))
-      : [];
+    // Normalize share credentials (trim whitespace)
+    const normalizedShares = shareCredentials
+      .map(credential => credential.trim())
+      .filter(credential => credential.length > 0);
 
     if (normalizedShares.length === 0) {
       return { ok: false, reason: 'no-valid-shares' };
@@ -440,7 +511,7 @@ app.whenReady().then(() => {
           try {
             existing?.cleanup?.();
           } catch (err) {
-            console.warn('[EchoBridge] Listener cleanup failed on sender destroyed', { listenerId, err });
+            console.warn('[EchoBridge] Listener cleanup failed on sender destroyed', { listenerId });
           } finally {
             activeEchoListeners.delete(listenerId);
           }
@@ -449,32 +520,33 @@ app.whenReady().then(() => {
 
       return { ok: true };
     } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
       if (!event.sender.isDestroyed()) {
         try {
-          event.sender.send('echo-error', { listenerId, reason: 'start-failed', message });
+          event.sender.send('echo-error', { listenerId, reason: 'start-failed', message: 'Failed to start echo listener' });
         } catch { /* ignore send error */ }
       }
-      console.error('[EchoBridge] Failed to start echo listener:', { listenerId, error: err });
-      return { ok: false, reason: 'start-failed', message };
+      console.error('[EchoBridge] Failed to start echo listener:', { listenerId, error: sanitizeErrorForLog(err) });
+      return { ok: false, reason: 'start-failed', message: 'Failed to start echo listener' };
     }
   });
 
-  type EchoStopArgs = { listenerId?: unknown };
-
-  ipcMain.handle('echo-stop', async (_event: IpcMainInvokeEvent, args: EchoStopArgs) => {
-    const { listenerId } = args ?? {};
-
-    if (typeof listenerId !== 'string' || listenerId.trim().length === 0) {
-      return { ok: false, reason: 'invalid-listener-id' };
+  ipcMain.handle('echo-stop', async (_event: IpcMainInvokeEvent, args: unknown) => {
+    // SECURITY: Validate input with Zod schema (includes length limits)
+    const parseResult = EchoStopArgsSchema.safeParse(args);
+    if (!parseResult.success) {
+      const issues = parseResult.error.issues.map(i => i.message).join(', ');
+      console.warn('[EchoBridge] echo-stop rejected: validation failed', { issues });
+      return { ok: false, reason: 'validation-failed', message: issues };
     }
+
+    const { listenerId } = parseResult.data;
 
     const existing = activeEchoListeners.get(listenerId);
     if (existing) {
       try {
         existing.cleanup?.();
       } catch (err) {
-        console.warn('[EchoBridge] Listener cleanup failed on stop', { listenerId, err });
+        console.warn('[EchoBridge] Listener cleanup failed on stop', { listenerId });
       } finally {
         activeEchoListeners.delete(listenerId);
       }

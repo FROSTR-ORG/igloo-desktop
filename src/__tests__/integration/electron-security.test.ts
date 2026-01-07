@@ -193,3 +193,140 @@ describe('Renderer Code Security', () => {
     expect(content).toMatch(/window\.electronAPI\./);
   });
 });
+
+describe('IPC Input Validation', () => {
+  let mainTsContent: string;
+
+  beforeAll(() => {
+    const mainTsPath = path.join(__dirname, '../../main.ts');
+    mainTsContent = fs.readFileSync(mainTsPath, 'utf-8');
+  });
+
+  describe('Zod Schema Definitions', () => {
+    it('should import zod for validation', () => {
+      expect(mainTsContent).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
+    });
+
+    it('should define ShareIdSchema with max length', () => {
+      expect(mainTsContent).toMatch(/ShareIdSchema\s*=\s*z\.string\(\)/);
+      expect(mainTsContent).toMatch(/ShareIdSchema[^;]*\.max\(255/);
+    });
+
+    it('should define SaveShareSchema with field limits', () => {
+      expect(mainTsContent).toMatch(/SaveShareSchema\s*=\s*z\.object/);
+      // Check that share data has a max length (multiline - use 's' flag)
+      expect(mainTsContent).toMatch(/share:\s*z\.string\(\)[\s\S]*?\.max\(10000/);
+    });
+
+    it('should define HexSaltSchema for salt validation', () => {
+      expect(mainTsContent).toMatch(/HexSaltSchema\s*=\s*z\.string\(\)/);
+      // Should require minimum 32 chars (16 bytes hex)
+      expect(mainTsContent).toMatch(/HexSaltSchema[^;]*\.min\(32/);
+      // Should validate hex format
+      expect(mainTsContent).toMatch(/HexSaltSchema[^;]*\.regex\(.*\[0-9a-fA-F\]/);
+    });
+
+    it('should define RelayUrlSchema with length limit', () => {
+      expect(mainTsContent).toMatch(/RelayUrlSchema\s*=\s*z\.string\(\)/);
+      expect(mainTsContent).toMatch(/RelayUrlSchema[^;]*\.max\(500/);
+    });
+
+    it('should define EchoStartArgsSchema with array limits', () => {
+      expect(mainTsContent).toMatch(/EchoStartArgsSchema\s*=\s*z\.object/);
+      // Should limit share credentials array
+      expect(mainTsContent).toMatch(/shareCredentials:[^}]*\.max\(100/);
+    });
+  });
+
+  describe('IPC Handler Validation', () => {
+    it('should validate save-share with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]save-share['"]/);
+      expect(mainTsContent).toMatch(/SaveShareSchema\.safeParse/);
+    });
+
+    it('should validate delete-share with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]delete-share['"]/);
+      expect(mainTsContent).toMatch(/ShareIdSchema\.safeParse/);
+    });
+
+    it('should validate open-share-location with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]open-share-location['"]/);
+      // Should use ShareIdSchema for validation
+      const openShareMatch = mainTsContent.match(/ipcMain\.handle\(['"]open-share-location['"][^}]+ShareIdSchema\.safeParse/s);
+      expect(openShareMatch).not.toBeNull();
+    });
+
+    it('should validate compute-relay-plan with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]compute-relay-plan['"]/);
+      expect(mainTsContent).toMatch(/RelayPlanArgsSchema\.safeParse/);
+    });
+
+    it('should validate echo-start with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]echo-start['"]/);
+      expect(mainTsContent).toMatch(/EchoStartArgsSchema\.safeParse/);
+    });
+
+    it('should validate echo-stop with Zod', () => {
+      expect(mainTsContent).toMatch(/ipcMain\.handle\(['"]echo-stop['"]/);
+      expect(mainTsContent).toMatch(/EchoStopArgsSchema\.safeParse/);
+    });
+  });
+});
+
+describe('Error Sanitization', () => {
+  let mainTsContent: string;
+
+  beforeAll(() => {
+    const mainTsPath = path.join(__dirname, '../../main.ts');
+    mainTsContent = fs.readFileSync(mainTsPath, 'utf-8');
+  });
+
+  it('should define sanitizeErrorForLog function', () => {
+    expect(mainTsContent).toMatch(/function\s+sanitizeErrorForLog\s*\(/);
+  });
+
+  it('should replace Unix-style paths in error messages', () => {
+    // Function should handle /path/to/file patterns
+    // Look for the regex pattern that matches Unix paths
+    expect(mainTsContent).toMatch(/sanitizeErrorForLog[\s\S]*?replace\([\s\S]*?<path>/);
+  });
+
+  it('should replace Windows-style paths in error messages', () => {
+    // Function should handle C:\path\to\file patterns
+    expect(mainTsContent).toMatch(/sanitizeErrorForLog[^}]+replace\([^)]*\[A-Za-z\]:\\\\/);
+  });
+
+  it('should use sanitizeErrorForLog in IPC error handlers', () => {
+    // Check that error handlers use the sanitization function
+    expect(mainTsContent).toMatch(/console\.error\([^)]*sanitizeErrorForLog\(/);
+  });
+});
+
+describe('File Permission Security', () => {
+  let shareManagerContent: string;
+
+  beforeAll(() => {
+    const shareManagerPath = path.join(__dirname, '../../lib/shareManager.ts');
+    shareManagerContent = fs.readFileSync(shareManagerPath, 'utf-8');
+  });
+
+  it('should set directory permissions to 0o700', () => {
+    // Verify mkdir uses restrictive permissions
+    expect(shareManagerContent).toMatch(/mkdir\([^)]*mode:\s*0o700/);
+  });
+
+  it('should set file permissions to 0o600', () => {
+    // Verify writeFile uses restrictive permissions (multiline call)
+    expect(shareManagerContent).toMatch(/writeFile\([\s\S]*?mode:\s*0o600/);
+  });
+
+  it('should include security comments for permissions', () => {
+    // Verify documentation of the security rationale
+    expect(shareManagerContent).toMatch(/SECURITY:.*restrictive permissions/i);
+  });
+
+  it('should note Windows compatibility', () => {
+    // Verify Windows behavior is documented
+    expect(shareManagerContent).toMatch(/Windows/);
+  });
+});

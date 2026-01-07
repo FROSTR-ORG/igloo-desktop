@@ -42,7 +42,7 @@ describe('ShareManager', () => {
       expect(getPathMock).toHaveBeenCalledWith('appData');
       expect(fsPromises.mkdir).toHaveBeenCalledWith(
         expect.stringContaining('/mock/app/data/igloo/shares'),
-        { recursive: true }
+        { recursive: true, mode: 0o700 }
       );
     });
 
@@ -135,7 +135,8 @@ describe('ShareManager', () => {
       await expect(shareManager.saveShare(baseShare)).resolves.toBe(true);
       expect(fsPromises.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('test-share.json'),
-        JSON.stringify(baseShare, null, 2)
+        JSON.stringify(baseShare, null, 2),
+        { mode: 0o600 }
       );
     });
 

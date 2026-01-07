@@ -36,7 +36,9 @@ class ShareManager {
    */
   private async ensureSharesDirectory(): Promise<void> {
     try {
-      await fs.promises.mkdir(this.sharesPath, { recursive: true });
+      // SECURITY: Use restrictive permissions (owner-only) to prevent other users from reading share files
+      // Note: mode is ignored on Windows, which is acceptable as Windows uses ACLs
+      await fs.promises.mkdir(this.sharesPath, { recursive: true, mode: 0o700 });
     } catch (error) {
       console.error('Failed to create shares directory:', error);
       throw error;
@@ -149,7 +151,9 @@ class ShareManager {
       await this.ensureReady();
 
       const filePath = this.resolveSharePath(share.id);
-      await fs.promises.writeFile(filePath, JSON.stringify(share, null, 2));
+      // SECURITY: Use restrictive permissions (owner read/write only) to prevent other users from reading share files
+      // Note: mode is ignored on Windows, which is acceptable as Windows uses ACLs
+      await fs.promises.writeFile(filePath, JSON.stringify(share, null, 2), { mode: 0o600 });
       return true;
     } catch (error) {
       console.error('Failed to save share:', error);
