@@ -9,6 +9,7 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { IpcRendererEvent } from 'electron';
 import type { RelayPlan } from '@/types';
 
 // Type definitions for the exposed API
@@ -118,7 +119,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       console.error('[preload] onEchoReceived requires a function callback');
       return () => {}; // Return no-op cleanup
     }
-    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => {
       if (isEchoReceivedData(data)) {
         callback(data);
       } else {
@@ -138,7 +139,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
       console.error('[preload] onEchoError requires a function callback');
       return () => {}; // Return no-op cleanup
     }
-    const handler = (_event: Electron.IpcRendererEvent, data: unknown) => {
+    const handler = (_event: IpcRendererEvent, data: unknown) => {
       if (isEchoErrorData(data)) {
         callback(data);
       } else {

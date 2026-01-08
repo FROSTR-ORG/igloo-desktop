@@ -34,9 +34,9 @@ function sanitizeErrorForLog(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error);
   return message
     // Quoted Unix paths: '/path/with spaces/file.txt' -> '<path>/file.txt'
-    .replace(/(['"])(\/(?:[^\/]+\/)+)([^\/'"]*)\1/g, '$1<path>/$3$1')
+    .replace(/(['"])(\/(?:[^/]+\/)+)([^/'"]*)\1/g, '$1<path>/$3$1')
     // Unquoted Unix paths: /path/to/file.txt -> <path>/file.txt
-    .replace(/\/(?:[^\/\s:]+\/)+([^\/\s:]+)/g, '<path>/$1')
+    .replace(/\/(?:[^/\s:]+\/)+([^/\s:]+)/g, '<path>/$1')
     // Quoted Windows paths: "C:\path\with spaces\file.txt" -> "<path>\file.txt"
     .replace(/(['"])([A-Za-z]:\\(?:[^\\]+\\)+)([^\\'"]*)(\1)/g, '$1<path>\\$3$1')
     // Unquoted Windows paths: C:\path\to\file.txt -> <path>\file.txt
@@ -426,7 +426,7 @@ app.whenReady().then(() => {
       const existing = activeEchoListeners.get(listenerId);
       try {
         existing?.cleanup?.();
-      } catch (err) {
+      } catch {
         console.warn('[EchoBridge] Failed to cleanup existing listener during start', { listenerId });
       } finally {
         activeEchoListeners.delete(listenerId);

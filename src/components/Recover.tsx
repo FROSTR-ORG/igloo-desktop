@@ -479,20 +479,15 @@ const Recover: React.FC<RecoverProps> = ({
   }, []);
 
   // Cleanup timeouts on unmount
+  // Note: Accessing .current in cleanup is intentional for timeout refs -
+  // we want to clear whatever timeout is active at unmount time.
   useEffect(() => {
     return () => {
-      if (nsecClearTimeoutRef.current) {
-        clearTimeout(nsecClearTimeoutRef.current);
-      }
-      if (copiedTimeoutRef.current) {
-        clearTimeout(copiedTimeoutRef.current);
-      }
-      if (copyErrorTimeoutRef.current) {
-        clearTimeout(copyErrorTimeoutRef.current);
-      }
-      if (autofilledTimeoutRef.current) {
-        clearTimeout(autofilledTimeoutRef.current);
-      }
+      if (nsecClearTimeoutRef.current) clearTimeout(nsecClearTimeoutRef.current);
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      if (copyErrorTimeoutRef.current) clearTimeout(copyErrorTimeoutRef.current);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (autofilledTimeoutRef.current) clearTimeout(autofilledTimeoutRef.current);
     };
   }, []);
 

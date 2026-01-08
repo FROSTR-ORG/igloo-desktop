@@ -414,23 +414,10 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
 
           const relays = relayPlanResult.relayPlan.relays;
 
-          // Enable verbose echo logging only when explicitly requested and when
-          // a Node-like `process` global is available (renderer may not have it).
-          const debugEnv = typeof process !== 'undefined' ? process.env.IGLOO_DEBUG_ECHO : undefined;
-          const debugEnabled = ((debugEnv ?? '').toLowerCase() === '1' || (debugEnv ?? '').toLowerCase() === 'true');
-
           await sendEcho(groupCredential, shareCredential, challenge, {
             relays,
             timeout: 10000,
-            // Bubble up debug logs if requested; guard access to process.env
-            eventConfig: debugEnabled
-              ? {
-                  enableLogging: true,
-                  customLogger: (level: string, message: string, data?: unknown) => {
-                    console.log(`[echo-send] ${level.toUpperCase()} ${message}`, data ?? '');
-                  }
-                }
-              : undefined
+            // Debug logging not available in renderer (process.env inaccessible with contextIsolation)
           });
 
           console.log('Echo sent successfully');

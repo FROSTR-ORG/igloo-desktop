@@ -71,7 +71,7 @@ export function createSignerKeepAlive(config: KeepAliveConfig): SignerKeepAliveH
     groupCredential,
     shareCredential,
     relays,
-    selfPubkey,
+    // selfPubkey available in config but not currently used
   } = config;
 
   const logger: KeepAliveLogger = rawLogger ?? (() => undefined);
