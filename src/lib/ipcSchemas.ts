@@ -22,11 +22,13 @@ export const HexSaltSchema = z.string()
   .max(128, 'Salt exceeds maximum length')
   .regex(/^[0-9a-fA-F]+$/, 'Salt must be a valid hex string');
 
-/** Relay URL: reasonable length limit */
-export const RelayUrlSchema = z.string().max(500, 'Relay URL exceeds maximum length');
+/** Relay URL: non-empty string with reasonable length limit */
+export const RelayUrlSchema = z.string()
+  .min(1, 'Relay URL is required')
+  .max(500, 'Relay URL exceeds maximum length');
 
-/** Relay URL array with size limit */
-const RelayArraySchema = z.array(z.string().max(500)).max(50, 'Too many relay URLs');
+/** Relay URL array with size limit (reuses RelayUrlSchema for consistency) */
+const RelayArraySchema = z.array(RelayUrlSchema).max(50, 'Too many relay URLs');
 
 /**
  * Decoded group object from @frostr/igloo-core.

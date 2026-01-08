@@ -114,8 +114,12 @@ describe('IPC Validation Schemas', () => {
       expect(RelayUrlSchema.safeParse('wss://relay.damus.io').success).toBe(true);
     });
 
-    it('accepts empty string (no min length)', () => {
-      expect(RelayUrlSchema.safeParse('').success).toBe(true);
+    it('rejects empty string', () => {
+      const result = RelayUrlSchema.safeParse('');
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Relay URL is required');
+      }
     });
 
     it('rejects URLs exceeding 500 characters', () => {

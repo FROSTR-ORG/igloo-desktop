@@ -84,6 +84,11 @@ function isEchoErrorData(data: unknown): data is {
   );
 }
 
+// Helper to normalize null values to undefined for Zod compatibility
+// Zod's .optional() accepts undefined but rejects null
+const nullToUndefined = <T>(value: T | null | undefined): T | undefined =>
+  value === null ? undefined : value;
+
 // Expose a safe API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Share management - invoke pattern (request/response)
@@ -92,13 +97,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
   deleteShare: (shareId: string) => ipcRenderer.invoke('delete-share', shareId),
   openShareLocation: (shareId: string) => ipcRenderer.invoke('open-share-location', shareId),
 
-  // Relay planning
+  // Relay planning - normalize nulls to undefined for Zod schema compatibility
   computeRelayPlan: (args: {
     groupCredential?: string | null;
     decodedGroup?: Record<string, unknown> | null;
     explicitRelays?: string[] | null;
     envRelay?: string | null;
-  }) => ipcRenderer.invoke('compute-relay-plan', args),
+  }) => ipcRenderer.invoke('compute-relay-plan', {
+    groupCredential: nullToUndefined(args.groupCredential),
+    decodedGroup: nullToUndefined(args.decodedGroup),
+    explicitRelays: nullToUndefined(args.explicitRelays),
+    envRelay: nullToUndefined(args.envRelay),
+  }),
 
   // Echo listener management
   echoStart: (args: { listenerId: string; groupCredential: string; shareCredentials: string[] }) =>
@@ -123,7 +133,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (isEchoReceivedData(data)) {
         callback(data);
       } else {
-        console.error('[preload] Received malformed echo-received data:', data);
+        // Don't log full payload - may contain sensitive shareCredential/challenge
+        console.error('[preload] Received malformed echo-received data (type:', typeof data, ')');
       }
     };
     ipcRenderer.on('echo-received', handler);
@@ -143,7 +154,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
       if (isEchoErrorData(data)) {
         callback(data);
       } else {
-        console.error('[preload] Received malformed echo-error data:', data);
+        // Don't log full payload - may contain sensitive data
+        console.error('[preload] Received malformed echo-error data (type:', typeof data, ')');
       }
     };
     ipcRenderer.on('echo-error', handler);
