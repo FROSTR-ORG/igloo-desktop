@@ -334,6 +334,90 @@ describe('IPC Validation Schemas', () => {
         envRelay: null,
       }).success).toBe(false);
     });
+
+    // DecodedGroup validation tests
+    it('accepts decodedGroup with relay arrays', () => {
+      expect(RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          relays: ['wss://relay1.example.com', 'wss://relay2.example.com'],
+          threshold: 2,
+          group_pk: 'abc123',
+        },
+      }).success).toBe(true);
+
+      expect(RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          relayUrls: ['wss://relay.example.com'],
+        },
+      }).success).toBe(true);
+
+      expect(RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          relay_urls: ['wss://relay.example.com'],
+        },
+      }).success).toBe(true);
+    });
+
+    it('accepts decodedGroup with commits array', () => {
+      expect(RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          threshold: 2,
+          group_pk: 'abc123',
+          commits: [
+            { idx: 0, pubkey: 'pub1', binder_sn: 'sn1' },
+            { idx: 1, pubkey: 'pub2', binder_sn: 'sn2' },
+          ],
+        },
+      }).success).toBe(true);
+    });
+
+    it('rejects decodedGroup with too many relay URLs', () => {
+      const result = RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          relays: Array(51).fill('wss://relay.example.com'),
+        },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Too many relay URLs');
+      }
+    });
+
+    it('rejects decodedGroup with too many commits', () => {
+      const result = RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          commits: Array(101).fill({ idx: 0, pubkey: 'pub' }),
+        },
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Too many commits');
+      }
+    });
+
+    it('rejects decodedGroup with too many properties', () => {
+      const manyProps: Record<string, string> = {};
+      for (let i = 0; i < 51; i++) {
+        manyProps[`prop${i}`] = 'value';
+      }
+      const result = RelayPlanArgsSchema.safeParse({
+        decodedGroup: manyProps,
+      });
+      expect(result.success).toBe(false);
+      if (!result.success) {
+        expect(result.error.issues[0].message).toBe('Decoded group object has too many properties');
+      }
+    });
+
+    it('allows additional unknown properties in decodedGroup (passthrough)', () => {
+      expect(RelayPlanArgsSchema.safeParse({
+        decodedGroup: {
+          threshold: 2,
+          someUnknownProp: 'value',
+          anotherProp: { nested: true },
+        },
+      }).success).toBe(true);
+    });
   });
 
   // ==========================================================================

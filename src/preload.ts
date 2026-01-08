@@ -10,14 +10,14 @@
 
 import { contextBridge, ipcRenderer } from 'electron';
 import type { IpcRendererEvent } from 'electron';
-import type { RelayPlan } from '@/types';
+import type { RelayPlan, IglooShare } from '@/types';
 
 // Type definitions for the exposed API
 
 export interface ElectronAPI {
   // Share management
-  getShares: () => Promise<unknown>;
-  saveShare: (share: unknown) => Promise<boolean>;
+  getShares: () => Promise<IglooShare[] | false>;
+  saveShare: (share: IglooShare) => Promise<boolean>;
   deleteShare: (shareId: string) => Promise<boolean>;
   openShareLocation: (shareId: string) => Promise<{ ok: boolean }>;
 
@@ -87,8 +87,8 @@ function isEchoErrorData(data: unknown): data is {
 // Expose a safe API to the renderer process
 contextBridge.exposeInMainWorld('electronAPI', {
   // Share management - invoke pattern (request/response)
-  getShares: () => ipcRenderer.invoke('get-shares'),
-  saveShare: (share: unknown) => ipcRenderer.invoke('save-share', share),
+  getShares: () => ipcRenderer.invoke('get-shares') as Promise<IglooShare[] | false>,
+  saveShare: (share: IglooShare) => ipcRenderer.invoke('save-share', share),
   deleteShare: (shareId: string) => ipcRenderer.invoke('delete-share', shareId),
   openShareLocation: (shareId: string) => ipcRenderer.invoke('open-share-location', shareId),
 

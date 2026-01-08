@@ -11,7 +11,7 @@ export type { IglooShare };
 class ClientShareManager {
   async getShares(): Promise<IglooShare[] | false> {
     try {
-      const shares = await window.electronAPI.getShares() as IglooShare[] | false;
+      const shares = await window.electronAPI.getShares();
       if (DEBUG_GROUP_AUTO) {
         console.log('Retrieved shares:', shares);
       }

@@ -25,6 +25,36 @@ export const HexSaltSchema = z.string()
 /** Relay URL: reasonable length limit */
 export const RelayUrlSchema = z.string().max(500, 'Relay URL exceeds maximum length');
 
+/** Relay URL array with size limit */
+const RelayArraySchema = z.array(z.string().max(500)).max(50, 'Too many relay URLs');
+
+/**
+ * Decoded group object from @frostr/igloo-core.
+ * Only relay-related properties are validated since computeRelayPlan only extracts
+ * relays/relayUrls/relay_urls arrays. Other properties are passed through but the
+ * total object size is constrained to prevent DoS.
+ */
+export const DecodedGroupSchema = z.object({
+  // Relay properties (the only ones actually used by computeRelayPlan)
+  relays: RelayArraySchema.optional(),
+  relayUrls: RelayArraySchema.optional(),
+  relay_urls: RelayArraySchema.optional(),
+  // Common properties from igloo-core (validated for safety)
+  threshold: z.number().int().min(1).max(100).optional(),
+  group_pk: z.string().max(500).optional(),
+  commits: z.array(z.object({
+    idx: z.number().int().min(0).max(100).optional(),
+    pubkey: z.string().max(500).optional(),
+    binder_sn: z.string().max(100).optional(),
+    binder_pn: z.string().max(100).optional(),
+  }).passthrough()).max(100, 'Too many commits').optional(),
+}).passthrough() // Allow additional properties from igloo-core
+  .refine(
+    (obj) => Object.keys(obj).length <= 50,
+    { message: 'Decoded group object has too many properties' }
+  )
+  .describe('Decoded group object from igloo-core with relay extraction support');
+
 /** Share credential: base64url encoded, reasonable max for FROST shares */
 export const ShareCredentialSchema = z.string()
   .min(1, 'Share credential is required')
@@ -69,7 +99,7 @@ export const SaveShareSchema = z.object({
 /** Schema for compute-relay-plan IPC handler */
 export const RelayPlanArgsSchema = z.object({
   groupCredential: GroupCredentialSchema.optional(),
-  decodedGroup: z.record(z.unknown()).optional(),
+  decodedGroup: DecodedGroupSchema.optional(),
   explicitRelays: z.array(RelayUrlSchema).max(50, 'Too many relays').optional(),
   envRelay: z.string().max(500).optional(),
 });

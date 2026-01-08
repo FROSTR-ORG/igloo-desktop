@@ -166,12 +166,17 @@ Relays are configured via `<appData>/igloo/relays.json`:
 }
 ```
 
-The `computeRelayPlan()` function in `echoRelays.ts` merges relays from multiple sources with priority:
-1. Environment variable (`IGLOO_RELAY`)
-2. Explicit user-provided relays
-3. Configured relays from `relays.json`
-4. Default relays from `@frostr/igloo-core`
-5. Group credential embedded relays
+The `computeRelayPlan()` function in `echoRelays.ts` merges relays from multiple sources using conditional logic with two distinct paths:
+
+**When `envRelay` is present:**
+- Priority: explicit relays > `envRelay` > group relays
+
+**When `envRelay` is absent:**
+- Priority: explicit relays > configured relays (`relays.json`) → `baseRelays` parameter → `DEFAULT_ECHO_RELAYS` as fallbacks > group relays
+- The `defaults` chain resolves as: if `relays.json` exists and contains relays, use those; otherwise fall back to the `baseRelays` parameter; if that's also absent, use `DEFAULT_ECHO_RELAYS` from `@frostr/igloo-core`
+- Group relays are appended after the defaults chain
+
+The function references: `envRelay` (from `IGLOO_RELAY` environment variable or passed parameter), `computeRelayPlan`, `baseRelays`, `DEFAULT_ECHO_RELAYS`, and `relays.json` (read via `readConfiguredRelaysSync()`).
 
 ## Testing Strategy
 
