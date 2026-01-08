@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { decodeGroup, DEFAULT_ECHO_RELAYS } from '@frostr/igloo-core';
+import type { RelayPlan } from '@/types';
 
 type RelayCandidateSource = {
   relays?: unknown;
@@ -129,15 +130,6 @@ const extractGroupRelayCandidates = (source?: RelayCandidateSource | null): unkn
   if (Array.isArray(source.relayUrls)) return source.relayUrls;
   if (Array.isArray(source.relay_urls)) return source.relay_urls;
   return undefined;
-};
-
-export type RelayPlan = {
-  relays: string[];
-  envRelays: string[];
-  defaultRelays: string[];
-  groupRelays: string[];
-  explicitRelays: string[];
-  groupExtras: string[];
 };
 
 export type ComputeRelayPlanOptions = {

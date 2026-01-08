@@ -404,8 +404,8 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
           const relayPlanResult = await window.electronAPI.computeRelayPlan({
             groupCredential,
             decodedGroup: legacyGroup as unknown as Record<string, unknown>,
-            explicitRelays: null,
-            envRelay: null // Environment variables are only accessible in main process
+            explicitRelays: undefined,
+            envRelay: undefined // Environment variables are only accessible in main process
           });
 
           if (!relayPlanResult.ok || !relayPlanResult.relayPlan) {

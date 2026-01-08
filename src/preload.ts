@@ -9,16 +9,9 @@
  */
 
 import { contextBridge, ipcRenderer } from 'electron';
+import type { RelayPlan } from '@/types';
 
 // Type definitions for the exposed API
-export interface RelayPlan {
-  relays: string[];
-  envRelays: string[];
-  defaultRelays: string[];
-  groupRelays: string[];
-  explicitRelays: string[];
-  groupExtras: string[];
-}
 
 export interface ElectronAPI {
   // Share management

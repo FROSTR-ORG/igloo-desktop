@@ -13,10 +13,13 @@ import { mockElectronAPI } from '../setup';
 
 describe('compute-relay-plan IPC Handler', () => {
   let mainTsContent: string;
+  let ipcSchemasContent: string;
 
   beforeAll(() => {
     const mainTsPath = path.join(__dirname, '../../main.ts');
     mainTsContent = fs.readFileSync(mainTsPath, 'utf-8');
+    const ipcSchemasPath = path.join(__dirname, '../../lib/ipcSchemas.ts');
+    ipcSchemasContent = fs.readFileSync(ipcSchemasPath, 'utf-8');
   });
 
   beforeEach(() => {
@@ -28,13 +31,16 @@ describe('compute-relay-plan IPC Handler', () => {
       expect(mainTsContent).toMatch(/ipcMain\.handle\(\s*['"]compute-relay-plan['"]/);
     });
 
-    it('should define RelayPlanArgsSchema with Zod validation', () => {
-      // Now uses Zod schema instead of manual type with unknown properties
-      expect(mainTsContent).toMatch(/RelayPlanArgsSchema\s*=\s*z\.object/);
-      expect(mainTsContent).toMatch(/groupCredential:.*\.optional\(\)/);
-      expect(mainTsContent).toMatch(/decodedGroup:.*\.optional\(\)/);
-      expect(mainTsContent).toMatch(/explicitRelays:.*\.optional\(\)/);
-      expect(mainTsContent).toMatch(/envRelay:.*\.optional\(\)/);
+    it('should import and use RelayPlanArgsSchema for validation', () => {
+      // Schema is imported from ipcSchemas module
+      expect(mainTsContent).toMatch(/from\s*['"]\.\/lib\/ipcSchemas/);
+      expect(mainTsContent).toMatch(/RelayPlanArgsSchema/);
+      // Schema is defined in ipcSchemas.ts with Zod
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+RelayPlanArgsSchema\s*=\s*z\.object/);
+      expect(ipcSchemasContent).toMatch(/groupCredential:.*\.optional\(\)/);
+      expect(ipcSchemasContent).toMatch(/decodedGroup:.*\.optional\(\)/);
+      expect(ipcSchemasContent).toMatch(/explicitRelays:.*\.optional\(\)/);
+      expect(ipcSchemasContent).toMatch(/envRelay:.*\.optional\(\)/);
     });
 
     it('should fall back to process.env.IGLOO_RELAY when envRelay not provided', () => {

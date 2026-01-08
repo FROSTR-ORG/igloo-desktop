@@ -302,8 +302,8 @@ describe('AddShare', () => {
           threshold: mockDecodedGroup.threshold,
           commits: mockDecodedGroup.commits
         }),
-        explicitRelays: null,
-        envRelay: null
+        explicitRelays: undefined,
+        envRelay: undefined
       });
 
       // Verify echo was sent with computed relays

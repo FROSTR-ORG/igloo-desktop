@@ -196,45 +196,57 @@ describe('Renderer Code Security', () => {
 
 describe('IPC Input Validation', () => {
   let mainTsContent: string;
+  let ipcSchemasContent: string;
 
   beforeAll(() => {
     const mainTsPath = path.join(__dirname, '../../main.ts');
     mainTsContent = fs.readFileSync(mainTsPath, 'utf-8');
+    const ipcSchemasPath = path.join(__dirname, '../../lib/ipcSchemas.ts');
+    ipcSchemasContent = fs.readFileSync(ipcSchemasPath, 'utf-8');
   });
 
-  describe('Zod Schema Definitions', () => {
-    it('should import zod for validation', () => {
-      expect(mainTsContent).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
+  describe('Zod Schema Architecture', () => {
+    it('should import schemas from ipcSchemas module', () => {
+      // Schemas are defined in a separate module for testability
+      expect(mainTsContent).toMatch(/from\s*['"]\.\/lib\/ipcSchemas/);
+      // Should import the key schemas used by IPC handlers
+      expect(mainTsContent).toMatch(/ShareIdSchema/);
+      expect(mainTsContent).toMatch(/SaveShareSchema/);
+      expect(mainTsContent).toMatch(/EchoStartArgsSchema/);
     });
 
-    it('should define ShareIdSchema with max length', () => {
-      expect(mainTsContent).toMatch(/ShareIdSchema\s*=\s*z\.string\(\)/);
-      expect(mainTsContent).toMatch(/ShareIdSchema[^;]*\.max\(255/);
+    it('should define schemas in ipcSchemas.ts with zod', () => {
+      expect(ipcSchemasContent).toMatch(/import\s*{\s*z\s*}\s*from\s*['"]zod['"]/);
     });
 
-    it('should define SaveShareSchema with field limits', () => {
-      expect(mainTsContent).toMatch(/SaveShareSchema\s*=\s*z\.object/);
-      // Check that share data has a max length (multiline - use 's' flag)
-      expect(mainTsContent).toMatch(/share:\s*z\.string\(\)[\s\S]*?\.max\(10000/);
+    it('should export ShareIdSchema with max length', () => {
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+ShareIdSchema\s*=\s*z\.string\(\)/);
+      expect(ipcSchemasContent).toMatch(/ShareIdSchema[^;]*\.max\(255/);
     });
 
-    it('should define HexSaltSchema for salt validation', () => {
-      expect(mainTsContent).toMatch(/HexSaltSchema\s*=\s*z\.string\(\)/);
+    it('should export SaveShareSchema with field limits', () => {
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+SaveShareSchema\s*=\s*z\.object/);
+      // Check that share data has a max length (multiline)
+      expect(ipcSchemasContent).toMatch(/share:\s*z\.string\(\)[\s\S]*?\.max\(10000/);
+    });
+
+    it('should export HexSaltSchema for salt validation', () => {
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+HexSaltSchema\s*=\s*z\.string\(\)/);
       // Should require minimum 32 chars (16 bytes hex)
-      expect(mainTsContent).toMatch(/HexSaltSchema[^;]*\.min\(32/);
+      expect(ipcSchemasContent).toMatch(/HexSaltSchema[^;]*\.min\(32/);
       // Should validate hex format
-      expect(mainTsContent).toMatch(/HexSaltSchema[^;]*\.regex\(.*\[0-9a-fA-F\]/);
+      expect(ipcSchemasContent).toMatch(/HexSaltSchema[^;]*\.regex\(.*\[0-9a-fA-F\]/);
     });
 
-    it('should define RelayUrlSchema with length limit', () => {
-      expect(mainTsContent).toMatch(/RelayUrlSchema\s*=\s*z\.string\(\)/);
-      expect(mainTsContent).toMatch(/RelayUrlSchema[^;]*\.max\(500/);
+    it('should export RelayUrlSchema with length limit', () => {
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+RelayUrlSchema\s*=\s*z\.string\(\)/);
+      expect(ipcSchemasContent).toMatch(/RelayUrlSchema[^;]*\.max\(500/);
     });
 
-    it('should define EchoStartArgsSchema with array limits', () => {
-      expect(mainTsContent).toMatch(/EchoStartArgsSchema\s*=\s*z\.object/);
+    it('should export EchoStartArgsSchema with array limits', () => {
+      expect(ipcSchemasContent).toMatch(/export\s+const\s+EchoStartArgsSchema\s*=\s*z\.object/);
       // Should limit share credentials array
-      expect(mainTsContent).toMatch(/shareCredentials:[^}]*\.max\(100/);
+      expect(ipcSchemasContent).toMatch(/shareCredentials:[^}]*\.max\(100/);
     });
   });
 
