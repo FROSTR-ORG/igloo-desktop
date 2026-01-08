@@ -54,10 +54,23 @@ const SaveShareSchema = z.object({
     .max(10000, 'Share data exceeds maximum length'),
   salt: HexSaltSchema,
   groupCredential: GroupCredentialSchema,
+  version: z.number().int().min(0).max(100).optional(),
   savedAt: z.string().optional(),
+  shareCredential: ShareCredentialSchema.optional(),
   metadata: z.object({
     binder_sn: z.string().max(64).optional(),
-    version: z.number().optional(),
+  }).optional(),
+  policy: z.object({
+    defaults: z.object({
+      allowSend: z.boolean(),
+      allowReceive: z.boolean(),
+    }),
+    peers: z.record(z.object({
+      allowSend: z.boolean(),
+      allowReceive: z.boolean(),
+      updatedAt: z.string().optional(),
+    })).optional(),
+    updatedAt: z.string().optional(),
   }).optional(),
 });
 

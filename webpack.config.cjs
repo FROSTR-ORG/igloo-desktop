@@ -38,7 +38,6 @@ module.exports = {
       'react/jsx-runtime': require.resolve('react/jsx-runtime')
     },
     fallback: {
-      crypto: false,
       stream: false,
       buffer: require.resolve('buffer/')
     }
