@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho, DEFAULT_ECHO_RELAYS } from '@frostr/igloo-core';
+import { validateGroup, decodeGroup, validateShare, decodeShare, sendEcho } from '@frostr/igloo-core';
 import { bytesToHex } from '@noble/hashes/utils';
 import { derive_secret_async, encrypt_payload, CURRENT_SHARE_VERSION } from '@/lib/encryption';
 import { InputWithValidation } from '@/components/ui/input-with-validation';
@@ -9,6 +9,7 @@ import { Loader2, ArrowLeft, ArrowRight, Check } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import type { DecodedGroup, DecodedShare, IglooShare } from '@/types';
 import { secp256k1 } from '@noble/curves/secp256k1';
+import { VALIDATION_LIMITS, sanitizeUserError } from '@/lib/validation';
 
 interface AddShareProps {
   onComplete: () => void;
@@ -22,16 +23,6 @@ const normalizeShareIdentifier = (input: string): string =>
     .trim()
     .toLowerCase()
     .replace(/\s+/g, '_');
-
-const buildEchoRelayList = (groupRelays?: string[]): string[] => {
-  const sanitizedGroupRelays = Array.isArray(groupRelays)
-    ? groupRelays.filter(relay => typeof relay === 'string' && relay.trim().length > 0)
-    : [];
-
-  // Always include defaults first so we prioritise tested relays, then append any custom ones
-  // while avoiding duplicates.
-  return Array.from(new Set([...DEFAULT_ECHO_RELAYS, ...sanitizedGroupRelays]));
-};
 
 /**
  * Validates that a share cryptographically belongs to a group by verifying
@@ -133,9 +124,17 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
 
   const evaluateShareName = useCallback(
     (value: string) => {
-      if (!value.trim()) {
+      const trimmed = value.trim();
+
+      if (trimmed.length === 0) {
         setIsNameValid(false);
         setNameError('Share name is required');
+        return false;
+      }
+
+      if (trimmed.length > VALIDATION_LIMITS.NAME_MAX) {
+        setIsNameValid(false);
+        setNameError(`Share name must be ${VALIDATION_LIMITS.NAME_MAX} characters or less`);
         return false;
       }
 
@@ -195,7 +194,8 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       setGroupError(undefined);
     } catch (error) {
       setIsGroupValid(false);
-      setGroupError('Failed to decode group: ' + (error instanceof Error ? error.message : String(error)));
+      // Sanitize error to avoid exposing internal implementation details
+      setGroupError('Failed to decode group: ' + sanitizeUserError(error));
       setDecodedGroup(null);
     }
   };
@@ -245,7 +245,8 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
       setShareError(undefined);
     } catch (error) {
       setIsShareValid(false);
-      setShareError('Failed to decode share: ' + (error instanceof Error ? error.message : String(error)));
+      // Sanitize error to avoid exposing internal implementation details
+      setShareError('Failed to decode share: ' + sanitizeUserError(error));
       setDecodedShare(null);
     }
   };
@@ -261,9 +262,12 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
     if (!value.trim()) {
       setIsPasswordValid(false);
       setPasswordError('Password is required');
-    } else if (value.length < 8) {
+    } else if (value.length < VALIDATION_LIMITS.PASSWORD_MIN) {
       setIsPasswordValid(false);
-      setPasswordError('Password must be at least 8 characters');
+      setPasswordError(`Password must be at least ${VALIDATION_LIMITS.PASSWORD_MIN} characters`);
+    } else if (value.length > VALIDATION_LIMITS.PASSWORD_MAX) {
+      setIsPasswordValid(false);
+      setPasswordError(`Password must be ${VALIDATION_LIMITS.PASSWORD_MAX} characters or less`);
     } else {
       setIsPasswordValid(true);
       setPasswordError(undefined);
@@ -388,11 +392,32 @@ const AddShare: React.FC<AddShareProps> = ({ onComplete, onCancel }) => {
           crypto.getRandomValues(challengeBytes);
           const challenge = bytesToHex(challengeBytes);
 
-          const relays = buildEchoRelayList(decodedGroup?.relays);
+          type LegacyDecodedGroup = DecodedGroup & {
+            relayUrls?: string[];
+            relay_urls?: string[];
+          };
+
+          const legacyGroup = decodedGroup as LegacyDecodedGroup;
+
+          // Compute relay plan via IPC (main process has access to Node.js APIs)
+          // Cast decodedGroup for IPC serialization - the main process only needs the object shape
+          const relayPlanResult = await window.electronAPI.computeRelayPlan({
+            groupCredential,
+            decodedGroup: legacyGroup as unknown as Record<string, unknown>,
+            explicitRelays: undefined,
+            envRelay: undefined // Environment variables are only accessible in main process
+          });
+
+          if (!relayPlanResult.ok || !relayPlanResult.relayPlan) {
+            throw new Error(relayPlanResult.message || 'Failed to compute relay plan');
+          }
+
+          const relays = relayPlanResult.relayPlan.relays;
 
           await sendEcho(groupCredential, shareCredential, challenge, {
             relays,
             timeout: 10000,
+            // Debug logging not available in renderer (process.env inaccessible with contextIsolation)
           });
 
           console.log('Echo sent successfully');

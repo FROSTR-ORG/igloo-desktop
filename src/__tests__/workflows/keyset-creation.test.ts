@@ -2,7 +2,10 @@ import { clientShareManager } from '../../lib/clientShareManager';
 import { mockDeriveSecret } from '../setup';
 import { validatePassword } from '../../lib/validation';
 
-// Mock the required modules  
+// Helper to generate realistic 64-char hex strings for scalar values
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
+
+// Mock the required modules
 jest.mock('../../lib/clientShareManager');
 
 const mockClientShareManager = clientShareManager as jest.Mocked<typeof clientShareManager>;
@@ -225,7 +228,7 @@ describe('Keyset Creation Workflow', () => {
         salt: 'salt',
         groupCredential: 'group',
         metadata: {
-          binder_sn: 'test-binder-serial',
+          binder_sn: toScalarHex(1001),
           threshold: 2,
           totalShares: 3
         }
@@ -239,7 +242,7 @@ describe('Keyset Creation Workflow', () => {
       expect(mockClientShareManager.saveShare).toHaveBeenCalledWith(
         expect.objectContaining({
           metadata: expect.objectContaining({
-            binder_sn: 'test-binder-serial',
+            binder_sn: toScalarHex(1001),
             threshold: 2,
             totalShares: 3
           })

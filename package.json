@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "start": "cross-env NODE_ENV=development npm run build && electron .",
-    "build": "tsc && webpack --config webpack.config.cjs",
+    "build": "tsc && tsc -p tsconfig.preload.json && webpack --config webpack.config.cjs",
     "watch": "tsc -w",
     "dev": "cross-env NODE_ENV=development concurrently \"webpack --config webpack.config.cjs --watch\" \"electron .\"",
     "test": "jest",
@@ -129,6 +129,7 @@
     "@typescript-eslint/eslint-plugin": "^8.33.1",
     "@typescript-eslint/parser": "^8.33.1",
     "autoprefixer": "^10.4.20",
+    "baseline-browser-mapping": "^2.9.12",
     "concurrently": "^9.0.1",
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
@@ -153,12 +154,13 @@
   "overrides": {
     "@eslint/plugin-kit": "^0.3.4",
     "form-data": "^4.0.4",
+    "js-yaml": ">=4.1.1",
     "tmp": "^0.2.4"
   },
   "dependencies": {
     "@cmdcode/buff": "^2.2.5",
     "@frostr/bifrost": "^1.0.6",
-    "@frostr/igloo-core": "^0.2.3",
+    "@frostr/igloo-core": "^0.2.4",
     "@noble/ciphers": "^1.2.1",
     "@noble/curves": "^1.8.1",
     "@noble/hashes": "^1.7.1",
@@ -167,6 +169,7 @@
     "@radix-ui/react-tabs": "^1.1.1",
     "@types/express": "^5.0.0",
     "audit": "^0.0.6",
+    "buffer": "^6.0.3",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "express": "^4.21.1",

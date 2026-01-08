@@ -7,40 +7,52 @@
 /* istanbul ignore file */
 /* eslint-disable */
 
+/**
+ * Helper to generate realistic 64-character hex strings for scalar values (binder_sn, hidden_sn, seckey).
+ * Real values from @frostr/igloo-core are 32-byte (64 hex char) cryptographic scalars.
+ */
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
+
+/**
+ * Helper to generate realistic 66-character hex strings for public points (binder_pn, hidden_pn, pubkey).
+ * Real values are compressed secp256k1 points (33 bytes = 66 hex chars, starting with 02 or 03).
+ */
+const toPointHex = (seed: number): string => '02' + seed.toString(16).padStart(64, '0');
+
 // Basic mock implementations for common Bifrost functions
 export const encode_group_pkg = jest.fn().mockReturnValue('mocked_group_pkg');
 export const decode_group_pkg = jest.fn().mockReturnValue({
   threshold: 2,
   commits: [
-    { idx: 1, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
-    { idx: 2, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' },
-    { idx: 3, pubkey: 'pubkey3', hidden_pn: 'hidden3', binder_pn: 'binder3' }
+    { idx: 1, pubkey: toPointHex(101), hidden_pn: toPointHex(111), binder_pn: toPointHex(121) },
+    { idx: 2, pubkey: toPointHex(102), hidden_pn: toPointHex(112), binder_pn: toPointHex(122) },
+    { idx: 3, pubkey: toPointHex(103), hidden_pn: toPointHex(113), binder_pn: toPointHex(123) }
   ],
-  group_pk: 'group_pubkey'
+  group_pk: toPointHex(100)
 });
 
 export const encode_share_pkg = jest.fn().mockReturnValue('mocked_share_pkg');
 export const decode_share_pkg = jest.fn().mockReturnValue({
   idx: 1,
-  binder_sn: 'binder_sn',
-  hidden_sn: 'hidden_sn',
-  seckey: 'share_seckey'
+  binder_sn: toScalarHex(1001),
+  hidden_sn: toScalarHex(1011),
+  seckey: toScalarHex(1021)
 });
 
 export const generate_dealer_pkg = jest.fn().mockReturnValue({
-  group: { 
-    threshold: 2, 
+  group: {
+    threshold: 2,
     commits: [
-      { idx: 1, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
-      { idx: 2, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' },
-      { idx: 3, pubkey: 'pubkey3', hidden_pn: 'hidden3', binder_pn: 'binder3' }
-    ], 
-    group_pk: 'group_pk' 
+      { idx: 1, pubkey: toPointHex(101), hidden_pn: toPointHex(111), binder_pn: toPointHex(121) },
+      { idx: 2, pubkey: toPointHex(102), hidden_pn: toPointHex(112), binder_pn: toPointHex(122) },
+      { idx: 3, pubkey: toPointHex(103), hidden_pn: toPointHex(113), binder_pn: toPointHex(123) }
+    ],
+    group_pk: toPointHex(100)
   },
   shares: [
-    { idx: 1, binder_sn: 'binder1', hidden_sn: 'hidden1', seckey: 'seckey1' },
-    { idx: 2, binder_sn: 'binder2', hidden_sn: 'hidden2', seckey: 'seckey2' },
-    { idx: 3, binder_sn: 'binder3', hidden_sn: 'hidden3', seckey: 'seckey3' }
+    { idx: 1, binder_sn: toScalarHex(1001), hidden_sn: toScalarHex(1011), seckey: toScalarHex(1021) },
+    { idx: 2, binder_sn: toScalarHex(1002), hidden_sn: toScalarHex(1012), seckey: toScalarHex(1022) },
+    { idx: 3, binder_sn: toScalarHex(1003), hidden_sn: toScalarHex(1013), seckey: toScalarHex(1023) }
   ]
 });
 
@@ -170,12 +182,12 @@ export function createDecodeShareMock() {
     
     // Return different values based on input to simulate decoding different shares
     const shareNumber = parseInt(share.split('_').pop() || '1');
-    
+
     return {
       idx: shareNumber,
-      binder_sn: `binder_sn_${shareNumber}`,
-      hidden_sn: `hidden_sn_${shareNumber}`,
-      seckey: `share_seckey_${shareNumber}`
+      binder_sn: toScalarHex(1000 + shareNumber),
+      hidden_sn: toScalarHex(1010 + shareNumber),
+      seckey: toScalarHex(1020 + shareNumber)
     };
   });
 }
@@ -222,15 +234,15 @@ export function createDecodeGroupMock() {
     // Generate commits based on the total
     const commits = Array(totalMembers).fill(0).map((_, i) => ({
       idx: i + 1,
-      pubkey: `pubkey${i + 1}`,
-      hidden_pn: `hidden${i + 1}`,
-      binder_pn: `binder${i + 1}`
+      pubkey: toPointHex(100 + i + 1),
+      hidden_pn: toPointHex(110 + i + 1),
+      binder_pn: toPointHex(120 + i + 1)
     }));
-    
+
     return {
       threshold,
       commits,
-      group_pk: 'group_pubkey'
+      group_pk: toPointHex(100)
     };
   });
 }

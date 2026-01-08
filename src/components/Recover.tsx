@@ -4,7 +4,8 @@ import { recoverSecretKeyFromCredentials, decodeShare, decodeGroup, validateShar
 import { InputWithValidation } from "@/components/ui/input-with-validation"
 import { Tooltip } from "@/components/ui/tooltip"
 import { clientShareManager } from "@/lib/clientShareManager"
-import { HelpCircle } from "lucide-react"
+import { HelpCircle, Copy, Check, Eye, EyeOff, AlertTriangle } from "lucide-react"
+import { VALIDATION_LIMITS } from "@/lib/validation"
 
 interface RecoverProps {
   initialShare?: string;
@@ -14,8 +15,9 @@ interface RecoverProps {
   mode?: "standalone" | "preloaded";
 }
 
-// Enable debugging for troubleshooting group auto-population issues
-const DEBUG_AUTO_POPULATE = true;
+// Debug helper for group auto-population
+// SECURITY: Set to true locally for debugging (do not commit as true)
+const DEBUG_AUTO_POPULATE = false;
 
 // Add utility function to find matching group at the component level
 const findMatchingGroup = async (shareValue: string) => {
@@ -179,11 +181,23 @@ const Recover: React.FC<RecoverProps> = ({
   const [sharesFormValid, setSharesFormValid] = useState(false);
   
   // State for the result
-  const [result, setResult] = useState<{ success: boolean; message: string | React.ReactNode }>({ 
-    success: false, 
-    message: null 
+  const [result, setResult] = useState<{ success: boolean; message: string | React.ReactNode }>({
+    success: false,
+    message: null
   });
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // SECURITY: State for secure NSEC display
+  // The NSEC is stored separately and NEVER rendered directly in the DOM unless explicitly revealed
+  const [recoveredNsec, setRecoveredNsec] = useState<string | null>(null);
+  const [isNsecRevealed, setIsNsecRevealed] = useState(false);
+  const [isNsecCopied, setIsNsecCopied] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
+  const nsecClearTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const copiedTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const copyErrorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // Auto-clear NSEC from memory after 60 seconds for security
+  const NSEC_AUTO_CLEAR_MS = 60000;
 
   // Add state for the dynamic threshold
   const [currentThreshold, setCurrentThreshold] = useState<number>(defaultThreshold);
@@ -312,6 +326,17 @@ const Recover: React.FC<RecoverProps> = ({
 
   // Handle adding more share inputs
   const addShareInput = () => {
+    // Validate currentThreshold is a valid positive integer within bounds
+    if (
+      typeof currentThreshold !== 'number' ||
+      !Number.isInteger(currentThreshold) ||
+      currentThreshold < VALIDATION_LIMITS.THRESHOLD_MIN ||
+      currentThreshold > VALIDATION_LIMITS.THRESHOLD_MAX
+    ) {
+      // Invalid threshold - don't allow adding more inputs
+      return;
+    }
+
     if (sharesInputs.length < currentThreshold) {
       setSharesInputs([...sharesInputs, ""]);
       setSharesValidity([...sharesValidity, { isValid: false }]);
@@ -337,7 +362,7 @@ const Recover: React.FC<RecoverProps> = ({
     const validation = validateShare(value);
     
     // Additional validation - try to decode with bifrost if the basic validation passes
-    if (validation.isValid && value.trim()) {
+    if (validation.isValid && value.trim().length > 0) {
       try {
         // If this doesn't throw, it's a valid share
         const decodedShare = decodeShare(value);
@@ -399,6 +424,73 @@ const Recover: React.FC<RecoverProps> = ({
     }
   };
 
+  // SECURITY: Clear NSEC from memory and reset related state
+  const clearRecoveredNsec = useCallback(() => {
+    setRecoveredNsec(null);
+    setIsNsecRevealed(false);
+    setIsNsecCopied(false);
+    setCopyError(null);
+    if (nsecClearTimeoutRef.current) {
+      clearTimeout(nsecClearTimeoutRef.current);
+      nsecClearTimeoutRef.current = null;
+    }
+    if (copiedTimeoutRef.current) {
+      clearTimeout(copiedTimeoutRef.current);
+      copiedTimeoutRef.current = null;
+    }
+    if (copyErrorTimeoutRef.current) {
+      clearTimeout(copyErrorTimeoutRef.current);
+      copyErrorTimeoutRef.current = null;
+    }
+  }, []);
+
+  // SECURITY: Copy NSEC to clipboard without displaying it
+  const handleCopyNsec = useCallback(async () => {
+    if (!recoveredNsec) return;
+    // Clear any previous error
+    setCopyError(null);
+    try {
+      await navigator.clipboard.writeText(recoveredNsec);
+      setIsNsecCopied(true);
+      // Clear any existing timeout before setting a new one
+      if (copiedTimeoutRef.current) {
+        clearTimeout(copiedTimeoutRef.current);
+      }
+      // Reset copied state after 2 seconds
+      copiedTimeoutRef.current = setTimeout(() => setIsNsecCopied(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy NSEC:', err);
+      // Reset success state on failure to prevent contradictory UI
+      setIsNsecCopied(false);
+      // Show error feedback to user
+      setCopyError('Failed to copy. Please reveal and copy manually.');
+      // Clear any existing error timeout
+      if (copyErrorTimeoutRef.current) {
+        clearTimeout(copyErrorTimeoutRef.current);
+      }
+      // Auto-clear error after 5 seconds
+      copyErrorTimeoutRef.current = setTimeout(() => setCopyError(null), 5000);
+    }
+  }, [recoveredNsec]);
+
+  // SECURITY: Toggle NSEC visibility with warning
+  const handleToggleNsecReveal = useCallback(() => {
+    setIsNsecRevealed(prev => !prev);
+  }, []);
+
+  // Cleanup timeouts on unmount
+  // Note: Accessing .current in cleanup is intentional for timeout refs -
+  // we want to clear whatever timeout is active at unmount time.
+  useEffect(() => {
+    return () => {
+      if (nsecClearTimeoutRef.current) clearTimeout(nsecClearTimeoutRef.current);
+      if (copiedTimeoutRef.current) clearTimeout(copiedTimeoutRef.current);
+      if (copyErrorTimeoutRef.current) clearTimeout(copyErrorTimeoutRef.current);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      if (autofilledTimeoutRef.current) clearTimeout(autofilledTimeoutRef.current);
+    };
+  }, []);
+
   // Handle group credential change
   const handleGroupChange = (value: string) => {
     setGroupCredential(value);
@@ -407,7 +499,7 @@ const Recover: React.FC<RecoverProps> = ({
     const validation = validateGroup(value);
     
     // Try deeper validation with bifrost decoder if basic validation passes
-    if (validation.isValid && value.trim()) {
+    if (validation.isValid && value.trim().length > 0) {
       try {
         // If this doesn't throw, it's a valid group
         const decodedGroup = decodeGroup(value);
@@ -458,9 +550,9 @@ const Recover: React.FC<RecoverProps> = ({
   // Handle form submission
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
-    
+
     if (!sharesFormValid) return;
-    
+
     setIsProcessing(true);
     try {
       // Get valid share credentials
@@ -470,23 +562,27 @@ const Recover: React.FC<RecoverProps> = ({
       // Recover the secret key using credentials directly
       const nsec = recoverSecretKeyFromCredentials(groupCredential, validShareCredentials);
 
-              setResult({
+      // SECURITY: Store NSEC in state but don't render it directly
+      // Clear any previous NSEC first
+      clearRecoveredNsec();
+
+      // Store the recovered NSEC securely in state
+      setRecoveredNsec(nsec);
+      setIsNsecRevealed(false);
+      setIsNsecCopied(false);
+
+      // Set up auto-clear timeout for security
+      nsecClearTimeoutRef.current = setTimeout(() => {
+        clearRecoveredNsec();
+        setResult({
           success: true,
-          message: (
-            <div>
-              <div className="mb-3 text-green-200 font-medium">
-                Successfully recovered NSEC using {validShareCredentials.length} shares
-              </div>
-            <div className="space-y-3">
-              <div>
-                <div className="text-sm font-medium mb-1">Recovered NSEC:</div>
-                <div className="bg-gray-800/50 p-2 rounded text-xs break-all">
-                  {nsec}
-                </div>
-              </div>
-            </div>
-          </div>
-        )
+          message: 'NSEC has been cleared from memory for security. Recover again if needed.'
+        });
+      }, NSEC_AUTO_CLEAR_MS);
+
+      setResult({
+        success: true,
+        message: `Successfully recovered NSEC using ${validShareCredentials.length} shares`
       });
     } catch (error) {
       setResult({
@@ -617,6 +713,100 @@ const Recover: React.FC<RecoverProps> = ({
           result.success ? 'bg-green-900/30 text-green-200' : 'bg-red-900/30 text-red-200'
         }`}>
           {result.message}
+        </div>
+      )}
+
+      {/* SECURITY: Secure NSEC display - never shows key in DOM by default */}
+      {recoveredNsec && (
+        <div className="mt-4 p-4 rounded-lg bg-gray-800/50 border border-green-700/50">
+          {/* Security warning */}
+          <div className="flex items-start gap-2 mb-4 p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-lg">
+            <AlertTriangle className="w-5 h-5 text-yellow-400 flex-shrink-0 mt-0.5" />
+            <div className="text-sm text-yellow-200">
+              <div className="font-medium mb-1">Security Warning</div>
+              <ul className="list-disc list-inside space-y-1 text-yellow-300/80">
+                <li>Your private key will auto-clear in 60 seconds</li>
+                <li>Do not screenshot or share this key</li>
+                <li>Copy to a secure password manager</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* NSEC display area */}
+          <div className="space-y-3">
+            <div className="text-sm font-medium text-green-300">Recovered NSEC:</div>
+
+            {/* Masked/Revealed key display */}
+            <div className="bg-gray-900/50 p-3 rounded-lg border border-gray-700/50">
+              {isNsecRevealed ? (
+                <div className="text-xs font-mono break-all text-green-200">
+                  {recoveredNsec}
+                </div>
+              ) : (
+                <div className="text-xs font-mono text-gray-400">
+                  {recoveredNsec.substring(0, 8)}{'•'.repeat(40)}...
+                </div>
+              )}
+            </div>
+
+            {/* Action buttons */}
+            <div className="flex flex-col gap-2">
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={handleCopyNsec}
+                  className={`flex-1 text-sm ${copyError ? 'bg-red-600 hover:bg-red-700' : 'bg-blue-600 hover:bg-blue-700'}`}
+                >
+                  {isNsecCopied ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Copied!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="w-4 h-4 mr-2" />
+                      Copy to Clipboard
+                    </>
+                  )}
+                </Button>
+
+              <Button
+                type="button"
+                onClick={handleToggleNsecReveal}
+                variant="outline"
+                className="bg-gray-700 hover:bg-gray-600 border-gray-600 text-sm"
+              >
+                {isNsecRevealed ? (
+                  <>
+                    <EyeOff className="w-4 h-4 mr-2" />
+                    Hide
+                  </>
+                ) : (
+                  <>
+                    <Eye className="w-4 h-4 mr-2" />
+                    Reveal
+                  </>
+                )}
+              </Button>
+
+              <Button
+                type="button"
+                onClick={clearRecoveredNsec}
+                variant="outline"
+                className="bg-red-900/30 hover:bg-red-800/50 border-red-700/50 text-red-300 text-sm"
+              >
+                Clear
+              </Button>
+              </div>
+
+              {/* Copy error feedback */}
+              {copyError && (
+                <div className="text-sm text-red-400 bg-red-900/20 border border-red-700/30 rounded px-3 py-2">
+                  {copyError}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
     </div>
