@@ -1,3 +1,8 @@
+// Helper to generate realistic 64-char hex strings for scalar values
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
+// Helper to generate realistic 66-char hex strings for public points
+const toPointHex = (seed: number): string => '02' + seed.toString(16).padStart(64, '0');
+
 // Mock igloo-core module
 const mockCreateConnectedNode = jest.fn();
 const mockCleanupBifrostNode = jest.fn();
@@ -31,16 +36,16 @@ describe('Igloo Core Integration Tests', () => {
     mockValidateGroup.mockReturnValue({ isValid: true });
     mockDecodeShare.mockReturnValue({
       idx: 1,
-      seckey: 'test-key',
-      binder_sn: 'test-binder',
-      hidden_sn: 'test-hidden'
+      seckey: toScalarHex(1021),
+      binder_sn: toScalarHex(1001),
+      hidden_sn: toScalarHex(1011)
     });
     mockDecodeGroup.mockReturnValue({
       threshold: 2,
-      group_pk: 'test-group-pk',
+      group_pk: toPointHex(100),
       commits: [
-        { idx: 0, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
-        { idx: 1, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' }
+        { idx: 0, pubkey: toPointHex(101), hidden_pn: toPointHex(111), binder_pn: toPointHex(121) },
+        { idx: 1, pubkey: toPointHex(102), hidden_pn: toPointHex(112), binder_pn: toPointHex(122) }
       ]
     });
     mockCreateConnectedNode.mockResolvedValue({
@@ -105,9 +110,9 @@ describe('Igloo Core Integration Tests', () => {
       expect(mockDecodeShare).toHaveBeenCalledWith(shareCredential);
       expect(result).toEqual({
         idx: 1,
-        seckey: 'test-key',
-        binder_sn: 'test-binder',
-        hidden_sn: 'test-hidden'
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011)
       });
     });
 
@@ -118,10 +123,10 @@ describe('Igloo Core Integration Tests', () => {
       expect(mockDecodeGroup).toHaveBeenCalledWith(groupCredential);
       expect(result).toEqual({
         threshold: 2,
-        group_pk: 'test-group-pk',
+        group_pk: toPointHex(100),
         commits: [
-          { idx: 0, pubkey: 'pubkey1', hidden_pn: 'hidden1', binder_pn: 'binder1' },
-          { idx: 1, pubkey: 'pubkey2', hidden_pn: 'hidden2', binder_pn: 'binder2' }
+          { idx: 0, pubkey: toPointHex(101), hidden_pn: toPointHex(111), binder_pn: toPointHex(121) },
+          { idx: 1, pubkey: toPointHex(102), hidden_pn: toPointHex(112), binder_pn: toPointHex(122) }
         ]
       });
     });

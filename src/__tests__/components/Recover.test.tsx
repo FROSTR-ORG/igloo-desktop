@@ -4,6 +4,9 @@ import '@testing-library/jest-dom';
 import Recover from '@/components/Recover';
 import { validateShare, validateGroup, decodeGroup, decodeShare, recoverSecretKeyFromCredentials } from '@frostr/igloo-core';
 
+// Helper to generate realistic 64-char hex strings for scalar values
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
+
 // Mock the igloo-core functions
 jest.mock('@frostr/igloo-core');
 
@@ -130,9 +133,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'mockseckey',
-        binder_sn: 'mockbinder',
-        hidden_sn: 'mockhidden',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
 
       render(<Recover mode="standalone" />);
@@ -173,9 +176,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'mockseckey',
-        binder_sn: 'mockbinder',
-        hidden_sn: 'mockhidden',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
       mockRecoverSecretKey.mockReturnValue('nsec1mockrecoveredkey');
 
@@ -265,9 +268,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'mockseckey',
-        binder_sn: 'mockbinder',
-        hidden_sn: 'mockhidden',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
       mockRecoverSecretKey.mockImplementation(() => {
         throw new Error('Recovery failed');
@@ -307,9 +310,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'secret-key-data',
-        binder_sn: 'binder-sn-data',
-        hidden_sn: 'hidden-sn-data',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
       mockValidateGroup.mockReturnValue({ isValid: true });
       mockDecodeGroup.mockReturnValue({
@@ -385,9 +388,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'mockseckey',
-        binder_sn: 'mockbinder',
-        hidden_sn: 'mockhidden',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
       mockRecoverSecretKey.mockReturnValue('nsec1abcdefghijklmnopqrstuvwxyz123456789');
 
@@ -584,9 +587,9 @@ describe('Recover Component', () => {
       mockValidateShare.mockReturnValue({ isValid: true });
       mockDecodeShare.mockReturnValue({
         idx: 1,
-        seckey: 'mockseckey',
-        binder_sn: 'mockbinder',
-        hidden_sn: 'mockhidden',
+        seckey: toScalarHex(1021),
+        binder_sn: toScalarHex(1001),
+        hidden_sn: toScalarHex(1011),
       });
       mockRecoverSecretKey.mockReturnValue('nsec1test');
 

@@ -2,6 +2,9 @@
 import { setupBuffMock } from '../__mocks__/buff.mock';
 setupBuffMock();
 
+// Helper to generate realistic 64-char hex strings for scalar values
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
+
 jest.mock('../../lib/encryption');
 
 import { clientShareManager, type IglooShare } from '../../lib/clientShareManager';
@@ -33,7 +36,7 @@ describe('Share Lifecycle Workflow (Desktop Integration)', () => {
         salt: 'random-salt-123',
         groupCredential: 'bfgroup1test123',
         metadata: {
-          binder_sn: 'abc123def',
+          binder_sn: toScalarHex(1001),
           created: Date.now()
         }
       };
@@ -101,7 +104,7 @@ describe('Share Lifecycle Workflow (Desktop Integration)', () => {
           share: 'data1',
           salt: 'salt1',
           groupCredential: 'group1',
-          metadata: { binder_sn: 'abc123' }
+          metadata: { binder_sn: toScalarHex(1001) }
         },
         {
           id: 'share-2',
@@ -109,16 +112,16 @@ describe('Share Lifecycle Workflow (Desktop Integration)', () => {
           share: 'data2',
           salt: 'salt2',
           groupCredential: 'group2',
-          metadata: { binder_sn: 'def456' }
+          metadata: { binder_sn: toScalarHex(1002) }
         }
       ];
 
       mockElectronAPI.getShares.mockResolvedValueOnce(testShares);
 
-      const foundShares = await clientShareManager.findSharesByBinderSN('abc123');
+      const foundShares = await clientShareManager.findSharesByBinderSN(toScalarHex(1001));
 
       expect(foundShares).toHaveLength(1);
-      expect(foundShares[0].metadata?.binder_sn).toBe('abc123');
+      expect(foundShares[0].metadata?.binder_sn).toBe(toScalarHex(1001));
     });
   });
 

@@ -197,7 +197,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       return undefined;
     }
 
-    const listenerId = `keyset-${groupCredential}`;
+    // Use truncated group_pk for a shorter, unique listener ID (group_pk uniquely identifies the group)
+    const listenerId = `keyset-${decodedGroup?.group_pk?.slice(0, 16) || groupCredential.slice(0, 16)}`;
     echoListenerIdRef.current = listenerId;
 
     // Set up echo received listener via preload API

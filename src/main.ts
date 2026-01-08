@@ -56,7 +56,7 @@ const SaveShareSchema = z.object({
   groupCredential: GroupCredentialSchema,
   savedAt: z.string().optional(),
   metadata: z.object({
-    binder_sn: z.string().max(20).optional(),
+    binder_sn: z.string().max(64).optional(),
     version: z.number().optional(),
   }).optional(),
 });
