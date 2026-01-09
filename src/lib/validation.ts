@@ -125,11 +125,91 @@ export function isValidSalt(salt: string): boolean {
 }
 
 /**
- * Checks if an IP address is in a private or reserved range (SSRF protection)
- * @param ip - The IP address to check (e.g., "192.168.1.1")
+ * Converts a hex IPv4-mapped IPv6 suffix (e.g., "7f00:1") to dotted decimal ("127.0.0.1")
+ * IPv4-mapped format after Node normalization: ::ffff:XXXX:XXXX where X are hex digits
+ * The last 32 bits (two 16-bit groups) represent the IPv4 address
+ */
+function hexToIpv4(hexPart: string): string | null {
+  // Handle formats like "7f00:1" (127.0.0.1) or "c0a8:101" (192.168.1.1)
+  const parts = hexPart.split(':');
+  if (parts.length !== 2) return null;
+
+  const high = parseInt(parts[0], 16);
+  const low = parseInt(parts[1], 16);
+
+  if (isNaN(high) || isNaN(low) || high > 0xffff || low > 0xffff) return null;
+
+  // Convert to IPv4 octets
+  const octet1 = (high >> 8) & 0xff;
+  const octet2 = high & 0xff;
+  const octet3 = (low >> 8) & 0xff;
+  const octet4 = low & 0xff;
+
+  return `${octet1}.${octet2}.${octet3}.${octet4}`;
+}
+
+/**
+ * Checks if an IPv6 address is in a private or reserved range (SSRF protection)
+ * @param ip - The IPv6 address to check (e.g., "::1", "fe80::1")
  * @returns true if the IP is private/reserved and should be blocked
  */
-function isPrivateOrReservedIp(ip: string): boolean {
+function isPrivateOrReservedIpv6(ip: string): boolean {
+  // Normalize the address to lowercase for comparison
+  const normalized = ip.toLowerCase();
+
+  // Loopback (::1)
+  if (normalized === '::1' || normalized === '0:0:0:0:0:0:0:1') return true;
+
+  // Unspecified address (::)
+  if (normalized === '::' || normalized === '0:0:0:0:0:0:0:0') return true;
+
+  // Link-local (fe80::/10)
+  if (normalized.startsWith('fe8') || normalized.startsWith('fe9') ||
+      normalized.startsWith('fea') || normalized.startsWith('feb')) return true;
+
+  // Unique local addresses (fc00::/7 - includes fc00::/8 and fd00::/8)
+  if (normalized.startsWith('fc') || normalized.startsWith('fd')) return true;
+
+  // IPv4-mapped IPv6 addresses - Node normalizes these to hex format (::ffff:XXXX:XXXX)
+  // e.g., ::ffff:127.0.0.1 becomes ::ffff:7f00:1
+  const ipv4MappedHexMatch = normalized.match(/^::ffff:([0-9a-f]+:[0-9a-f]+)$/);
+  if (ipv4MappedHexMatch) {
+    const ipv4 = hexToIpv4(ipv4MappedHexMatch[1]);
+    if (ipv4) {
+      return isPrivateOrReservedIpv4(ipv4);
+    }
+  }
+
+  // IPv4-compatible IPv6 addresses (deprecated) - also normalized to hex (::XXXX:XXXX)
+  // e.g., ::127.0.0.1 becomes ::7f00:1
+  const ipv4CompatHexMatch = normalized.match(/^::([0-9a-f]+:[0-9a-f]+)$/);
+  if (ipv4CompatHexMatch) {
+    const ipv4 = hexToIpv4(ipv4CompatHexMatch[1]);
+    if (ipv4) {
+      return isPrivateOrReservedIpv4(ipv4);
+    }
+  }
+
+  // Also check dotted-decimal format in case it's not normalized (defensive)
+  const ipv4MappedDotMatch = normalized.match(/^::ffff:(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (ipv4MappedDotMatch) {
+    return isPrivateOrReservedIpv4(ipv4MappedDotMatch[1]);
+  }
+
+  const ipv4CompatDotMatch = normalized.match(/^::(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/);
+  if (ipv4CompatDotMatch) {
+    return isPrivateOrReservedIpv4(ipv4CompatDotMatch[1]);
+  }
+
+  return false;
+}
+
+/**
+ * Checks if an IPv4 address is in a private or reserved range (SSRF protection)
+ * @param ip - The IPv4 address to check (e.g., "192.168.1.1")
+ * @returns true if the IP is private/reserved and should be blocked
+ */
+function isPrivateOrReservedIpv4(ip: string): boolean {
   const parts = ip.split('.').map(Number);
   if (parts.length !== 4 || parts.some(p => isNaN(p) || p < 0 || p > 255)) {
     return false; // Invalid IP format - let other validation handle it
@@ -153,65 +233,79 @@ function isPrivateOrReservedIp(ip: string): boolean {
 }
 
 /**
- * Validates if a string is a valid hostname
- * @param hostname - The hostname to validate
+ * Checks if an IP address (IPv4 or IPv6) is in a private or reserved range (SSRF protection)
+ * @param ip - The IP address to check (e.g., "192.168.1.1", "::1", "fe80::1")
+ * @returns true if the IP is private/reserved and should be blocked
+ */
+function isPrivateOrReservedIp(ip: string): boolean {
+  // Check if it's an IPv6 address (contains colons)
+  if (ip.includes(':')) {
+    return isPrivateOrReservedIpv6(ip);
+  }
+
+  // Otherwise treat as IPv4
+  return isPrivateOrReservedIpv4(ip);
+}
+
+/**
+ * Validates if a string is a valid hostname for WebSocket relay URLs.
+ * This function receives the hostname portion from URL parsing (without port).
+ * For IPv6 addresses, the URL parser strips brackets, so "::1" not "[::1]".
+ *
+ * @param hostname - The hostname to validate (no port)
  * @returns boolean indicating if the hostname is valid
  */
 function isValidHostname(hostname: string): boolean {
   // Check for basic invalid cases
   if (!hostname || hostname.length === 0) return false;
-  if (hostname.startsWith('.') || hostname.endsWith('.')) return false;
-  if (hostname.includes('..')) return false;
-
-  // Valid hostname patterns:
-  // - Domain names: example.com, relay.nostr.com, sub.domain.example.com
-  // - IP addresses: Only public IPs (private ranges blocked for SSRF protection)
-  // - With port: example.com:8080, 203.0.113.1:7777
-
-  // Split hostname and port if present
-  const parts = hostname.split(':');
-  if (parts.length > 2) return false; // Too many colons
-
-  const host = parts[0];
-  const port = parts[1];
-
-  // Validate port if present
-  if (port) {
-    const portNum = parseInt(port, 10);
-    if (isNaN(portNum) || portNum < 1 || portNum > 65535) return false;
-  }
 
   // SSRF Protection: Block localhost
-  if (host === 'localhost') return false;
+  if (hostname === 'localhost') return false;
 
-  // Validate the host part
-  // Check if it's an IP address
-  const ipPattern = /^(\d{1,3}\.){3}\d{1,3}$/;
-  if (ipPattern.test(host)) {
-    // Validate IP address ranges
-    const ipParts = host.split('.').map(Number);
-    if (!ipParts.every(part => part >= 0 && part <= 255)) return false;
+  // Check if it's an IPv6 address first (contains colons)
+  // Note: URL parser strips brackets, so we receive raw IPv6 like "::1" or "2001:db8::1"
+  if (hostname.includes(':')) {
+    // Basic IPv6 format validation (hex digits and colons only)
+    const ipv6Pattern = /^[a-fA-F0-9:]+$/;
+    if (!ipv6Pattern.test(hostname)) return false;
 
-    // SSRF Protection: Block private/reserved IP ranges
-    if (isPrivateOrReservedIp(host)) return false;
+    // SSRF Protection: Block private/reserved IPv6 ranges
+    if (isPrivateOrReservedIp(hostname)) return false;
 
     return true;
   }
-  
+
+  // Domain/IPv4 validation (no colons)
+  if (hostname.startsWith('.') || hostname.endsWith('.')) return false;
+  if (hostname.includes('..')) return false;
+
+  // Check if it's an IPv4 address
+  const ipv4Pattern = /^(\d{1,3}\.){3}\d{1,3}$/;
+  if (ipv4Pattern.test(hostname)) {
+    // Validate IP address ranges
+    const ipParts = hostname.split('.').map(Number);
+    if (!ipParts.every(part => part >= 0 && part <= 255)) return false;
+
+    // SSRF Protection: Block private/reserved IP ranges
+    if (isPrivateOrReservedIp(hostname)) return false;
+
+    return true;
+  }
+
   // Check if it's a valid domain name with at least one dot (for relay URLs we expect proper domains)
-  if (!host.includes('.')) {
+  if (!hostname.includes('.')) {
     // Single-label hostnames are generally not valid for WebSocket relays
     // except for special cases like localhost (handled above)
     return false;
   }
-  
+
   const domainPattern = /^[a-zA-Z0-9][a-zA-Z0-9.-]*[a-zA-Z0-9]$/;
-  if (!domainPattern.test(host)) return false;
-  
+  if (!domainPattern.test(hostname)) return false;
+
   // Additional checks for domain names
-  const labels = host.split('.');
+  const labels = hostname.split('.');
   if (labels.length < 2) return false; // Must have at least domain.tld
-  
+
   return labels.every(label => {
     // Each label should be 1-63 characters
     if (label.length === 0 || label.length > 63) return false;
@@ -279,17 +373,22 @@ export function formatRelayUrl(url: string): RelayUrlValidationResult {
   let isValid = false;
   try {
     const urlObj = new URL(formatted);
-    
+
     // Check protocol
     if (urlObj.protocol !== 'ws:' && urlObj.protocol !== 'wss:') {
       isValid = false;
     } else {
       // Validate the hostname part
-      const hostname = urlObj.port ? `${urlObj.hostname}:${urlObj.port}` : urlObj.hostname;
-      isValid = isValidHostname(hostname) && 
+      // Note: Node's URL parser keeps brackets for IPv6 (e.g., "[::1]").
+      // Strip them for validation since isValidHostname expects raw IP.
+      let hostname = urlObj.hostname;
+      if (hostname.startsWith('[') && hostname.endsWith(']')) {
+        hostname = hostname.slice(1, -1);
+      }
+      isValid = isValidHostname(hostname) &&
                 formatted.length > 6 &&
                 !formatted.includes(' ') &&
-                formatted !== 'wss://' && 
+                formatted !== 'wss://' &&
                 formatted !== 'ws://';
     }
   } catch {

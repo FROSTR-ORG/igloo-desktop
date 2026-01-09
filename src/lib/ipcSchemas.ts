@@ -60,12 +60,14 @@ export const DecodedGroupSchema = z.object({
 /** Share credential: base64url encoded, reasonable max for FROST shares */
 export const ShareCredentialSchema = z.string()
   .min(1, 'Share credential is required')
-  .max(5000, 'Share credential exceeds maximum length');
+  .max(5000, 'Share credential exceeds maximum length')
+  .refine(s => s.trim().length > 0, 'Share credential cannot be only whitespace');
 
 /** Group credential: encoded group key data */
 export const GroupCredentialSchema = z.string()
   .min(1, 'Group credential is required')
-  .max(5000, 'Group credential exceeds maximum length');
+  .max(5000, 'Group credential exceeds maximum length')
+  .refine(s => s.trim().length > 0, 'Group credential cannot be only whitespace');
 
 /** Schema for save-share IPC handler */
 export const SaveShareSchema = z.object({

@@ -268,51 +268,157 @@ describe('sanitizeUserError', () => {
 });
 
 describe('SSRF Protection in formatRelayUrl', () => {
-  it('should block localhost', () => {
-    const result = formatRelayUrl('wss://localhost:8080');
-    expect(result.isValid).toBe(false);
+  // ==========================================================================
+  // IPv4 SSRF Protection
+  // ==========================================================================
+  describe('IPv4 SSRF protection', () => {
+    it('should block localhost', () => {
+      const result = formatRelayUrl('wss://localhost:8080');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block 127.0.0.1 loopback', () => {
+      const result = formatRelayUrl('wss://127.0.0.1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block entire 127.x.x.x loopback range', () => {
+      expect(formatRelayUrl('wss://127.0.0.1').isValid).toBe(false);
+      expect(formatRelayUrl('wss://127.255.255.255').isValid).toBe(false);
+      expect(formatRelayUrl('wss://127.1.2.3').isValid).toBe(false);
+    });
+
+    it('should block 10.x.x.x private range', () => {
+      const result = formatRelayUrl('wss://10.0.0.1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block 172.16-31.x.x private range', () => {
+      expect(formatRelayUrl('wss://172.16.0.1').isValid).toBe(false);
+      expect(formatRelayUrl('wss://172.31.255.255').isValid).toBe(false);
+      // 172.15 and 172.32 should be allowed (not in private range)
+      expect(formatRelayUrl('wss://172.15.0.1').isValid).toBe(true);
+      expect(formatRelayUrl('wss://172.32.0.1').isValid).toBe(true);
+    });
+
+    it('should block 192.168.x.x private range', () => {
+      const result = formatRelayUrl('wss://192.168.1.1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block 169.254.x.x link-local', () => {
+      const result = formatRelayUrl('wss://169.254.1.1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block 0.x.x.x reserved range', () => {
+      const result = formatRelayUrl('wss://0.0.0.1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should allow public IP addresses', () => {
+      expect(formatRelayUrl('wss://8.8.8.8').isValid).toBe(true);
+      expect(formatRelayUrl('wss://203.0.113.50').isValid).toBe(true);
+    });
   });
 
-  it('should block 127.0.0.1 loopback', () => {
-    const result = formatRelayUrl('wss://127.0.0.1');
-    expect(result.isValid).toBe(false);
+  // ==========================================================================
+  // IPv6 SSRF Protection
+  // ==========================================================================
+  describe('IPv6 SSRF protection', () => {
+    // Note: IPv6 addresses in URLs must be enclosed in brackets, e.g., wss://[::1]:8080
+    it('should block IPv6 loopback (::1)', () => {
+      const result = formatRelayUrl('wss://[::1]');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block IPv6 loopback with port', () => {
+      const result = formatRelayUrl('wss://[::1]:8080');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block expanded IPv6 loopback', () => {
+      const result = formatRelayUrl('wss://[0:0:0:0:0:0:0:1]');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block IPv6 unspecified address (::)', () => {
+      const result = formatRelayUrl('wss://[::]');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block IPv6 link-local addresses (fe80::/10)', () => {
+      expect(formatRelayUrl('wss://[fe80::1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[fe80::abcd:1234]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[fe90::1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[fea0::1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[feb0::1]').isValid).toBe(false);
+    });
+
+    it('should block IPv6 unique local addresses (fc00::/7)', () => {
+      // fc00::/8
+      expect(formatRelayUrl('wss://[fc00::1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[fcff::1]').isValid).toBe(false);
+      // fd00::/8
+      expect(formatRelayUrl('wss://[fd00::1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[fdff::abcd]').isValid).toBe(false);
+    });
+
+    it('should allow public IPv6 addresses', () => {
+      // Google's public DNS IPv6
+      expect(formatRelayUrl('wss://[2001:4860:4860::8888]').isValid).toBe(true);
+      // Cloudflare's public DNS IPv6
+      expect(formatRelayUrl('wss://[2606:4700:4700::1111]').isValid).toBe(true);
+    });
+
+    it('should allow public IPv6 addresses with port', () => {
+      expect(formatRelayUrl('wss://[2001:4860:4860::8888]:443').isValid).toBe(true);
+    });
+
+    it('should reject unbracketed IPv6 addresses (invalid URL format)', () => {
+      // These are not valid URLs - IPv6 must be bracketed
+      const result = formatRelayUrl('wss://::1');
+      expect(result.isValid).toBe(false);
+    });
+
+    it('should block IPv4-mapped IPv6 loopback addresses', () => {
+      // These get normalized by Node to hex format (::ffff:7f00:1)
+      expect(formatRelayUrl('wss://[::ffff:127.0.0.1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[::ffff:127.0.0.2]').isValid).toBe(false);
+    });
+
+    it('should block IPv4-mapped IPv6 private addresses', () => {
+      // 10.x.x.x range
+      expect(formatRelayUrl('wss://[::ffff:10.0.0.1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[::ffff:10.255.255.255]').isValid).toBe(false);
+      // 192.168.x.x range
+      expect(formatRelayUrl('wss://[::ffff:192.168.1.1]').isValid).toBe(false);
+      // 172.16-31.x.x range
+      expect(formatRelayUrl('wss://[::ffff:172.16.0.1]').isValid).toBe(false);
+    });
+
+    it('should block IPv4-compatible IPv6 private addresses (deprecated format)', () => {
+      // These also get normalized to hex format
+      expect(formatRelayUrl('wss://[::127.0.0.1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[::10.0.0.1]').isValid).toBe(false);
+      expect(formatRelayUrl('wss://[::192.168.1.1]').isValid).toBe(false);
+    });
+
+    it('should allow IPv4-mapped IPv6 public addresses', () => {
+      // Google DNS mapped
+      expect(formatRelayUrl('wss://[::ffff:8.8.8.8]').isValid).toBe(true);
+      // Cloudflare DNS mapped
+      expect(formatRelayUrl('wss://[::ffff:1.1.1.1]').isValid).toBe(true);
+    });
   });
 
-  it('should block 10.x.x.x private range', () => {
-    const result = formatRelayUrl('wss://10.0.0.1');
-    expect(result.isValid).toBe(false);
-  });
-
-  it('should block 172.16-31.x.x private range', () => {
-    expect(formatRelayUrl('wss://172.16.0.1').isValid).toBe(false);
-    expect(formatRelayUrl('wss://172.31.255.255').isValid).toBe(false);
-    // 172.15 and 172.32 should be allowed (not in private range)
-    expect(formatRelayUrl('wss://172.15.0.1').isValid).toBe(true);
-    expect(formatRelayUrl('wss://172.32.0.1').isValid).toBe(true);
-  });
-
-  it('should block 192.168.x.x private range', () => {
-    const result = formatRelayUrl('wss://192.168.1.1');
-    expect(result.isValid).toBe(false);
-  });
-
-  it('should block 169.254.x.x link-local', () => {
-    const result = formatRelayUrl('wss://169.254.1.1');
-    expect(result.isValid).toBe(false);
-  });
-
-  it('should block 0.x.x.x reserved range', () => {
-    const result = formatRelayUrl('wss://0.0.0.1');
-    expect(result.isValid).toBe(false);
-  });
-
-  it('should allow public IP addresses', () => {
-    expect(formatRelayUrl('wss://8.8.8.8').isValid).toBe(true);
-    expect(formatRelayUrl('wss://203.0.113.50').isValid).toBe(true);
-  });
-
-  it('should allow public domain names', () => {
-    expect(formatRelayUrl('wss://relay.damus.io').isValid).toBe(true);
-    expect(formatRelayUrl('wss://nos.lol').isValid).toBe(true);
+  // ==========================================================================
+  // Domain Names
+  // ==========================================================================
+  describe('Domain name validation', () => {
+    it('should allow public domain names', () => {
+      expect(formatRelayUrl('wss://relay.damus.io').isValid).toBe(true);
+      expect(formatRelayUrl('wss://nos.lol').isValid).toBe(true);
+    });
   });
 });

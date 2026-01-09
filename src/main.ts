@@ -47,9 +47,33 @@ function sanitizeErrorForLog(error: unknown): string {
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-type EchoListener = { cleanup: () => void };
+/** Internal type returned by startEchoMonitor */
+type EchoListenerResult = {
+  cleanup: () => void;
+};
+
+/** Type stored in activeEchoListeners map, includes disposed flag for race condition prevention */
+type EchoListener = {
+  cleanup: () => void;
+  /** Flag to prevent double-cleanup race conditions */
+  disposed: boolean;
+};
 
 const activeEchoListeners = new Map<string, EchoListener>();
+
+/**
+ * Safely cleanup an echo listener, preventing double-cleanup race conditions.
+ * Sets disposed flag before calling cleanup to ensure idempotency.
+ */
+function safeCleanupListener(listener: EchoListener | undefined): void {
+  if (!listener || listener.disposed) return;
+  listener.disposed = true;
+  try {
+    listener.cleanup?.();
+  } catch {
+    // Ignore cleanup errors - listener may already be disposed
+  }
+}
 
 // Minimal SimplePool shim: unwrap single-element filter arrays to a plain object.
 // This matches igloo-cli/server behavior and avoids nested [[filter]] payloads
@@ -79,7 +103,7 @@ const startEchoMonitor = async (
   groupCredential: string,
   shareCredentials: string[],
   onEcho: (shareIndex: number, shareCredential: string, challenge?: string | null) => void
-): Promise<EchoListener> => {
+): Promise<EchoListenerResult> => {
   const handledShares = new Set<string>();
   let coreListener: { cleanup: () => void; isActive?: boolean } | null = null;
 
@@ -421,29 +445,29 @@ app.whenReady().then(() => {
 
     const { listenerId, groupCredential, shareCredentials } = parseResult.data;
 
-    // Clean up existing listener if any
+    // Clean up existing listener if any (uses safe cleanup to prevent race conditions)
     if (activeEchoListeners.has(listenerId)) {
       const existing = activeEchoListeners.get(listenerId);
-      try {
-        existing?.cleanup?.();
-      } catch {
-        console.warn('[EchoBridge] Failed to cleanup existing listener during start', { listenerId });
-      } finally {
-        activeEchoListeners.delete(listenerId);
-      }
+      safeCleanupListener(existing);
+      activeEchoListeners.delete(listenerId);
     }
 
-    // Normalize share credentials (trim whitespace)
+    // Normalize credentials (trim whitespace for consistent handling)
+    const normalizedGroupCredential = groupCredential.trim();
     const normalizedShares = shareCredentials
       .map(credential => credential.trim())
       .filter(credential => credential.length > 0);
+
+    if (normalizedGroupCredential.length === 0) {
+      return { ok: false, reason: 'invalid-group-credential', message: 'Group credential cannot be empty or whitespace-only' };
+    }
 
     if (normalizedShares.length === 0) {
       return { ok: false, reason: 'no-valid-shares' };
     }
 
     try {
-      const listener = await startEchoMonitor(groupCredential, normalizedShares, (shareIndex, shareCredential, challenge) => {
+      const listener = await startEchoMonitor(normalizedGroupCredential, normalizedShares, (shareIndex, shareCredential, challenge) => {
         if (!event.sender.isDestroyed()) {
           event.sender.send('echo-received', {
             listenerId,
@@ -454,18 +478,19 @@ app.whenReady().then(() => {
         }
       });
 
-      activeEchoListeners.set(listenerId, listener);
+      // Wrap the listener with disposed flag for race condition prevention
+      const wrappedListener: EchoListener = {
+        cleanup: listener.cleanup,
+        disposed: false,
+      };
+      activeEchoListeners.set(listenerId, wrappedListener);
 
       event.sender.once('destroyed', () => {
-        if (activeEchoListeners.has(listenerId)) {
-          const existing = activeEchoListeners.get(listenerId);
-          try {
-            existing?.cleanup?.();
-          } catch (err) {
-            console.warn('[EchoBridge] Listener cleanup failed on sender destroyed', { listenerId });
-          } finally {
-            activeEchoListeners.delete(listenerId);
-          }
+        // Use safe cleanup to prevent race conditions with echo-start/echo-stop
+        const existing = activeEchoListeners.get(listenerId);
+        if (existing && !existing.disposed) {
+          safeCleanupListener(existing);
+          activeEchoListeners.delete(listenerId);
         }
       });
 
@@ -492,15 +517,11 @@ app.whenReady().then(() => {
 
     const { listenerId } = parseResult.data;
 
+    // Use safe cleanup to prevent race conditions
     const existing = activeEchoListeners.get(listenerId);
     if (existing) {
-      try {
-        existing.cleanup?.();
-      } catch (err) {
-        console.warn('[EchoBridge] Listener cleanup failed on stop', { listenerId });
-      } finally {
-        activeEchoListeners.delete(listenerId);
-      }
+      safeCleanupListener(existing);
+      activeEchoListeners.delete(listenerId);
     }
 
     return { ok: true };

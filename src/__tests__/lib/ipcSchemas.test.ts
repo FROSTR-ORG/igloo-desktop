@@ -156,6 +156,23 @@ describe('IPC Validation Schemas', () => {
         expect(result.error.issues[0].message).toBe('Share credential exceeds maximum length');
       }
     });
+
+    it('rejects whitespace-only credentials', () => {
+      const whitespaceVariants = ['   ', '\t\t', '\n\n', '  \t\n  '];
+      for (const ws of whitespaceVariants) {
+        const result = ShareCredentialSchema.safeParse(ws);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Share credential cannot be only whitespace');
+        }
+      }
+    });
+
+    it('accepts credentials with leading/trailing whitespace and content', () => {
+      // These should pass because they have non-whitespace content after trimming
+      expect(ShareCredentialSchema.safeParse('  bfshare1abc123  ').success).toBe(true);
+      expect(ShareCredentialSchema.safeParse('\tcredential\t').success).toBe(true);
+    });
   });
 
   // ==========================================================================
@@ -181,6 +198,22 @@ describe('IPC Validation Schemas', () => {
       if (!result.success) {
         expect(result.error.issues[0].message).toBe('Group credential exceeds maximum length');
       }
+    });
+
+    it('rejects whitespace-only credentials', () => {
+      const whitespaceVariants = ['   ', '\t\t', '\n\n', '  \t\n  '];
+      for (const ws of whitespaceVariants) {
+        const result = GroupCredentialSchema.safeParse(ws);
+        expect(result.success).toBe(false);
+        if (!result.success) {
+          expect(result.error.issues[0].message).toBe('Group credential cannot be only whitespace');
+        }
+      }
+    });
+
+    it('accepts credentials with leading/trailing whitespace and content', () => {
+      expect(GroupCredentialSchema.safeParse('  bfgroup1abc123  ').success).toBe(true);
+      expect(GroupCredentialSchema.safeParse('\tcredential\t').success).toBe(true);
     });
   });
 
