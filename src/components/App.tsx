@@ -5,6 +5,7 @@ import Keyset from "@/components/Keyset"
 import Signer, { SignerHandle } from "@/components/Signer"
 import Recover from "@/components/Recover"
 import AddShare from "@/components/AddShare"
+import OnboardingWelcome from "@/components/OnboardingWelcome"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { HelpCircle, Plus, Upload } from "lucide-react"
@@ -33,6 +34,7 @@ const App: React.FC = () => {
   const [showingCreate, setShowingCreate] = useState(false);
   const [showingRecover, setShowingRecover] = useState(false);
   const [showingAddShare, setShowingAddShare] = useState(false);
+  const [showingOnboarding, setShowingOnboarding] = useState(true);
   const [keysetData, setKeysetData] = useState<KeysetData | null>(null);
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
@@ -269,6 +271,8 @@ const App: React.FC = () => {
       <ContentCard>
         {showingCreate ? (
           <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
+        ) : !hasShares && showingOnboarding ? (
+          <OnboardingWelcome onGetStarted={() => setShowingOnboarding(false)} />
         ) : (
           <>
             <div className="flex justify-between items-center mb-6">
