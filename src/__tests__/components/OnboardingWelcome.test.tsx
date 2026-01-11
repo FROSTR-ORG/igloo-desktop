@@ -88,6 +88,7 @@ describe('OnboardingWelcome Component', () => {
       render(<OnboardingWelcome onGetStarted={mockOnGetStarted} />);
 
       const link = screen.getByRole('link', { name: /igloo-android.*NIP-55/i });
+      expect(link).toHaveAttribute('href', 'https://github.com/FROSTR-ORG/igloo-android');
       expect(link).toHaveAttribute('target', '_blank');
       expect(link).toHaveAttribute('rel', 'noopener noreferrer');
     });

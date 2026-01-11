@@ -98,7 +98,7 @@ export const OnboardingWelcome: React.FC<OnboardingWelcomeProps> = ({ onGetStart
             <ExternalLink className="w-3 h-3" />
           </a>
           <a
-            href="https://github.com/nicegram/nicegram-android"
+            href="https://github.com/FROSTR-ORG/igloo-android"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-600/20 hover:bg-blue-600/30 border border-blue-600/30 rounded text-blue-300 text-xs transition-colors"
