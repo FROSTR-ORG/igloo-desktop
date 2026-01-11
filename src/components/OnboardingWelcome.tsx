@@ -74,7 +74,7 @@ export const OnboardingWelcome: React.FC<OnboardingWelcomeProps> = ({ onGetStart
         <h3 className="text-sm font-semibold text-blue-200">Using Your Keyset</h3>
         <p className="text-sm text-blue-100/80 leading-relaxed">
           Igloo Desktop creates keysets and runs as a signer. To sign into Nostr clients,
-          you'll need one of these apps with a share loaded:
+          you&apos;ll need one of these apps with a share loaded:
         </p>
         <div className="flex flex-wrap gap-2 pt-1">
           <a
