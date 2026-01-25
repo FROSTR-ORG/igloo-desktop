@@ -10,7 +10,7 @@
   "type": "module",
   "scripts": {
     "start": "cross-env NODE_ENV=development npm run build && electron .",
-    "build": "tsc && tsc -p tsconfig.preload.json && webpack --config webpack.config.cjs",
+    "build": "tsc -p tsconfig.build.json && tsc -p tsconfig.preload.json && webpack --config webpack.config.cjs",
     "watch": "tsc -w",
     "dev": "cross-env NODE_ENV=development concurrently \"webpack --config webpack.config.cjs --watch\" \"electron .\"",
     "test": "jest",
