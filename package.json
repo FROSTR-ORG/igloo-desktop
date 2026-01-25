@@ -133,7 +133,7 @@
     "cross-env": "^7.0.3",
     "css-loader": "^7.1.2",
     "electron": "^38.1.2",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.5.0",
     "eslint": "^9.28.0",
     "eslint-plugin-react": "^7.37.5",
     "eslint-plugin-react-hooks": "^5.2.0",
@@ -154,6 +154,7 @@
     "@eslint/plugin-kit": "^0.3.4",
     "form-data": "^4.0.4",
     "js-yaml": ">=4.1.1",
+    "tar": "^7.5.6",
     "tmp": "^0.2.4"
   },
   "dependencies": {
