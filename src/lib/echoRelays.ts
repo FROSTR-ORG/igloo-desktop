@@ -105,7 +105,85 @@ const dedupeKey = (url: string): string => {
   }
 };
 
-const normalizeList = (candidates?: unknown): string[] => {
+/**
+ * SECURITY: Check if a hostname resolves to localhost, loopback, or private IP ranges.
+ * Used to filter untrusted relay URLs from group credentials to prevent SSRF-like attacks.
+ *
+ * Blocked:
+ * - localhost, 127.0.0.1, ::1 (loopback)
+ * - 10.0.0.0/8 (Class A private)
+ * - 172.16.0.0/12 (Class B private)
+ * - 192.168.0.0/16 (Class C private)
+ * - 169.254.0.0/16 (link-local)
+ * - 0.0.0.0 (unspecified)
+ */
+const isPrivateOrLocalhost = (hostname: string): boolean => {
+  const lower = hostname.toLowerCase();
+
+  // Check for localhost variants
+  if (lower === 'localhost' || lower === 'localhost.localdomain') {
+    return true;
+  }
+
+  // Check for IPv6 loopback
+  if (lower === '::1' || lower === '[::1]') {
+    return true;
+  }
+
+  // Check for IPv4 patterns
+  const ipv4Match = lower.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (ipv4Match) {
+    const [, a, b, c, d] = ipv4Match.map(Number);
+
+    // Loopback: 127.0.0.0/8
+    if (a === 127) return true;
+
+    // Unspecified: 0.0.0.0
+    if (a === 0 && b === 0 && c === 0 && d === 0) return true;
+
+    // Class A private: 10.0.0.0/8
+    if (a === 10) return true;
+
+    // Class B private: 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
+    if (a === 172 && b >= 16 && b <= 31) return true;
+
+    // Class C private: 192.168.0.0/16
+    if (a === 192 && b === 168) return true;
+
+    // Link-local: 169.254.0.0/16
+    if (a === 169 && b === 254) return true;
+  }
+
+  return false;
+};
+
+/**
+ * SECURITY: Validate that a relay URL is safe to connect to.
+ * Returns false for malformed URLs or URLs pointing to private/localhost addresses.
+ * Only used for untrusted sources (group credentials), not user-configured relays.
+ */
+const isValidPublicRelayUrl = (url: string): boolean => {
+  try {
+    const parsed = new URL(url);
+
+    // Must be wss:// protocol
+    if (parsed.protocol !== 'wss:') {
+      return false;
+    }
+
+    // Check for private/localhost hostnames
+    if (isPrivateOrLocalhost(parsed.hostname)) {
+      return false;
+    }
+
+    return true;
+  } catch {
+    // Malformed URL
+    return false;
+  }
+};
+
+const normalizeList = (candidates?: unknown, filterPrivate = false): string[] => {
   if (!Array.isArray(candidates)) return [];
   const seen = new Set<string>();
   const output: string[] = [];
@@ -113,6 +191,12 @@ const normalizeList = (candidates?: unknown): string[] => {
     if (typeof value !== 'string') continue;
     const normalized = normalizeRelayUrl(value);
     if (!normalized) continue;
+
+    // SECURITY: When filterPrivate is true, reject private/localhost URLs
+    if (filterPrivate && !isValidPublicRelayUrl(normalized)) {
+      continue;
+    }
+
     const key = dedupeKey(normalized);
     if (seen.has(key)) continue;
     seen.add(key);
@@ -160,7 +244,9 @@ export const computeRelayPlan = ({
 
   const envRelays = normalizeList(envRelay ? [envRelay] : []);
   const explicit = normalizeList(explicitRelays ?? undefined);
-  const group = normalizeList(groupRelayCandidates);
+  // SECURITY: Filter private/localhost URLs from group credentials (untrusted source)
+  // to prevent SSRF-like attacks. User-configured relays are not filtered.
+  const group = normalizeList(groupRelayCandidates, true);
 
   const configured = readConfiguredRelaysSync();
   const defaults = normalizeList(

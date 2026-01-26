@@ -39,6 +39,8 @@ const App: React.FC = () => {
   const [showingNewKeyset, setShowingNewKeyset] = useState(false);
   const [signerData, setSignerData] = useState<SignerData | null>(null);
   const [hasShares, setHasShares] = useState(false);
+  // Track whether initial share discovery has completed to prevent onboarding flash
+  const [sharesLoaded, setSharesLoaded] = useState(false);
   const [activeTab, setActiveTab] = useState("signer");
   // Reference to the Signer component to call its stop method
   const signerRef = useRef<SignerHandle>(null);
@@ -48,6 +50,7 @@ const App: React.FC = () => {
     const checkForShares = async () => {
       const shares = await clientShareManager.getShares();
       setHasShares(Array.isArray(shares) && shares.length > 0);
+      setSharesLoaded(true);
     };
     checkForShares();
   }, []);
@@ -271,6 +274,11 @@ const App: React.FC = () => {
       <ContentCard>
         {showingCreate ? (
           <Create onKeysetCreated={handleKeysetCreated} onBack={() => setShowingCreate(false)} />
+        ) : !sharesLoaded ? (
+          // Lightweight loading state while checking for shares
+          <div className="flex items-center justify-center py-12">
+            <div className="text-blue-400 text-sm">Loading...</div>
+          </div>
         ) : !hasShares && showingOnboarding ? (
           <OnboardingWelcome onGetStarted={() => setShowingOnboarding(false)} />
         ) : (

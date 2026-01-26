@@ -618,11 +618,13 @@ const Signer = forwardRef<SignerHandle, SignerProps>(({ initialData }, ref) => {
     isMountedRef.current = true;
     // Cleanup function that runs when component unmounts
     return () => {
-      // SECURITY: Mark as unmounted FIRST to prevent any pending state updates
-      isMountedRef.current = false;
-      if (nodeRef.current) {
+      // SECURITY: Log before marking as unmounted to avoid state update after unmount
+      // The addLog call triggers setLogs which would warn if called after unmount
+      if (nodeRef.current && isMountedRef.current) {
         addLog('info', 'Signer stopped due to page navigation');
       }
+      // Mark as unmounted AFTER logging to prevent any other pending state updates
+      isMountedRef.current = false;
       cleanupNode();
     };
   }, [addLog, cleanupNode]); // Include dependencies

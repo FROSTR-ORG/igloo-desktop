@@ -770,33 +770,33 @@ const Recover: React.FC<RecoverProps> = ({
                   )}
                 </Button>
 
-              <Button
-                type="button"
-                onClick={handleToggleNsecReveal}
-                variant="outline"
-                className="bg-gray-700 hover:bg-gray-600 border-gray-600 text-sm"
-              >
-                {isNsecRevealed ? (
-                  <>
-                    <EyeOff className="w-4 h-4 mr-2" />
-                    Hide
-                  </>
-                ) : (
-                  <>
-                    <Eye className="w-4 h-4 mr-2" />
-                    Reveal
-                  </>
-                )}
-              </Button>
+                <Button
+                  type="button"
+                  onClick={handleToggleNsecReveal}
+                  variant="outline"
+                  className="bg-gray-700 hover:bg-gray-600 border-gray-600 text-sm"
+                >
+                  {isNsecRevealed ? (
+                    <>
+                      <EyeOff className="w-4 h-4 mr-2" />
+                      Hide
+                    </>
+                  ) : (
+                    <>
+                      <Eye className="w-4 h-4 mr-2" />
+                      Reveal
+                    </>
+                  )}
+                </Button>
 
-              <Button
-                type="button"
-                onClick={clearRecoveredNsec}
-                variant="outline"
-                className="bg-red-900/30 hover:bg-red-800/50 border-red-700/50 text-red-300 text-sm"
-              >
-                Clear
-              </Button>
+                <Button
+                  type="button"
+                  onClick={clearRecoveredNsec}
+                  variant="outline"
+                  className="bg-red-900/30 hover:bg-red-800/50 border-red-700/50 text-red-300 text-sm"
+                >
+                  Clear
+                </Button>
               </div>
 
               {/* Copy error feedback */}
