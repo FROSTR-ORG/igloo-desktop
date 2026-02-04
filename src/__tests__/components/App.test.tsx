@@ -79,6 +79,20 @@ jest.mock('@/components/Recover', () => {
   };
 });
 
+// Mock OnboardingWelcome to auto-dismiss in tests
+jest.mock('@/components/OnboardingWelcome', () => {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const React = require('react');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const MockOnboardingWelcome = ({ onGetStarted }: any) => {
+    React.useEffect(() => {
+      onGetStarted();
+    }, [onGetStarted]);
+    return <div data-testid="onboarding-welcome" />;
+  };
+  return { __esModule: true, default: MockOnboardingWelcome, OnboardingWelcome: MockOnboardingWelcome };
+});
+
 const mockClientShareManager = clientShareManager as jest.Mocked<typeof clientShareManager>;
 
 describe('App Component', () => {

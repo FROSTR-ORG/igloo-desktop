@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip } from "@/components/ui/tooltip";
 import { decodeGroup, decodeShare } from "@frostr/igloo-core";
-import { ipcRenderer } from 'electron';
 import SaveShare from './SaveShare';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { CURRENT_SHARE_VERSION } from '@/lib/encryption';
@@ -23,6 +22,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     shareIndex: null
   });
   const [showConfirmModal, setShowConfirmModal] = useState(false);
+  const [showGroupQrCode, setShowGroupQrCode] = useState(false);
   const [showQrCode, setShowQrCode] = useState<{
     show: boolean, 
     shareData: string | null,
@@ -52,7 +52,8 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     setShowSaveDialog({ show: true, shareIndex });
   };
 
-  const handleSaveComplete = async (password: string, salt: string, encryptedShare: string) => {
+  // SECURITY: Callback receives only salt and encrypted share - password is kept local to SaveShare
+  const handleSaveComplete = async (salt: string, encryptedShare: string) => {
     if (showSaveDialog.shareIndex === null) return;
 
     const decodedShare = decodedShares[showSaveDialog.shareIndex];
@@ -188,7 +189,7 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
     if (!decodedGroup || shareCredentials.length === 0) {
       if (echoListenerIdRef.current) {
         const listenerId = echoListenerIdRef.current;
-        void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+        void window.electronAPI.echoStop({ listenerId }).catch(() => {
           /* noop */
         });
         echoListenerIdRef.current = null;
@@ -196,10 +197,12 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       return undefined;
     }
 
-    const listenerId = `keyset-${groupCredential}`;
+    // Use truncated group_pk for a shorter, unique listener ID (group_pk uniquely identifies the group)
+    const listenerId = `keyset-${decodedGroup?.group_pk?.slice(0, 16) || groupCredential.slice(0, 16)}`;
     echoListenerIdRef.current = listenerId;
 
-    const handleIpcEcho = (_event: unknown, payload: { listenerId: string; shareIndex: number }) => {
+    // Set up echo received listener via preload API
+    const cleanupEchoListener = window.electronAPI.onEchoReceived((payload) => {
       if (!payload || payload.listenerId !== listenerId) {
         return;
       }
@@ -208,12 +211,18 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
         handledEchoSharesRef.current.add(payload.shareIndex);
         handleEchoReceived(payload.shareIndex);
       }
-    };
+    });
 
-    ipcRenderer.on('echo-received', handleIpcEcho as never);
+    // Set up echo error listener to handle errors during monitoring
+    const cleanupErrorListener = window.electronAPI.onEchoError((payload) => {
+      if (!payload || payload.listenerId !== listenerId) {
+        return;
+      }
+      console.error('Echo monitoring error:', payload.message || payload.reason);
+    });
 
-    void ipcRenderer
-      .invoke('echo-start', {
+    void window.electronAPI
+      .echoStart({
         listenerId,
         groupCredential,
         shareCredentials,
@@ -223,8 +232,9 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
       });
 
     return () => {
-      ipcRenderer.removeListener('echo-received', handleIpcEcho as never);
-      void ipcRenderer.invoke('echo-stop', { listenerId }).catch(() => {
+      cleanupEchoListener();
+      cleanupErrorListener();
+      void window.electronAPI.echoStop({ listenerId }).catch(() => {
         /* noop */
       });
       echoListenerIdRef.current = null;
@@ -286,6 +296,14 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                     className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
                   >
                     Copy
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowGroupQrCode(true)}
+                    className="text-blue-400 hover:text-blue-300 hover:bg-blue-900/30"
+                  >
+                    <QrCode className="w-4 h-4" />
                   </Button>
                   <Button
                     variant="ghost"
@@ -527,6 +545,32 @@ const Keyset: React.FC<KeysetProps> = ({ groupCredential, shareCredentials, name
                 }`}
               >
                 {showQrCode.status === 'success' ? 'Done' : 'Close'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showGroupQrCode && (
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center backdrop-blur-sm">
+          <div className="bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-sm">
+            <h3 className="text-xl font-semibold text-blue-200 mb-4">Group Credential QR Code</h3>
+            <div className="flex justify-center bg-white p-6 rounded-lg">
+              <QRCodeSVG
+                value={groupCredential}
+                size={250}
+                level="H"
+              />
+            </div>
+            <p className="mt-4 text-sm text-gray-400 text-center">
+              Share this QR code with other signers in your group
+            </p>
+            <div className="mt-6 flex justify-end">
+              <Button
+                onClick={() => setShowGroupQrCode(false)}
+                className="bg-blue-600 hover:bg-blue-700 text-blue-100"
+              >
+                Close
               </Button>
             </div>
           </div>

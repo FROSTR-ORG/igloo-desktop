@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { 
-  derive_secret_async, 
+import {
+  derive_secret_async,
   decrypt_payload,
   PBKDF2_ITERATIONS_DEFAULT,
   PBKDF2_ITERATIONS_LEGACY,
@@ -11,6 +11,7 @@ import { InputWithValidation } from '@/components/ui/input-with-validation';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import type { SharePolicy } from '@/types';
+import { VALIDATION_LIMITS, sanitizeUserError } from '@/lib/validation';
 
 interface LoadShareProps {
   share: {
@@ -43,9 +44,16 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
 
   const handlePasswordChange = (value: string) => {
     setPassword(value);
+    // No strict length validation - this component decrypts EXISTING shares where
+    // legacy shares may have passwords outside current PASSWORD_MAX limits.
+    // We only enforce a generous sanity limit (64KB) to prevent memory issues
+    // from accidental large pastes. Any real password is well under this limit.
     if (!value.trim()) {
       setIsPasswordValid(false);
       setPasswordError('Password is required');
+    } else if (value.length > VALIDATION_LIMITS.PASSWORD_LEGACY_MAX) {
+      setIsPasswordValid(false);
+      setPasswordError('Input too long');
     } else {
       setIsPasswordValid(true);
       setPasswordError(undefined);
@@ -115,7 +123,8 @@ const LoadShare: React.FC<LoadShareProps> = ({ share, onLoad, onCancel }) => {
         return;
       }
       setIsPasswordValid(false);
-      setPasswordError('Failed to decrypt share: ' + (err instanceof Error ? err.message : String(err)));
+      // SECURITY: Sanitize error to prevent leaking crypto implementation details
+      setPasswordError('Failed to decrypt share: ' + sanitizeUserError(err));
       setIsSubmitting(false);
     }
   };

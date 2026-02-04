@@ -9,6 +9,11 @@ import { generateKeysetWithSecret, generateNostrKeyPair, nsecToHex, validateNsec
 import { ArrowLeft, HelpCircle } from 'lucide-react';
 import { clientShareManager } from '@/lib/clientShareManager';
 import { InputWithValidation } from "@/components/ui/input-with-validation"
+import {
+  validatePositiveInteger,
+  validateShareName,
+  VALIDATION_LIMITS
+} from '@/lib/validation'
 
 interface CreateProps {
   onKeysetCreated: (data: { groupCredential: string; shareCredentials: string[]; name: string }) => void;
@@ -27,6 +32,8 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
   const [existingNames, setExistingNames] = useState<string[]>([]);
   const [isNameValid, setIsNameValid] = useState(true);
   const [nameError, setNameError] = useState<string | undefined>(undefined);
+  const [totalKeysError, setTotalKeysError] = useState<string | undefined>(undefined);
+  const [thresholdError, setThresholdError] = useState<string | undefined>(undefined);
 
   useEffect(() => {
     const loadExistingNames = async () => {
@@ -41,15 +48,58 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
 
   const handleNameChange = (value: string) => {
     setKeysetName(value);
-    if (value.trim()) {
-      const nameWithoutShare = value.split(' share ')[0];
-      const valid = !existingNames.includes(nameWithoutShare);
-      setIsNameValid(valid);
-      setNameError(valid ? undefined : 'This keyset name already exists');
-    } else {
-      setIsNameValid(false);
-      setNameError('Name is required');
+    const result = validateShareName(value, existingNames, VALIDATION_LIMITS.NAME_MAX);
+    setIsNameValid(result.isValid);
+    setNameError(result.error);
+  };
+
+  const handleTotalKeysChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const result = validatePositiveInteger(
+      e.target.value,
+      VALIDATION_LIMITS.TOTAL_KEYS_MIN,
+      VALIDATION_LIMITS.TOTAL_KEYS_MAX,
+      'Total keys'
+    );
+
+    // Only update state when input parses to a number; preserve previous value
+    // when empty/unparseable to ensure state always holds a valid number
+    if (result.value !== null) {
+      setTotalKeys(result.value);
     }
+    setTotalKeysError(result.error);
+
+    // Only cascade threshold validation when totalKeys is valid.
+    // When totalKeys is invalid, avoid confusing "must be at most X" errors
+    // that stem from the invalid totalKeys value rather than threshold itself.
+    if (result.isValid && result.value !== null) {
+      const thresholdResult = validatePositiveInteger(
+        threshold,
+        VALIDATION_LIMITS.THRESHOLD_MIN,
+        result.value,
+        'Threshold'
+      );
+      setThresholdError(thresholdResult.error);
+    }
+  };
+
+  const handleThresholdChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Determine if totalKeys is currently valid. When invalid, validate threshold
+    // against the max limit only to avoid confusing cascading errors.
+    const totalKeysIsValid =
+      totalKeys >= VALIDATION_LIMITS.TOTAL_KEYS_MIN &&
+      totalKeys <= VALIDATION_LIMITS.TOTAL_KEYS_MAX;
+
+    const result = validatePositiveInteger(
+      e.target.value,
+      VALIDATION_LIMITS.THRESHOLD_MIN,
+      totalKeysIsValid ? totalKeys : VALIDATION_LIMITS.TOTAL_KEYS_MAX,
+      'Threshold'
+    );
+
+    if (result.value !== null) {
+      setThreshold(result.value);
+    }
+    setThresholdError(result.error);
   };
 
   const handleGenerateNsec = async () => {
@@ -226,7 +276,7 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
                 <label htmlFor="total-keys" className="text-blue-200 text-sm font-medium">
                   Total Keys
                 </label>
-                <Tooltip 
+                <Tooltip
                   trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
                   content={
                     <p>The total number of key shares that will be created. Each share can be stored on a different device.</p>
@@ -237,19 +287,23 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               <Input
                 id="total-keys"
                 type="number"
-                min={2}
+                min={VALIDATION_LIMITS.TOTAL_KEYS_MIN}
+                max={VALIDATION_LIMITS.TOTAL_KEYS_MAX}
                 value={totalKeys}
-                onChange={(e) => setTotalKeys(Number(e.target.value))}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
+                onChange={handleTotalKeysChange}
+                className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full ${totalKeysError ? 'border-red-500' : ''}`}
                 disabled={isGenerating}
               />
+              {totalKeysError && (
+                <p className="text-red-400 text-xs mt-1">{totalKeysError}</p>
+              )}
             </div>
             <div className="space-y-2 w-full">
               <div className="flex items-center gap-1">
                 <label htmlFor="threshold" className="text-blue-200 text-sm font-medium">
                   Threshold
                 </label>
-                <Tooltip 
+                <Tooltip
                   trigger={<HelpCircle size={16} className="text-blue-400 cursor-pointer" />}
                   content={
                     <p>The minimum number of shares required to sign. Must be at least 2 and no more than the total number of keys.</p>
@@ -260,13 +314,16 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
               <Input
                 id="threshold"
                 type="number"
-                min={2}
+                min={VALIDATION_LIMITS.THRESHOLD_MIN}
                 max={totalKeys}
                 value={threshold}
-                onChange={(e) => setThreshold(Number(e.target.value))}
-                className="bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full"
+                onChange={handleThresholdChange}
+                className={`bg-gray-800/50 border-gray-700/50 text-blue-300 py-2 text-sm w-full ${thresholdError ? 'border-red-500' : ''}`}
                 disabled={isGenerating}
               />
+              {thresholdError && (
+                <p className="text-red-400 text-xs mt-1">{thresholdError}</p>
+              )}
             </div>
           </div>
         </div>
@@ -274,7 +331,15 @@ const Create: React.FC<CreateProps> = ({ onKeysetCreated, onBack }) => {
         <Button
           onClick={handleCreateKeyset}
           className="w-full py-5 bg-blue-600 hover:bg-blue-700 transition-colors duration-200 text-sm font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-          disabled={isGenerating || !keysetName.trim() || !nsec.trim() || !isValidNsec || !isNameValid}
+          disabled={
+            isGenerating ||
+            !keysetName.trim() ||
+            !nsec.trim() ||
+            !isValidNsec ||
+            !isNameValid ||
+            !!totalKeysError ||
+            !!thresholdError
+          }
         >
           {isGenerating ? "Creating..." : "Create keyset"}
         </Button>

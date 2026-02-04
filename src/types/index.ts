@@ -187,6 +187,16 @@ export interface NobleCipher {
   decrypt: (data: Uint8Array) => Uint8Array;
 }
 
+// Relay planning types
+export interface RelayPlan {
+  relays: string[];
+  envRelays: string[];
+  defaultRelays: string[];
+  groupRelays: string[];
+  explicitRelays: string[];
+  groupExtras: string[];
+}
+
 // Event handler types
 export type EventCallback<T = unknown> = (data: T) => void;
 export type BifrostEventCallback = (reason: string, data: BifrostMessage) => void;

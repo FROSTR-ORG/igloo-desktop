@@ -2,6 +2,29 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <!--
+      CSP Security Notes:
+      - 'unsafe-inline' for style-src: Required for Tailwind CSS and some React component
+        libraries. Nonce-based approach would require build-time or server-side generation
+        which isn't practical for static Electron HTML. Lower priority since style injection
+        is less dangerous than script injection.
+      - wss: wildcard for connect-src: Required because users configure arbitrary nostr
+        relays and group credentials embed relay URLs. Cannot be restricted without
+        breaking core app functionality. Note: ws:// (non-TLS) is intentionally blocked;
+        all relay connections must use secure WebSockets.
+    -->
+    <meta http-equiv="Content-Security-Policy" content="
+      default-src 'self';
+      script-src 'self';
+      style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
+      font-src 'self' https://fonts.gstatic.com;
+      img-src 'self' data:;
+      connect-src 'self' wss:;
+      object-src 'none';
+      base-uri 'self';
+      form-action 'none';
+      frame-ancestors 'none';
+    ">
     <title>igloo</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

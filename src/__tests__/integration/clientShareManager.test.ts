@@ -1,6 +1,9 @@
 import { clientShareManager, type IglooShare } from '../../lib/clientShareManager';
-import { mockIpcRenderer } from '../setup';
+import { mockElectronAPI } from '../setup';
 import { decodeShare } from '@frostr/igloo-core';
+
+// Helper to generate realistic 64-char hex strings for scalar values
+const toScalarHex = (seed: number): string => seed.toString(16).padStart(64, '0');
 
 describe('ClientShareManager (Desktop Integration)', () => {
   beforeEach(() => {
@@ -22,16 +25,16 @@ describe('ClientShareManager (Desktop Integration)', () => {
         }
       ];
 
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
       const result = await clientShareManager.getShares();
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
+      expect(mockElectronAPI.getShares).toHaveBeenCalled();
       expect(result).toEqual(mockShares);
     });
 
     it('should return false when IPC call fails', async () => {
-      mockIpcRenderer.invoke.mockRejectedValue(new Error('IPC Error'));
+      mockElectronAPI.getShares.mockRejectedValue(new Error('IPC Error'));
 
       const result = await clientShareManager.getShares();
 
@@ -49,11 +52,11 @@ describe('ClientShareManager (Desktop Integration)', () => {
         groupCredential: 'group'
       };
 
-      mockIpcRenderer.invoke.mockResolvedValue(true);
+      mockElectronAPI.saveShare.mockResolvedValue(true);
 
       const result = await clientShareManager.saveShare(testShare);
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('save-share', testShare);
+      expect(mockElectronAPI.saveShare).toHaveBeenCalledWith(testShare);
       expect(result).toBe(true);
     });
 
@@ -66,7 +69,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
         groupCredential: 'group'
       };
 
-      mockIpcRenderer.invoke.mockRejectedValue(new Error('Save failed'));
+      mockElectronAPI.saveShare.mockRejectedValue(new Error('Save failed'));
 
       const result = await clientShareManager.saveShare(testShare);
 
@@ -83,7 +86,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'abc123' }
+          metadata: { binder_sn: toScalarHex(1001) }
         },
         {
           id: 'share-2',
@@ -91,18 +94,18 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'def456' }
+          metadata: { binder_sn: toScalarHex(1002) }
         }
       ];
 
-      // Mock get-shares to return all shares, and let frontend filtering handle the rest
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      // Mock getShares to return all shares, and let frontend filtering handle the rest
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('abc123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1001));
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
+      expect(mockElectronAPI.getShares).toHaveBeenCalled();
       expect(result).toHaveLength(1);
-      expect(result[0].metadata?.binder_sn).toBe('abc123');
+      expect(result[0].metadata?.binder_sn).toBe(toScalarHex(1001));
     });
 
     it('should return empty array when no shares match', async () => {
@@ -113,7 +116,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'xyz789' }
+          metadata: { binder_sn: toScalarHex(1003) }
         },
         {
           id: 'share-2',
@@ -121,7 +124,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'mno456' }
+          metadata: { binder_sn: toScalarHex(1004) }
         },
         {
           id: 'share-3',
@@ -133,12 +136,12 @@ describe('ClientShareManager (Desktop Integration)', () => {
         }
       ];
 
-      // Mock get-shares to return shares that don't match the searched binder_sn
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      // Mock getShares to return shares that don't match the searched binder_sn
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('abc123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1001));
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
+      expect(mockElectronAPI.getShares).toHaveBeenCalled();
       expect(result).toEqual([]);
     });
 
@@ -150,7 +153,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data1',
           salt: 'salt1',
           groupCredential: 'group1',
-          metadata: { binder_sn: 'common123' }
+          metadata: { binder_sn: toScalarHex(1005) }
         },
         {
           id: 'share-2',
@@ -158,7 +161,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data2',
           salt: 'salt2',
           groupCredential: 'group2',
-          metadata: { binder_sn: 'common123' }
+          metadata: { binder_sn: toScalarHex(1005) }
         },
         {
           id: 'share-3',
@@ -166,19 +169,19 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data3',
           salt: 'salt3',
           groupCredential: 'group3',
-          metadata: { binder_sn: 'different456' }
+          metadata: { binder_sn: toScalarHex(1006) }
         }
       ];
 
-      // Mock get-shares to return all shares, and let frontend filtering handle the rest
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      // Mock getShares to return all shares, and let frontend filtering handle the rest
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('common123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1005));
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
+      expect(mockElectronAPI.getShares).toHaveBeenCalled();
       expect(result).toHaveLength(2);
-      expect(result[0].metadata?.binder_sn).toBe('common123');
-      expect(result[1].metadata?.binder_sn).toBe('common123');
+      expect(result[0].metadata?.binder_sn).toBe(toScalarHex(1005));
+      expect(result[1].metadata?.binder_sn).toBe(toScalarHex(1005));
       expect(result[0].id).toBe('share-1');
       expect(result[1].id).toBe('share-2');
     });
@@ -203,18 +206,18 @@ describe('ClientShareManager (Desktop Integration)', () => {
         }
       ];
 
-      // Mock get-shares to return shares without metadata
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      // Mock getShares to return shares without metadata
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
       const result = await clientShareManager.findSharesByBinderSN('abc12345');
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('get-shares');
+      expect(mockElectronAPI.getShares).toHaveBeenCalled();
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe('share-abc12345-suffix');
     });
 
     it('should handle error when getShares returns false', async () => {
-      mockIpcRenderer.invoke.mockResolvedValue(false);
+      mockElectronAPI.getShares.mockResolvedValue(false);
 
       const result = await clientShareManager.findSharesByBinderSN('abc123');
 
@@ -246,12 +249,12 @@ describe('ClientShareManager (Desktop Integration)', () => {
 
       // Mock decodeShare to return different binder_sn values
       (decodeShare as jest.Mock)
-        .mockReturnValueOnce({ binder_sn: 'target123' })
-        .mockReturnValueOnce({ binder_sn: 'other456' });
+        .mockReturnValueOnce({ binder_sn: toScalarHex(1007) })
+        .mockReturnValueOnce({ binder_sn: toScalarHex(1008) });
 
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('target123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1007));
 
       expect(decodeShare).toHaveBeenCalledTimes(2);
       expect(decodeShare).toHaveBeenCalledWith('encoded-share-credential-1');
@@ -263,7 +266,7 @@ describe('ClientShareManager (Desktop Integration)', () => {
     it('should handle decodeShare errors gracefully', async () => {
       const mockShares: IglooShare[] = [
         {
-          id: 'baz',  // Simple ID that won't match  
+          id: 'baz',  // Simple ID that won't match
           name: 'Share 1',
           share: 'data',
           salt: 'salt',
@@ -287,11 +290,11 @@ describe('ClientShareManager (Desktop Integration)', () => {
         .mockImplementationOnce(() => {
           throw new Error('Invalid share credential');
         })
-        .mockReturnValueOnce({ binder_sn: 'target123' });
+        .mockReturnValueOnce({ binder_sn: toScalarHex(1007) });
 
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('target123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1007));
 
       expect(decodeShare).toHaveBeenCalledTimes(2);
       expect(result).toHaveLength(1);
@@ -306,14 +309,14 @@ describe('ClientShareManager (Desktop Integration)', () => {
           share: 'data',
           salt: 'salt',
           groupCredential: 'group',
-          metadata: { binder_sn: 'target123' },
+          metadata: { binder_sn: toScalarHex(1007) },
           shareCredential: 'encoded-credential'
         }
       ];
 
-      mockIpcRenderer.invoke.mockResolvedValue(mockShares);
+      mockElectronAPI.getShares.mockResolvedValue(mockShares);
 
-      const result = await clientShareManager.findSharesByBinderSN('target123');
+      const result = await clientShareManager.findSharesByBinderSN(toScalarHex(1007));
 
       // decodeShare should not be called since metadata match takes precedence
       expect(decodeShare).not.toHaveBeenCalled();
@@ -326,26 +329,26 @@ describe('ClientShareManager (Desktop Integration)', () => {
 
   describe('deleteShare', () => {
     it('should delete share via Electron main process', async () => {
-      mockIpcRenderer.invoke.mockResolvedValue(true);
+      mockElectronAPI.deleteShare.mockResolvedValue(true);
 
       const result = await clientShareManager.deleteShare('share-id');
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('delete-share', 'share-id');
+      expect(mockElectronAPI.deleteShare).toHaveBeenCalledWith('share-id');
       expect(result).toBe(true);
     });
   });
 
   describe('openShareLocation', () => {
     it('should open share location in file explorer', async () => {
-      mockIpcRenderer.invoke.mockResolvedValue(undefined);
+      mockElectronAPI.openShareLocation.mockResolvedValue({ ok: true });
 
       await clientShareManager.openShareLocation('share-id');
 
-      expect(mockIpcRenderer.invoke).toHaveBeenCalledWith('open-share-location', 'share-id');
+      expect(mockElectronAPI.openShareLocation).toHaveBeenCalledWith('share-id');
     });
 
     it('should handle errors gracefully', async () => {
-      mockIpcRenderer.invoke.mockRejectedValue(new Error('Failed to open'));
+      mockElectronAPI.openShareLocation.mockRejectedValue(new Error('Failed to open'));
 
       // Should not throw
       await expect(clientShareManager.openShareLocation('share-id')).resolves.toBeUndefined();
